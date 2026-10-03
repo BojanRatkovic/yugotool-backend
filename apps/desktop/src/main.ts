@@ -18,7 +18,7 @@ import {
 } from "electron";
 import { followEvents } from "./events";
 import { quitWarning, readPrefs, themeSchema, WINDOW_BACKGROUND, writePrefs } from "./prefs";
-import { loginShellPath } from "./shell-env";
+import { loginShellPath, withWellKnownDirs } from "./shell-env";
 import { flagBitmap, trayMenuTemplate, trayTitle } from "./tray-menu";
 
 const STATIC = path.join(__dirname, "..", "static");
@@ -31,7 +31,8 @@ if (!app.requestSingleInstanceLock()) app.quit();
 
 // Finder-launched apps get launchd's PATH; take the login shell's so git, gh,
 // nvm and temporal resolve. API and worker run on Electron's own Node.
-process.env["PATH"] = loginShellPath() ?? process.env["PATH"];
+const shellPath = loginShellPath();
+process.env["PATH"] = withWellKnownDirs(shellPath.path ?? process.env["PATH"] ?? "");
 /**
  * Packaged app layout (scripts/dist.mjs): code in Resources/app, the web UI in
  * Resources/web, the temporal CLI in Resources/bin. A checkout uses its siblings.
@@ -68,6 +69,11 @@ let asking = false;
 
 // Crash logs stay on this Mac: minidumps in ~/.zastava/crashes, the rest in logs/desktop.log.
 const log = new LogFile(config.logsDir, "desktop");
+log.line(
+  shellPath.error
+    ? `PATH: login shell failed, using fallback (${shellPath.error}): ${process.env["PATH"]}`
+    : `PATH: ${process.env["PATH"]}`,
+);
 app.setPath("crashDumps", path.join(config.home, "crashes"));
 crashReporter.start({ uploadToServer: false });
 process.on("uncaughtException", (error) => log.line(`uncaught: ${error.stack ?? String(error)}`));

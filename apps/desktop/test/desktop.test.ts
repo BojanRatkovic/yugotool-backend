@@ -2,7 +2,7 @@ import type { SupervisorStatus } from "@zastava/supervisor";
 import { describe, expect, it, vi } from "vitest";
 import { parseSse } from "../src/events";
 import { quitWarning, readPrefs } from "../src/prefs";
-import { parseShellPath } from "../src/shell-env";
+import { loginShellPath, parseShellPath, withWellKnownDirs } from "../src/shell-env";
 import { flagBitmap, trayMenuTemplate, trayTitle } from "../src/tray-menu";
 
 describe("parseShellPath", () => {
@@ -12,6 +12,18 @@ describe("parseShellPath", () => {
   });
   it("returns null without both markers", () => {
     expect(parseShellPath("__ZASTAVA_PATH__/usr/bin")).toBeNull();
+  });
+});
+
+describe("withWellKnownDirs", () => {
+  it("puts missing Homebrew dirs in front of launchd's PATH", () => {
+    expect(withWellKnownDirs("/usr/bin:/bin")).toBe(
+      "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin",
+    );
+  });
+  it("leaves a PATH that already has them as is", () => {
+    const full = "/Users/me/.nvm/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin";
+    expect(withWellKnownDirs(full)).toBe(full);
   });
 });
 
@@ -110,5 +122,13 @@ describe("quitWarning", () => {
 describe("readPrefs", () => {
   it("falls back to dark for a missing or broken file", () => {
     expect(readPrefs("/nonexistent/desktop.json")).toEqual({ theme: "dark" });
+  });
+});
+
+describe("loginShellPath", () => {
+  it("reads the PATH a login shell exports", () => {
+    const result = loginShellPath("/bin/sh");
+    expect(result.error).toBeNull();
+    expect(result.path).toContain("/usr/bin");
   });
 });
