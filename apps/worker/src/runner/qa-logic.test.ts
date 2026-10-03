@@ -94,6 +94,15 @@ describe("newConsoleErrors", () => {
       ),
     ).toEqual(["Uncaught: x is not defined"]);
   });
+
+  it("ignores the port on a project host too", () => {
+    expect(
+      newConsoleErrors(
+        ["Request failed: http://app.example.localhost:5100/a.js (net::ERR)"],
+        ["Request failed: http://app.example.localhost:6200/a.js (net::ERR)"],
+      ),
+    ).toEqual([]);
+  });
 });
 
 const verdict = (over: Partial<QaVerdict> = {}): QaVerdict => ({

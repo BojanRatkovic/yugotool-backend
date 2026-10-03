@@ -25,6 +25,7 @@ import type {
   Line,
   PreviewDetection,
   ProjectRemote,
+  PreviewSessionStatus,
   PreviewStatus,
   PreviewTestResult,
   Project,
@@ -34,7 +35,9 @@ import type {
 import {
   CreateProjectDto,
   LineDto,
+  FinishSignInDto,
   PreviewDetectionDto,
+  PreviewSessionStatusDto,
   ProjectRemoteDto,
   PreviewStatusDto,
   PreviewTestResultDto,
@@ -45,12 +48,16 @@ import {
   UpdateProjectDto,
   UpdateRoutesDto,
 } from "./projects.dto";
+import { PreviewSessionService } from "./preview-session.service";
 import { ProjectsService } from "./projects.service";
 
 @ApiTags("projects")
 @Controller("projects")
 export class ProjectsController {
-  constructor(private readonly service: ProjectsService) {}
+  constructor(
+    private readonly service: ProjectsService,
+    private readonly sessions: PreviewSessionService,
+  ) {}
 
   @Get()
   @ApiOkResponse({ type: [ProjectDto] })
@@ -142,6 +149,38 @@ export class ProjectsController {
     @Body() body: UpdateRoutesDto,
   ): Promise<RouteMapStatus> {
     return this.service.updateRoutes(id, body);
+  }
+
+  /** The saved preview session (if any) and the sign-in in progress (if any). */
+  @Get(":id/preview/session")
+  @ApiOkResponse({ type: PreviewSessionStatusDto })
+  previewSession(@Param("id", ParseUUIDPipe) id: string): Promise<PreviewSessionStatus> {
+    return this.sessions.status(id);
+  }
+
+  /** Boots the preview and opens a browser window on this Mac to sign in. */
+  @Post(":id/preview/sign-in")
+  @HttpCode(202)
+  @ApiAcceptedResponse({ type: PreviewSessionStatusDto })
+  signIn(@Param("id", ParseUUIDPipe) id: string): Promise<PreviewSessionStatus> {
+    return this.sessions.start(id);
+  }
+
+  @Post(":id/preview/sign-in/finish")
+  @HttpCode(202)
+  @ApiAcceptedResponse({ type: PreviewSessionStatusDto })
+  finishSignIn(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() body: FinishSignInDto,
+  ): Promise<PreviewSessionStatus> {
+    return this.sessions.finish(id, body);
+  }
+
+  @Delete(":id/preview/session")
+  @HttpCode(204)
+  @ApiNoContentResponse()
+  forgetSession(@Param("id", ParseUUIDPipe) id: string): Promise<void> {
+    return this.sessions.forget(id);
   }
 
   @Get(":id/preview/screenshot")

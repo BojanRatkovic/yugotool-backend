@@ -284,6 +284,22 @@ export const previewSchema = z.object({
    * Null: themes are emulated via prefers-color-scheme only.
    */
   themeInit: z.string().max(2_000).nullable().default(null),
+  /**
+   * Host the browser opens the preview on (`http://<host>:$PORT`), for apps
+   * whose cookies, CORS or redirects expect a name, e.g. "app.example.localhost".
+   * It must resolve to this Mac (any *.localhost does). Null: localhost.
+   */
+  host: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .regex(
+      /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/,
+      "a host name, without scheme or port",
+    )
+    .max(253)
+    .nullable()
+    .default(null),
 });
 export type Preview = z.infer<typeof previewSchema>;
 
@@ -361,6 +377,65 @@ export const projectRemoteSchema = z.object({
 export type ProjectRemote = z.infer<typeof projectRemoteSchema>;
 
 /** The project's last preview test (persisted on disk by the worker), if any. */
+/**
+ * A signed-in browser session saved for the preview ("Sign in once"): cookies
+ * and localStorage every browser on the preview starts with.
+ */
+export const previewSessionSchema = z.object({
+  savedAt: isoDate,
+  cookieCount: z.number().int(),
+  /** Cookie domains and localStorage origins, for "signed in to …". */
+  domains: z.array(z.string()),
+});
+export type PreviewSession = z.infer<typeof previewSessionSchema>;
+
+/** The interactive sign-in: the worker boots the preview and opens a visible browser. */
+/** The parts of a Playwright storage state file ZASTAVA reads (the file holds more). */
+export const storageStateSchema = z.object({
+  cookies: z.array(z.object({ domain: z.string() }).loose()).default([]),
+  origins: z
+    .array(z.object({ origin: z.string(), localStorage: z.array(z.unknown()).default([]) }).loose())
+    .default([]),
+});
+export type StorageStateSummary = Pick<PreviewSession, "cookieCount" | "domains">;
+
+/** Cookie count and where the session applies: cookie domains + localStorage hosts. */
+export function summarizeStorageState(
+  state: z.infer<typeof storageStateSchema>,
+): StorageStateSummary {
+  const hosts = [
+    ...state.cookies.map((c) => c.domain.replace(/^\./, "")),
+    ...state.origins
+      .filter((o) => o.localStorage.length > 0)
+      .map((o) => o.origin.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "").replace(/\/.*$/, "")),
+  ];
+  return { cookieCount: state.cookies.length, domains: [...new Set(hosts)].toSorted() };
+}
+
+export const previewSignInSchema = z.object({
+  status: z.enum(["starting", "waiting", "saved", "cancelled", "failed"]),
+  /** The URL the browser window opened, once the preview is up. */
+  url: z.string().nullable(),
+  error: z.string().nullable(),
+  /** Install + start output tail, for a preview that did not come up. */
+  logs: z.string(),
+  startedAt: isoDate,
+  finishedAt: isoDate.nullable(),
+});
+export type PreviewSignIn = z.infer<typeof previewSignInSchema>;
+
+export const previewSessionStatusSchema = z.object({
+  session: previewSessionSchema.nullable(),
+  signIn: previewSignInSchema.nullable(),
+});
+export type PreviewSessionStatus = z.infer<typeof previewSessionStatusSchema>;
+
+export const finishSignInSchema = z.object({
+  /** save: keep what the browser holds now; cancel: discard it. */
+  action: z.enum(["save", "cancel"]),
+});
+export type FinishSignIn = z.infer<typeof finishSignInSchema>;
+
 export const previewStatusSchema = z.object({ last: previewTestResultSchema.nullable() });
 export type PreviewStatus = z.infer<typeof previewStatusSchema>;
 

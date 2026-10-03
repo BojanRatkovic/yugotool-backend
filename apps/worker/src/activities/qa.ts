@@ -34,7 +34,7 @@ import {
 import { and, asc, eq, ne } from "drizzle-orm";
 import type { Browser } from "playwright";
 import { z } from "zod";
-import { previewTestDir, runArtifactsDir } from "../runner/artifacts";
+import { existingSession, previewTestDir, runArtifactsDir } from "../runner/artifacts";
 import { localRunner } from "../runner/local-runner";
 import { PreviewError, portInUse, type RunningPreview, startPreview } from "../runner/preview";
 import {
@@ -206,6 +206,7 @@ export function createQaActivities(db: Database, deps: QaDeps) {
         .innerJoin(projects, eq(projects.id, workOrders.projectId))
         .where(eq(runs.id, runId));
       const preview = row?.preview ?? null;
+      const session = row ? existingSession(row.projectId) : null;
 
       const [qaRun] = await db
         .insert(qaRuns)
@@ -408,6 +409,7 @@ export function createQaActivities(db: Database, deps: QaDeps) {
               viewport: combo.viewport,
               theme: combo.theme,
               file: baseFile,
+              session,
             });
             baseErrors = shot.consoleErrors;
             baseError = shot.error;
@@ -431,6 +433,7 @@ export function createQaActivities(db: Database, deps: QaDeps) {
             viewport: combo.viewport,
             theme: combo.theme,
             file: path.join(artifacts, prRel),
+            session,
           });
           const consoleEntry = consoleByPath.get(combo.path) ?? { base: [], pr: [] };
           consoleEntry.base.push(...baseErrors);
@@ -568,6 +571,7 @@ export function createQaActivities(db: Database, deps: QaDeps) {
           prompt,
           prOrigin: prPreview.url,
           initScript: initScript(preview, station.themes[0] ?? "light", prPreview),
+          session,
           artifacts,
           agentDir,
           model: input.modelOverride ?? station.model,
@@ -723,6 +727,7 @@ export function createQaActivities(db: Database, deps: QaDeps) {
           viewport: "desktop",
           theme: "light",
           file: path.join(dir, "screenshot.png"),
+          session: existingSession(input.projectId),
         });
         const logs = tail(running.logs(), 200);
         return await finish({
@@ -884,6 +889,8 @@ export function createQaActivities(db: Database, deps: QaDeps) {
     prOrigin: string;
     /** The project's init snippet for the judge's browser; null when none. */
     initScript: string | null;
+    /** Saved sign-in the judge's browser starts with; null when none. */
+    session: string | null;
     artifacts: string;
     agentDir: string;
     model: string;
@@ -942,6 +949,7 @@ export function createQaActivities(db: Database, deps: QaDeps) {
                     "--viewport-size",
                     "1440x900",
                     ...(initScriptFile ? ["--init-script", initScriptFile] : []),
+                    ...(args.session ? ["--storage-state", args.session] : []),
                   ],
                 },
               },

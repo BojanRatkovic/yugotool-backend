@@ -34,3 +34,13 @@ export class ProjectHasActiveWorkError extends DomainError {
   readonly code = "project_has_active_work";
   readonly kind = "conflict";
 }
+
+export class PreviewSignInRunningError extends DomainError {
+  readonly code = "preview_sign_in_running";
+  readonly kind = "conflict";
+}
+
+export class PreviewSignInNotRunningError extends DomainError {
+  readonly code = "preview_sign_in_not_running";
+  readonly kind = "conflict";
+}

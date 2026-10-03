@@ -40,6 +40,7 @@ import { sandboxFor } from "../runner/sandbox";
 import { createCiActivities } from "./ci";
 import { createKnowledgeActivities } from "./knowledge";
 import { createPrBodyComposer } from "./pr-body";
+import { createPreviewSignInActivities } from "./preview-sign-in";
 import { createQaActivities } from "./qa";
 import { createRouteActivities } from "./routes";
 import { createShiftActivities } from "./shifts";
@@ -284,6 +285,7 @@ export function createActivities(
     ...createShiftActivities(db, { appendEvent, notify, invalidateBoard, notifyHumans }),
     ...createQaActivities(db, { appendEvent, notify }),
     ...createRouteActivities(db, { notify }),
+    ...createPreviewSignInActivities(db, { notify }),
     ...createCiActivities(db, { appendEvent, invalidateBoard, notifyHumans }),
     ...createKnowledgeActivities(db, { appendEvent, notify }),
 

@@ -163,6 +163,7 @@ function preview(p: Pick<Preview, "install" | "start"> & Partial<Preview>): Prev
     env: {},
     baseUrlPath: "/",
     themeInit: null,
+    host: null,
     ...p,
   };
 }

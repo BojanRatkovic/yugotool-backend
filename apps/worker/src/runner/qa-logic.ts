@@ -226,7 +226,9 @@ export function visualStatus(diffPct: number, thresholdPct: number): "pass" | "c
 }
 
 /** Console errors that exist on the PR but not on base (messages compared without ports). */
-const normalizeMessage = (m: string): string => m.replace(/localhost:\d+/g, "localhost").trim();
+// Covers a project host on *.localhost too (base and PR previews get different ports).
+const normalizeMessage = (m: string): string =>
+  m.replace(/\b((?:[a-z0-9-]+\.)*localhost):\d+/gi, "$1").trim();
 
 export function newConsoleErrors(base: string[], pr: string[]): string[] {
   const known = new Set(base.map(normalizeMessage));

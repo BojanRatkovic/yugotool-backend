@@ -91,6 +91,15 @@ function joinUrl(base: string, path: string): string {
   return `${base.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
 }
 
+/**
+ * Where browsers open the preview: the project's host (cookies, CORS and
+ * redirects may expect a name) or localhost. Previews saved before the field
+ * existed have no `host`.
+ */
+export function previewOrigin(preview: Preview, port: number): string {
+  return `http://${(preview.host as string | null | undefined) ?? "localhost"}:${port}`;
+}
+
 /** Full URL of `path` on a preview, honouring the project's baseUrlPath. */
 export function previewUrl(origin: string, preview: Preview, path: string): string {
   return joinUrl(joinUrl(origin, preview.baseUrlPath), path);
@@ -99,7 +108,9 @@ export function previewUrl(origin: string, preview: Preview, path: string): stri
 /**
  * Repos pin Node in `.nvmrc` / `.node-version`; the worker runs whatever Node
  * it was started with. With nvm installed, commands run under the pinned
- * version unless they already call nvm. Pure: the caller checks the files.
+ * version unless they already call nvm. `nvm install` (not `use`): the base
+ * branch may pin a version this Mac doesn't have yet — it is downloaded once,
+ * and the log says so. Pure: the caller checks the files.
  */
 export function withPinnedNode(
   command: string,
@@ -108,11 +119,12 @@ export function withPinnedNode(
 ): string {
   if (!nvmScript || /\bnvm\b/.test(command)) return command;
   const use = pin.nvmrc
-    ? "nvm use --silent"
+    ? "nvm install --no-progress"
     : pin.nodeVersion
-      ? 'nvm use --silent "$(cat .node-version)"'
+      ? 'nvm install --no-progress "$(cat .node-version)"'
       : null;
-  return use ? `. "${nvmScript}" && ${use} && ${command}` : command;
+  // Grouped, so every part of a compound command (`a & b`, `a; b`) gets the pinned Node.
+  return use ? `. "${nvmScript}" && ${use} && {\n${command}\n}` : command;
 }
 
 function pinnedNode(command: string, cwd: string, env: NodeJS.ProcessEnv): string {
@@ -216,8 +228,10 @@ export async function startPreview(options: PreviewOptions): Promise<RunningPrev
     }
   };
 
-  const origin = `http://localhost:${port}`;
-  const readyUrl = previewUrl(origin, preview, preview.readyPath);
+  // Probe on localhost (always this Mac); browsers use the project's host when set.
+  const probeOrigin = `http://localhost:${port}`;
+  const origin = previewOrigin(preview, port);
+  const readyUrl = previewUrl(probeOrigin, preview, preview.readyPath);
   const deadline = Date.now() + preview.readyTimeoutSec * 1000;
   try {
     for (;;) {

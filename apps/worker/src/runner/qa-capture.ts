@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { type Preview, QA_VIEWPORTS, type QaTheme, type QaViewport } from "@zastava/contracts";
 import pixelmatch from "pixelmatch";
-import { type Browser, chromium } from "playwright";
+import { type Browser, chromium, type Page } from "playwright";
 import { PNG } from "pngjs";
 import { previewUrl, withPorts } from "./preview";
 
@@ -11,9 +11,18 @@ const STABILIZE_CSS = `*,*::before,*::after{animation-duration:0s!important;anim
 /** Masked in every capture: mark volatile UI (timestamps, avatars) with data-qa-mask. */
 const MASK_SELECTOR = "[data-qa-mask]";
 const NAV_TIMEOUT_MS = 30_000;
+/** First load on a cold dev server (dependency optimizing, redirects) can be slow. */
+const LOAD_TIMEOUT_MS = 90_000;
+/** Dev servers that compile on first request (Vite optimizing deps, Ember) render late. */
+const CONTENT_TIMEOUT_MS = 45_000;
 
 export function launchBrowser(): Promise<Browser> {
   return chromium.launch({ headless: true });
+}
+
+/** A browser window the user works in (preview sign-in). */
+export function launchVisibleBrowser(): Promise<Browser> {
+  return chromium.launch({ headless: false });
 }
 
 /** The Chromium binary Playwright installed; the judge's MCP browser uses the same one. */
@@ -55,6 +64,8 @@ export async function capturePage(input: {
   viewport: QaViewport;
   theme: QaTheme;
   file: string;
+  /** Saved sign-in (storage state file) the page starts with; null: signed out. */
+  session?: string | null;
 }): Promise<Capture> {
   const size = QA_VIEWPORTS[input.viewport];
   const context = await input.browser.newContext({
@@ -66,6 +77,7 @@ export async function capturePage(input: {
     reducedMotion: "reduce",
     timezoneId: "UTC",
     locale: "en-US",
+    ...(input.session ? { storageState: input.session } : {}),
   });
   const consoleErrors: string[] = [];
   try {
@@ -79,10 +91,14 @@ export async function capturePage(input: {
     page.on("requestfailed", (req) =>
       consoleErrors.push(`Request failed: ${req.url()} (${req.failure()?.errorText ?? "error"})`),
     );
+    // "load" bounds the navigation; a quiet network and visible content are
+    // waited for on top, without failing (dev servers compile on first hit).
     await page.goto(previewUrl(input.origin, input.preview, input.path), {
-      waitUntil: "networkidle",
-      timeout: NAV_TIMEOUT_MS,
+      waitUntil: "load",
+      timeout: LOAD_TIMEOUT_MS,
     });
+    await page.waitForLoadState("networkidle", { timeout: NAV_TIMEOUT_MS }).catch(() => undefined);
+    await waitForContent(page);
     await page.addStyleTag({ content: STABILIZE_CSS });
     await page.evaluate("document.fonts.ready");
     await mkdir(path.dirname(input.file), { recursive: true });
@@ -103,6 +119,24 @@ export async function capturePage(input: {
   } finally {
     await context.close();
   }
+}
+
+/**
+ * Waits until the page shows something (text or an image) and the network is
+ * quiet again; a blank first paint is usually still compiling. Never throws:
+ * a page that stays blank is captured blank.
+ */
+async function waitForContent(page: Page): Promise<void> {
+  const shown = await page
+    .waitForFunction(
+      "document.body && (document.body.innerText.trim().length > 0 || document.images.length > 0)",
+      null,
+      { timeout: CONTENT_TIMEOUT_MS },
+    )
+    .then(() => true)
+    .catch(() => false);
+  if (shown)
+    await page.waitForLoadState("networkidle", { timeout: NAV_TIMEOUT_MS }).catch(() => undefined);
 }
 
 /** Pads a PNG with transparent pixels to width×height (full-page shots differ in height). */

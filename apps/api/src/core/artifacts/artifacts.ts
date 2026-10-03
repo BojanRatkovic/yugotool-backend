@@ -11,6 +11,13 @@ export const WORKTREES_ROOT = path.join(os.homedir(), ".zastava", "worktrees");
 export const runArtifactsDir = (runId: string): string => path.join(ARTIFACTS_ROOT, runId);
 export const previewTestDir = (projectId: string): string =>
   path.join(ARTIFACTS_ROOT, "preview", projectId);
+/** Same files as the worker's runner/artifacts.ts: saved session, sign-in progress, Done/Cancel. */
+export const previewSessionFile = (projectId: string): string =>
+  path.join(previewTestDir(projectId), "session.json");
+export const previewSignInFile = (projectId: string): string =>
+  path.join(previewTestDir(projectId), "sign-in.json");
+export const previewSignInFinishFile = (projectId: string): string =>
+  path.join(previewTestDir(projectId), "sign-in-finish.json");
 
 const inside = (p: string, base: string): boolean =>
   p === base || p.startsWith(`${base}${path.sep}`);
