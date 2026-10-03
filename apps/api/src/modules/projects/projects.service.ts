@@ -15,6 +15,7 @@ import {
   previewTestResultSchema,
   type Project,
   type ProjectStats,
+  REVIEW_LINE_STATIONS,
   type RouteMapStatus,
   TASK_QUEUE,
   type UpdateLine,
@@ -253,6 +254,33 @@ export class ProjectsService {
   async getLine(projectId: string): Promise<Line> {
     const line = await this.repository.findLine(this.database.db, projectId);
     if (!line) throw new ProjectNotFoundError(`project ${projectId} not found`);
+    return line;
+  }
+
+  /** The project's review line (spec 0009), seeded from the template on first use. */
+  async getReviewLine(projectId: string): Promise<Line> {
+    const db = this.database.db;
+    const existing = await this.repository.findLine(db, projectId, "review");
+    if (existing) return existing;
+    if (!(await this.repository.find(db, projectId))) {
+      throw new ProjectNotFoundError(`project ${projectId} not found`);
+    }
+    await this.repository.insertLine(db, projectId, REVIEW_LINE_STATIONS, "review");
+    const line = await this.repository.findLine(db, projectId, "review");
+    if (!line) throw new ProjectNotFoundError(`project ${projectId} not found`);
+    return line;
+  }
+
+  async updateReviewLine(projectId: string, input: UpdateLine): Promise<Line> {
+    await this.getReviewLine(projectId);
+    const line = await this.repository.updateLine(
+      this.database.db,
+      projectId,
+      input.stations,
+      "review",
+    );
+    if (!line) throw new ProjectNotFoundError(`project ${projectId} not found`);
+    await this.events.publish({ type: "invalidate", collection: "projects" });
     return line;
   }
 }

@@ -45,6 +45,7 @@ import {
   ProjectStatsDto,
   RouteMapStatusDto,
   UpdateLineDto,
+  UpdateReviewLineDto,
   UpdateProjectDto,
   UpdateRoutesDto,
 } from "./projects.dto";
@@ -75,6 +76,21 @@ export class ProjectsController {
   @ApiOkResponse({ type: LineDto })
   updateLine(@Param("id", ParseUUIDPipe) id: string, @Body() body: UpdateLineDto): Promise<Line> {
     return this.service.updateLine(id, body);
+  }
+
+  @Get(":id/lines/review")
+  @ApiOkResponse({ type: LineDto })
+  reviewLine(@Param("id", ParseUUIDPipe) id: string): Promise<Line> {
+    return this.service.getReviewLine(id);
+  }
+
+  @Put(":id/lines/review")
+  @ApiOkResponse({ type: LineDto })
+  updateReviewLine(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() body: UpdateReviewLineDto,
+  ): Promise<Line> {
+    return this.service.updateReviewLine(id, body);
   }
 
   @Get(":id/stats")

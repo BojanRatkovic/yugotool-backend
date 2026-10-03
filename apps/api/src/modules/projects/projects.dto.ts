@@ -12,6 +12,7 @@ import {
   routeMapStatusSchema,
   updateRoutesSchema,
   updateLineSchema,
+  updateReviewLineSchema,
   updateProjectSchema,
 } from "@zastava/contracts";
 import { createZodDto } from "nestjs-zod";
@@ -20,6 +21,7 @@ export class CreateProjectDto extends createZodDto(createProjectSchema) {}
 export class ProjectDto extends createZodDto(projectSchema) {}
 export class LineDto extends createZodDto(lineSchema) {}
 export class UpdateLineDto extends createZodDto(updateLineSchema) {}
+export class UpdateReviewLineDto extends createZodDto(updateReviewLineSchema) {}
 export class ProjectStatsDto extends createZodDto(projectStatsSchema) {}
 export class UpdateProjectDto extends createZodDto(updateProjectSchema) {}
 export class PreviewTestResultDto extends createZodDto(previewTestResultSchema) {}
