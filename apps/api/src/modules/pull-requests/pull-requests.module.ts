@@ -1,8 +1,13 @@
 import { Module } from "@nestjs/common";
+import { ProjectsModule } from "../projects/projects.module";
 import { GithubClient } from "./github/gh-client";
+import { PullRequestsController } from "./pull-requests.controller";
+import { PullRequestsService } from "./pull-requests.service";
 
 /** My pull requests and review requests per project, from GitHub through gh (spec 0008). */
 @Module({
-  providers: [GithubClient],
+  imports: [ProjectsModule],
+  controllers: [PullRequestsController],
+  providers: [PullRequestsService, GithubClient],
 })
 export class PullRequestsModule {}

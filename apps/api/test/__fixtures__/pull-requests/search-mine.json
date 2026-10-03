@@ -1,0 +1,459 @@
+{
+  "data": {
+    "open": {
+      "issueCount": 2,
+      "nodes": [
+        {
+          "number": 1177,
+          "title": "Change 1177",
+          "url": "https://github.com/acme/app/pull/1177",
+          "state": "OPEN",
+          "isDraft": false,
+          "author": {
+            "login": "me",
+            "avatarUrl": "https://avatars.example/me"
+          },
+          "headRefName": "feature/1177",
+          "baseRefName": "main",
+          "headRefOid": "5266a166772cd404423d78971adfa5bb43b85482",
+          "additions": 56,
+          "deletions": 64,
+          "changedFiles": 7,
+          "createdAt": "2026-10-03T12:55:49Z",
+          "updatedAt": "2026-10-03T12:55:49Z",
+          "mergedAt": null,
+          "reviewDecision": null,
+          "mergeable": "CONFLICTING",
+          "comments": {
+            "totalCount": 0
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "myReviews": {
+            "nodes": []
+          },
+          "reviewThreads": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "FAILURE",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "test",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "build",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "build",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "lint",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "e2e",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "FAILURE"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 1176,
+          "title": "Change 1176",
+          "url": "https://github.com/acme/app/pull/1176",
+          "state": "OPEN",
+          "isDraft": false,
+          "author": {
+            "login": "me",
+            "avatarUrl": "https://avatars.example/me"
+          },
+          "headRefName": "feature/1176",
+          "baseRefName": "main",
+          "headRefOid": "d315fb325a81f91a6eed6859e4f81390d0b607e6",
+          "additions": 130,
+          "deletions": 193,
+          "changedFiles": 9,
+          "createdAt": "2026-10-03T12:51:21Z",
+          "updatedAt": "2026-10-03T12:51:21Z",
+          "mergedAt": null,
+          "reviewDecision": null,
+          "mergeable": "CONFLICTING",
+          "comments": {
+            "totalCount": 0
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "myReviews": {
+            "nodes": []
+          },
+          "reviewThreads": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "build",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "done": {
+      "issueCount": 3,
+      "nodes": [
+        {
+          "number": 1175,
+          "title": "Change 1175",
+          "url": "https://github.com/acme/app/pull/1175",
+          "state": "CLOSED",
+          "isDraft": true,
+          "author": {
+            "login": "me",
+            "avatarUrl": "https://avatars.example/me"
+          },
+          "headRefName": "feature/1175",
+          "baseRefName": "main",
+          "headRefOid": "5b32b50047a8b575d4a64ed1717071bfd7149911",
+          "additions": 2,
+          "deletions": 0,
+          "changedFiles": 1,
+          "createdAt": "2026-10-03T12:34:49Z",
+          "updatedAt": "2026-10-03T12:35:08Z",
+          "mergedAt": null,
+          "reviewDecision": null,
+          "mergeable": "MERGEABLE",
+          "comments": {
+            "totalCount": 1
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "myReviews": {
+            "nodes": []
+          },
+          "reviewThreads": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "FAILURE",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "test",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "build",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "build",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "lint",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "e2e",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "ERROR"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 1152,
+          "title": "Change 1152",
+          "url": "https://github.com/acme/app/pull/1152",
+          "state": "CLOSED",
+          "isDraft": true,
+          "author": {
+            "login": "me",
+            "avatarUrl": "https://avatars.example/me"
+          },
+          "headRefName": "feature/1152",
+          "baseRefName": "main",
+          "headRefOid": "f8e7217fc88cd20a29fc28acc0e492527992cc8c",
+          "additions": 4,
+          "deletions": 1,
+          "changedFiles": 1,
+          "createdAt": "2026-10-03T07:48:14Z",
+          "updatedAt": "2026-10-03T12:13:21Z",
+          "mergedAt": null,
+          "reviewDecision": null,
+          "mergeable": "MERGEABLE",
+          "comments": {
+            "totalCount": 0
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "myReviews": {
+            "nodes": []
+          },
+          "reviewThreads": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "test",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "build",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "build",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "lint",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "e2e",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 1145,
+          "title": "Change 1145",
+          "url": "https://github.com/acme/app/pull/1145",
+          "state": "CLOSED",
+          "isDraft": false,
+          "author": {
+            "login": "me",
+            "avatarUrl": "https://avatars.example/me"
+          },
+          "headRefName": "feature/1145",
+          "baseRefName": "main",
+          "headRefOid": "cf64987cf415ba7d661eecab29793ad04d2fa814",
+          "additions": 150,
+          "deletions": 192,
+          "changedFiles": 10,
+          "createdAt": "2026-10-02T21:49:29Z",
+          "updatedAt": "2026-10-03T12:13:14Z",
+          "mergedAt": null,
+          "reviewDecision": null,
+          "mergeable": "CONFLICTING",
+          "comments": {
+            "totalCount": 0
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "myReviews": {
+            "nodes": []
+          },
+          "reviewThreads": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "test",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "build",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "build",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "lint",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "e2e",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}
