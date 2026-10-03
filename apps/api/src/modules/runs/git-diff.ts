@@ -50,9 +50,9 @@ export interface DiffLimits {
  * local base. Diffing against the local branch directly showed every commit
  * the local base is behind (or ahead) as a change of the run.
  */
-export async function diffBase(cwd: string, baseBranch: string): Promise<string> {
+export async function diffBase(cwd: string, baseBranch: string, head = "HEAD"): Promise<string> {
   for (const ref of [`origin/${baseBranch}`, baseBranch]) {
-    const mergeBase = await gitCapped(cwd, ["merge-base", "HEAD", ref], 200).then(
+    const mergeBase = await gitCapped(cwd, ["merge-base", head, ref], 200).then(
       (out) => out.text.trim(),
       () => "",
     );
@@ -80,6 +80,30 @@ export async function worktreeDiff(
   let statText = stat.text.trim();
   if (stat.truncated) {
     const short = await gitCapped(cwd, ["diff", "--shortstat", base], 1_000);
+    const lastNewline = stat.text.lastIndexOf("\n");
+    statText = `${stat.text.slice(0, Math.max(lastNewline, 0))}\n …\n${short.text.trim()}`.trim();
+  }
+  return { stat: statText, patch: patch.text, truncated: patch.truncated };
+}
+
+/**
+ * A finished run's changes, read from its branch in the repo once the worktree
+ * is gone (unfinished work was committed to the branch before removal).
+ */
+export async function branchDiff(
+  repoPath: string,
+  branch: string,
+  baseBranch: string,
+  limits: DiffLimits,
+): Promise<{ stat: string; patch: string; truncated: boolean }> {
+  const base = await diffBase(repoPath, baseBranch, branch);
+  const [stat, patch] = await Promise.all([
+    gitCapped(repoPath, ["diff", "--stat", base, branch], limits.statChars),
+    gitCapped(repoPath, ["diff", base, branch], limits.patchChars),
+  ]);
+  let statText = stat.text.trim();
+  if (stat.truncated) {
+    const short = await gitCapped(repoPath, ["diff", "--shortstat", base, branch], 1_000);
     const lastNewline = stat.text.lastIndexOf("\n");
     statText = `${stat.text.slice(0, Math.max(lastNewline, 0))}\n …\n${short.text.trim()}`.trim();
   }

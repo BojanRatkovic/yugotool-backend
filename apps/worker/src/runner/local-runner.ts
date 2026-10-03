@@ -1,5 +1,6 @@
 import { execFile, spawn } from "node:child_process";
-import { access, constants, mkdir, rename, rm, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { access, constants, cp, mkdir, rename, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -164,6 +165,38 @@ export const localRunner = {
     );
     await rm(target, { recursive: true, force: true });
     await exec("git", ["-C", repoOrWorktree, "worktree", "prune"]).catch(() => undefined);
+  },
+
+  /**
+   * A finished run's worktree goes (a node_modules each adds up to GBs).
+   * Nothing is lost: unfinished changes are committed to the run's branch
+   * (hooks skipped — this is a snapshot, not a delivery) and the shift memory
+   * (`.zastava/`, never committed) is copied to `memoryDir` first. Returns the
+   * snapshot commit, or null when the tree was clean.
+   */
+  async archiveWorkspace(input: {
+    repoPath: string;
+    worktreePath: string;
+    memoryDir: string;
+    message: string;
+  }): Promise<string | null> {
+    const { repoPath, worktreePath } = input;
+    let snapshot: string | null = null;
+    if (existsSync(worktreePath)) {
+      const memory = path.join(worktreePath, ".zastava");
+      if (existsSync(memory)) await cp(memory, input.memoryDir, { recursive: true });
+      const git = (...args: string[]) => exec("git", ["-C", worktreePath, ...args]);
+      await git("add", "-A");
+      const { stdout: staged } = await git("diff", "--cached", "--name-only");
+      if (staged.trim()) {
+        await git("commit", "--no-verify", "-m", input.message);
+        snapshot = (await git("rev-parse", "--short", "HEAD")).stdout.trim();
+      }
+    }
+    await localRunner.removeWorktree(repoPath, worktreePath);
+    // QA's second worktree on the base commit, if a run stopped mid-QA.
+    await localRunner.removeWorktree(repoPath, `${worktreePath}-qa-base`);
+    return snapshot;
   },
 
   async headSha(worktreePath: string): Promise<string> {

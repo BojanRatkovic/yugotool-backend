@@ -31,7 +31,7 @@ import {
   ShiftReviewNotPendingError,
   WorkspaceGoneError,
 } from "./run.errors";
-import { worktreeDiff } from "./git-diff";
+import { branchDiff, gitCapped, worktreeDiff } from "./git-diff";
 import { RunsRepository } from "./runs.repository";
 
 /** Shift station memory inside the worktree (written by the worker). */
@@ -62,13 +62,13 @@ export class RunsService {
   async diff(runId: string): Promise<RunDiff> {
     const workspace = await this.repository.findWorkspace(this.database.db, runId);
     if (!workspace) throw new RunNotFoundError(`run ${runId} not found`);
+    const limits = { patchChars: MAX_PATCH_CHARS, statChars: MAX_STAT_CHARS };
     const cwd = workspace.worktreePath;
-    if (!cwd || !existsSync(cwd))
-      throw new WorkspaceGoneError("the run's worktree no longer exists");
-    return worktreeDiff(cwd, workspace.baseBranch, {
-      patchChars: MAX_PATCH_CHARS,
-      statChars: MAX_STAT_CHARS,
-    });
+    if (cwd && existsSync(cwd)) return worktreeDiff(cwd, workspace.baseBranch, limits);
+    // Finished runs: the worktree was removed, the branch holds the work.
+    if (workspace.branch && (await branchExists(workspace.repoPath, workspace.branch)))
+      return branchDiff(workspace.repoPath, workspace.branch, workspace.baseBranch, limits);
+    throw new WorkspaceGoneError("the run's worktree and branch no longer exist");
   }
 
   /** The workflow owns state transitions; the API only validates and signals. */
@@ -89,11 +89,15 @@ export class RunsService {
   async memory(runId: string): Promise<RunMemory> {
     const workspace = await this.repository.findWorkspace(this.database.db, runId);
     if (!workspace) throw new RunNotFoundError(`run ${runId} not found`);
+    // Live in the worktree; copied to the run's artifacts when the worktree is removed.
     const cwd = workspace.worktreePath;
-    if (!cwd || !existsSync(cwd))
-      throw new WorkspaceGoneError("the run's worktree no longer exists");
+    const dir =
+      cwd && existsSync(cwd)
+        ? path.join(cwd, MEMORY_DIR)
+        : path.join(runArtifactsDir(runId), "memory");
+    if (!existsSync(dir)) throw new WorkspaceGoneError("the run's shift memory no longer exists");
     const read = (file: string): Promise<string | null> =>
-      readFile(path.join(cwd, MEMORY_DIR, file), "utf8").catch(() => null);
+      readFile(path.join(dir, file), "utf8").catch(() => null);
     const [goal, tasks, progress, learnings] = await Promise.all([
       read("goal.md"),
       read("tasks.json"),
@@ -162,4 +166,15 @@ export class RunsService {
     if (!workflowId) throw new RunNotFoundError(`run ${runId} not found`);
     await this.temporal.workflow.getHandle(workflowId).signal(SHIFT_CONTROL_SIGNAL, control);
   }
+}
+
+function branchExists(repoPath: string, branch: string): Promise<boolean> {
+  return gitCapped(
+    repoPath,
+    ["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`],
+    200,
+  ).then(
+    () => true,
+    () => false,
+  );
 }

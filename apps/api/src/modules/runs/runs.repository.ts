@@ -259,9 +259,19 @@ export class RunsRepository {
   async findWorkspace(
     db: Executor,
     runId: string,
-  ): Promise<{ worktreePath: string | null; baseBranch: string } | null> {
+  ): Promise<{
+    worktreePath: string | null;
+    baseBranch: string;
+    repoPath: string;
+    branch: string | null;
+  } | null> {
     const [row] = await db
-      .select({ worktreePath: runs.worktreePath, baseBranch: projects.baseBranch })
+      .select({
+        worktreePath: runs.worktreePath,
+        baseBranch: projects.baseBranch,
+        repoPath: projects.repoPath,
+        branch: workOrders.branch,
+      })
       .from(runs)
       .innerJoin(workOrders, eq(workOrders.id, runs.workOrderId))
       .innerJoin(projects, eq(projects.id, workOrders.projectId))

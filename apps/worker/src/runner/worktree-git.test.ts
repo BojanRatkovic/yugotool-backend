@@ -1,5 +1,12 @@
 import { execFileSync } from "node:child_process";
-import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -76,5 +83,56 @@ describe("checkCommitMessage", () => {
     const rejected = await localRunner.checkCommitMessage(dir, "Add a footer");
     expect(rejected?.passed).toBe(false);
     expect(rejected?.output).toContain("subject must be conventional");
+  });
+});
+
+describe("archiveWorkspace", () => {
+  it("commits unfinished work to the branch, keeps the memory, removes the worktree", async () => {
+    const dir = repo();
+    const tree = path.join(mkdtempSync(path.join(tmpdir(), "zastava-archive-")), "wt");
+    git(dir, "worktree", "add", "-q", "-b", "zastava/task-1", tree);
+    writeFileSync(path.join(tree, "a.txt"), "half done\n");
+    writeFileSync(path.join(tree, "new.txt"), "draft\n");
+    // A pre-commit hook must not block the snapshot.
+    const hook = path.join(dir, ".git", "hooks", "pre-commit");
+    writeFileSync(hook, "#!/bin/sh\nexit 1\n");
+    chmodSync(hook, 0o755);
+    mkdirSync(path.join(tree, ".zastava"));
+    writeFileSync(path.join(tree, ".zastava", "progress.md"), "step 2\n");
+    writeFileSync(path.join(dir, ".git", "info", "exclude"), ".zastava/\n");
+    const memoryDir = path.join(mkdtempSync(path.join(tmpdir(), "zastava-mem-")), "memory");
+
+    const snapshot = await localRunner.archiveWorkspace({
+      repoPath: dir,
+      worktreePath: tree,
+      memoryDir,
+      message: "wip: unfinished",
+    });
+
+    expect(snapshot).toMatch(/^[0-9a-f]{7,}$/);
+    expect(existsSync(tree)).toBe(false);
+    expect(git(dir, "worktree", "list")).not.toContain(tree);
+    expect(git(dir, "show", "zastava/task-1:a.txt")).toBe("half done");
+    expect(git(dir, "show", "zastava/task-1:new.txt")).toBe("draft");
+    expect(git(dir, "log", "-1", "--format=%s", "zastava/task-1")).toBe("wip: unfinished");
+    expect(readFileSync(path.join(memoryDir, "progress.md"), "utf8")).toBe("step 2\n");
+  });
+
+  it("removes a clean worktree without a commit", async () => {
+    const dir = repo();
+    const tree = path.join(mkdtempSync(path.join(tmpdir(), "zastava-archive-")), "wt");
+    git(dir, "worktree", "add", "-q", "-b", "zastava/task-2", tree);
+    const head = git(dir, "rev-parse", "zastava/task-2");
+    const memoryDir = path.join(tree, "..", "memory");
+    expect(
+      await localRunner.archiveWorkspace({
+        repoPath: dir,
+        worktreePath: tree,
+        memoryDir,
+        message: "x",
+      }),
+    ).toBeNull();
+    expect(existsSync(tree)).toBe(false);
+    expect(git(dir, "rev-parse", "zastava/task-2")).toBe(head);
   });
 });

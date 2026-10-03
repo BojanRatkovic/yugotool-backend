@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import path from "node:path";
 import { type ApiKeySource, query } from "@anthropic-ai/claude-agent-sdk";
 import { ApplicationFailure, Context } from "@temporalio/activity";
 import {
@@ -33,6 +34,7 @@ import {
 } from "@zastava/db";
 import { broadcast, type DesktopSink, truncateNotice } from "@zastava/notify";
 import { eq, sql } from "drizzle-orm";
+import { runArtifactsDir } from "../runner/artifacts";
 import { localRunner } from "../runner/local-runner";
 import { runRoots, strayListeners, tcpListeners } from "../runner/orphans";
 import { authRejection, withApiKey } from "../claude-env";
@@ -405,6 +407,48 @@ export function createActivities(
       if (input.log && input.output)
         await appendEvent(input.runId, input.stationRunId, "system", input.output);
       await invalidateBoard();
+    },
+
+    /**
+     * After the run ends: unfinished changes are committed to its branch, the
+     * shift memory copied to artifacts, and the worktree removed (each one
+     * holds its own node_modules). Failures are logged, never fatal.
+     */
+    async archiveRun(input: { runId: string }): Promise<void> {
+      const [row] = await db
+        .select({
+          worktreePath: runs.worktreePath,
+          status: runs.status,
+          repoPath: projects.repoPath,
+        })
+        .from(runs)
+        .innerJoin(workOrders, eq(workOrders.id, runs.workOrderId))
+        .innerJoin(projects, eq(projects.id, workOrders.projectId))
+        .where(eq(runs.id, input.runId));
+      if (!row?.worktreePath) return;
+      try {
+        const snapshot = await localRunner.archiveWorkspace({
+          repoPath: row.repoPath,
+          worktreePath: row.worktreePath,
+          memoryDir: path.join(runArtifactsDir(input.runId), "memory"),
+          message: `wip: unfinished changes of ZASTAVA run ${input.runId.slice(0, 8)} (${row.status})`,
+        });
+        await appendEvent(
+          input.runId,
+          null,
+          "system",
+          snapshot
+            ? `Worktree removed; unfinished changes kept on the branch (${snapshot})`
+            : "Worktree removed; the branch keeps the work",
+        );
+      } catch (error) {
+        await appendEvent(
+          input.runId,
+          null,
+          "system",
+          `Could not remove the worktree: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
     },
 
     async finishRun(input: {

@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { worktreeDiff } from "../src/modules/runs/git-diff";
+import { branchDiff, worktreeDiff } from "../src/modules/runs/git-diff";
 
 const git = (cwd: string, ...args: string[]) =>
   execFileSync("git", ["-C", cwd, ...args], { stdio: "pipe" });
@@ -93,5 +93,35 @@ describe("worktreeDiff base", () => {
     expect(diff.stat).toMatch(/a\.txt/);
     expect(diff.stat).not.toMatch(/b\.txt|c\.txt/);
     expect(diff.stat).toMatch(/1 file changed/);
+  });
+});
+
+describe("branchDiff", () => {
+  it("reads a finished run's changes from its branch, without a worktree", async () => {
+    const repo = mkdtempSync(path.join(tmpdir(), "zastava-branchdiff-"));
+    git(repo, "init", "-q", "-b", "main");
+    git(repo, "config", "user.email", "test@example.com");
+    git(repo, "config", "user.name", "test");
+    writeFileSync(path.join(repo, "a.txt"), "base\n");
+    git(repo, "add", ".");
+    git(repo, "commit", "-q", "-m", "init");
+    git(repo, "branch", "zastava/run");
+    // The base moves on after the run branched off; that is not the run's change.
+    writeFileSync(path.join(repo, "later.txt"), "later\n");
+    git(repo, "add", ".");
+    git(repo, "commit", "-q", "-m", "later on main");
+    git(repo, "checkout", "-q", "zastava/run");
+    writeFileSync(path.join(repo, "a.txt"), "run change\n");
+    git(repo, "commit", "-q", "-am", "wip");
+    git(repo, "checkout", "-q", "main");
+
+    const diff = await branchDiff(repo, "zastava/run", "main", {
+      patchChars: 100_000,
+      statChars: 10_000,
+    });
+    expect(diff.stat).toContain("a.txt");
+    expect(diff.stat).not.toContain("later.txt");
+    expect(diff.patch).toContain("+run change");
+    rmSync(repo, { recursive: true, force: true });
   });
 });

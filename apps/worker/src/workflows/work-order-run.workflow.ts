@@ -41,6 +41,12 @@ const bookkeeping = proxyActivities<Activities>({
   retry: { maximumAttempts: 5 },
 });
 
+/** Removing a worktree deletes its node_modules: can take a while on big repos. */
+const housekeeping = proxyActivities<Activities>({
+  startToCloseTimeout: "10 minutes",
+  retry: { maximumAttempts: 3 },
+});
+
 /**
  * Agent sessions, checks and delivery cost money or have side effects and are
  * not idempotent, so they are never retried automatically. Heartbeats let
@@ -87,9 +93,11 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
   const stopRequested = (): boolean => stopAfterShift;
 
   const finish = (status: "succeeded" | "failed" | "rejected" | "cancelled", reason?: string) =>
-    CancellationScope.nonCancellable(() =>
-      bookkeeping.finishRun({ ...input, status, ...(reason ? { reason } : {}) }),
-    );
+    CancellationScope.nonCancellable(async () => {
+      await bookkeeping.finishRun({ ...input, status, ...(reason ? { reason } : {}) });
+      // Finished runs keep their branch, not their worktree (disk space).
+      if (patched("archive-worktree")) await housekeeping.archiveRun({ runId: input.runId });
+    });
 
   try {
     const run = await bookkeeping.prepareRun(input);
