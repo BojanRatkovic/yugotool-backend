@@ -1,11 +1,16 @@
 import type {
   PrActor,
+  PrCheck,
   PrCiState,
+  PrFile,
   PrReviewer,
   PrReviewState,
+  PrThread,
+  PrTimelineItem,
+  PullRequestDetail,
   PullRequestSummary,
 } from "@zastava/contracts";
-import { prReviewStateSchema } from "@zastava/contracts";
+import { prFileSchema, prReviewStateSchema } from "@zastava/contracts";
 import { z } from "zod";
 
 // ── GitHub shapes (what PR_FIELDS returns) ──────────────────────────────────
@@ -165,18 +170,18 @@ function myLastReview(pr: GhPullRequest): PullRequestSummary["myLastReview"] {
  * Unresolved threads, and those waiting on me: the last comment isn't mine,
  * and the thread is mine to answer (my PR, or I started it).
  */
-function threadCounts(pr: GhPullRequest, viewer: string): PullRequestSummary["threads"] {
-  const mine = pr.author?.login === viewer;
-  let unresolved = 0;
-  let waitingOnMe = 0;
-  for (const thread of compact(pr.reviewThreads)) {
-    if (thread.isResolved) continue;
-    unresolved += 1;
-    const first = compact(thread.firstComment)[0]?.author?.login;
-    const last = compact(thread.lastComment)[0]?.author?.login;
-    if (last !== viewer && (mine || first === viewer)) waitingOnMe += 1;
-  }
-  return { unresolved, waitingOnMe };
+export function threadCounts(
+  threads: { isResolved: boolean; first: string | undefined; last: string | undefined }[],
+  prAuthor: string | undefined,
+  viewer: string,
+): PullRequestSummary["threads"] {
+  const open = threads.filter((t) => !t.isResolved);
+  return {
+    unresolved: open.length,
+    waitingOnMe: open.filter(
+      (t) => t.last !== viewer && (prAuthor === viewer || t.first === viewer),
+    ).length,
+  };
 }
 
 function checks(pr: GhPullRequest): { ci: PrCiState; failingChecks: string[] } {
@@ -228,8 +233,440 @@ export function toSummary(pr: GhPullRequest, context: SummaryContext): PullReque
     requestedFromMe,
     requestedFromMyTeam: !requestedFromMe && (context.teamRequested ?? false),
     assignedToMe: compact(pr.assignees).some((a) => a.login === viewer),
-    threads: threadCounts(pr, viewer),
+    threads: threadCounts(
+      compact(pr.reviewThreads).map((t) => ({
+        isResolved: t.isResolved,
+        first: compact(t.firstComment)[0]?.author?.login,
+        last: compact(t.lastComment)[0]?.author?.login,
+      })),
+      pr.author?.login,
+      viewer,
+    ),
     comments: pr.comments.totalCount,
     labels: compact(pr.labels).map(({ name, color }) => ({ name, color })),
+  };
+}
+
+// ── Detail ──────────────────────────────────────────────────────────────────
+
+const ghCheckContextSchema = z.object({
+  kind: z.string(),
+  name: z.string().optional(),
+  status: z.string().optional(),
+  conclusion: z.string().nullable().optional(),
+  detailsUrl: z.string().nullable().optional(),
+  checkSuite: z
+    .object({
+      workflowRun: z.object({ workflow: z.object({ name: z.string() }) }).nullable(),
+    })
+    .nullable()
+    .optional(),
+  context: z.string().optional(),
+  state: z.string().optional(),
+  targetUrl: z.string().nullable().optional(),
+});
+
+export const ghDetailSchema = z.object({
+  repository: z.object({
+    viewerPermission: z.string().nullable(),
+    mergeCommitAllowed: z.boolean(),
+    squashMergeAllowed: z.boolean(),
+    rebaseMergeAllowed: z.boolean(),
+    pullRequest: ghPullRequestSchema
+      .extend({
+        bodyHTML: z.string(),
+        viewerCanUpdate: z.boolean(),
+        pendingReviews: nodes(
+          z.object({ id: z.string(), comments: z.object({ totalCount: z.number().int() }) }),
+        ).nullable(),
+        headCommit: nodes(
+          z.object({
+            commit: z.object({
+              statusCheckRollup: z.object({ contexts: nodes(ghCheckContextSchema) }).nullable(),
+            }),
+          }),
+        ),
+        commitList: z.object({
+          totalCount: z.number().int(),
+          nodes: z.array(
+            z
+              .object({
+                commit: z.object({
+                  oid: z.string(),
+                  messageHeadline: z.string(),
+                  committedDate: z.string(),
+                  author: z
+                    .object({
+                      name: z.string().nullable(),
+                      user: ghActorSchema,
+                    })
+                    .nullable(),
+                  statusCheckRollup: z.object({ state: z.string() }).nullable(),
+                }),
+              })
+              .nullable(),
+          ),
+        }),
+      })
+      .nullable(),
+  }),
+});
+export type GhDetail = z.infer<typeof ghDetailSchema>;
+
+export const ghThreadsSchema = z.object({
+  repository: z.object({
+    pullRequest: z
+      .object({
+        reviewThreads: z.object({
+          totalCount: z.number().int(),
+          nodes: z.array(
+            z
+              .object({
+                id: z.string(),
+                isResolved: z.boolean(),
+                isOutdated: z.boolean(),
+                path: z.string(),
+                line: z.number().int().nullable(),
+                startLine: z.number().int().nullable(),
+                originalLine: z.number().int().nullable(),
+                diffSide: z.enum(["LEFT", "RIGHT"]),
+                viewerCanResolve: z.boolean(),
+                viewerCanUnresolve: z.boolean(),
+                viewerCanReply: z.boolean(),
+                comments: nodes(
+                  z.object({
+                    id: z.string(),
+                    diffHunk: z.string(),
+                    bodyHTML: z.string(),
+                    createdAt: z.string(),
+                    state: z.string(),
+                    author: ghActorSchema,
+                  }),
+                ),
+              })
+              .nullable(),
+          ),
+        }),
+      })
+      .nullable(),
+  }),
+});
+export type GhThreads = z.infer<typeof ghThreadsSchema>;
+
+export const ghFilesSchema = z.object({
+  repository: z.object({
+    pullRequest: z
+      .object({
+        files: z
+          .object({
+            totalCount: z.number().int(),
+            pageInfo: z.object({ hasNextPage: z.boolean(), endCursor: z.string().nullable() }),
+            nodes: z.array(
+              z
+                .object({
+                  path: z.string(),
+                  additions: z.number().int(),
+                  deletions: z.number().int(),
+                  changeType: prFileSchema.shape.changeType,
+                  viewerViewedState: z.string(),
+                })
+                .nullable(),
+            ),
+          })
+          .nullable(),
+      })
+      .nullable(),
+  }),
+});
+export type GhFiles = z.infer<typeof ghFilesSchema>;
+
+const ghTimelineNodeSchema = z.object({
+  kind: z.string(),
+  id: z.string().optional(),
+  bodyHTML: z.string().optional(),
+  createdAt: z.string().optional(),
+  submittedAt: z.string().nullable().optional(),
+  state: z.string().optional(),
+  author: ghActorSchema.optional(),
+  actor: ghActorSchema.optional(),
+  comments: nodes(z.object({ id: z.string() })).optional(),
+  commit: z
+    .object({
+      oid: z.string(),
+      committedDate: z.string(),
+      author: z.object({ user: ghActorSchema }).nullable(),
+    })
+    .optional(),
+  requestedReviewer: z
+    .object({ kind: z.string(), login: z.string().optional(), name: z.string().optional() })
+    .nullable()
+    .optional(),
+  previousTitle: z.string().optional(),
+  currentTitle: z.string().optional(),
+});
+export type GhTimelineNode = z.infer<typeof ghTimelineNodeSchema>;
+
+export const ghTimelineSchema = z.object({
+  repository: z.object({
+    pullRequest: z
+      .object({
+        timelineItems: z.object({
+          totalCount: z.number().int(),
+          pageInfo: z.object({
+            hasPreviousPage: z.boolean(),
+            startCursor: z.string().nullable(),
+          }),
+          nodes: z.array(ghTimelineNodeSchema.nullable()),
+        }),
+      })
+      .nullable(),
+  }),
+});
+export type GhTimeline = z.infer<typeof ghTimelineSchema>;
+
+type GhFile = NonNullable<
+  NonNullable<NonNullable<GhFiles["repository"]["pullRequest"]>["files"]>["nodes"][number]
+>;
+type GhThread = NonNullable<
+  NonNullable<GhThreads["repository"]["pullRequest"]>["reviewThreads"]["nodes"][number]
+>;
+type GhCheckContext = z.infer<typeof ghCheckContextSchema>;
+
+const WRITE_PERMISSIONS = new Set(["ADMIN", "MAINTAIN", "WRITE"]);
+
+export function toCheck(context: GhCheckContext): PrCheck {
+  if (context.kind === "StatusContext") {
+    const state = context.state ?? "";
+    return {
+      name: context.context ?? "status",
+      state: state === "SUCCESS" ? "pass" : FAILED_STATUSES.has(state) ? "fail" : "pending",
+      url: context.targetUrl ?? null,
+      workflow: null,
+    };
+  }
+  return {
+    name: context.name ?? "check",
+    state: checkRunState(context.status, context.conclusion),
+    url: context.detailsUrl ?? null,
+    workflow: context.checkSuite?.workflowRun?.workflow.name ?? null,
+  };
+}
+
+function checkRunState(status: string | undefined, conclusion: string | null | undefined) {
+  if (status !== "COMPLETED") return "pending" as const;
+  switch (conclusion) {
+    case "SUCCESS":
+    case "NEUTRAL":
+      return "pass" as const;
+    case "SKIPPED":
+    case "STALE":
+      return "skipping" as const;
+    case "CANCELLED":
+      return "cancel" as const;
+    default:
+      return "fail" as const;
+  }
+}
+
+/** Failing first, then pending, passed, skipped, cancelled (the Checks tab's order). */
+const CHECK_ORDER: Record<PrCheck["state"], number> = {
+  fail: 0,
+  pending: 1,
+  pass: 2,
+  skipping: 3,
+  cancel: 4,
+};
+
+export function toThread(thread: GhThread): PrThread {
+  const comments = compact(thread.comments);
+  return {
+    id: thread.id,
+    isResolved: thread.isResolved,
+    isOutdated: thread.isOutdated,
+    path: thread.path,
+    line: thread.line,
+    startLine: thread.startLine,
+    side: thread.diffSide,
+    diffHunk: comments[0]?.diffHunk ?? "",
+    viewerCanResolve: thread.isResolved ? thread.viewerCanUnresolve : thread.viewerCanResolve,
+    viewerCanReply: thread.viewerCanReply,
+    comments: comments.map((c) => ({
+      id: c.id,
+      author: toActor(c.author),
+      bodyHtml: c.bodyHTML,
+      createdAt: c.createdAt,
+      isPending: c.state === "PENDING",
+    })),
+  };
+}
+
+export function toFile(file: GhFile): PrFile {
+  return {
+    path: file.path,
+    additions: file.additions,
+    deletions: file.deletions,
+    changeType: file.changeType,
+    viewed: file.viewerViewedState === "VIEWED",
+  };
+}
+
+const actorOf = (node: GhTimelineNode): PrActor | null => (node.actor ? toActor(node.actor) : null);
+
+/**
+ * Timeline items, oldest first. Consecutive commits by the same author become
+ * one `commits` item; my pending review and unknown kinds are left out.
+ */
+export function toTimeline(
+  timelineNodes: GhTimelineNode[],
+  threadIdByCommentId: Map<string, string>,
+): PrTimelineItem[] {
+  const items: PrTimelineItem[] = [];
+  for (const node of timelineNodes) {
+    const createdAt = node.createdAt ?? "";
+    switch (node.kind) {
+      case "IssueComment":
+        items.push({
+          kind: "comment",
+          id: node.id ?? "",
+          author: toActor(node.author ?? null),
+          bodyHtml: node.bodyHTML ?? "",
+          createdAt,
+        });
+        break;
+      case "PullRequestReview": {
+        const state = reviewState(node.state ?? "");
+        if (!state || state === "PENDING") break;
+        const threadIds = compact(node.comments).flatMap((c) => {
+          const id = threadIdByCommentId.get(c.id);
+          return id ? [id] : [];
+        });
+        items.push({
+          kind: "review",
+          id: node.id ?? "",
+          author: toActor(node.author ?? null),
+          state,
+          bodyHtml: node.bodyHTML ?? "",
+          createdAt: node.submittedAt ?? createdAt,
+          threadIds: [...new Set(threadIds)],
+        });
+        break;
+      }
+      case "PullRequestCommit": {
+        if (!node.commit) break;
+        const author = node.commit.author?.user ? toActor(node.commit.author.user) : null;
+        const last = items.at(-1);
+        if (last?.kind === "commits" && last.author?.login === author?.login) {
+          last.count += 1;
+          last.oids.push(node.commit.oid);
+        } else {
+          items.push({
+            kind: "commits",
+            count: 1,
+            oids: [node.commit.oid],
+            createdAt: node.commit.committedDate,
+            author,
+          });
+        }
+        break;
+      }
+      case "HeadRefForcePushedEvent":
+        items.push({ kind: "force_push", createdAt, author: actorOf(node) });
+        break;
+      case "ReadyForReviewEvent":
+        items.push({ kind: "ready_for_review", createdAt, author: actorOf(node) });
+        break;
+      case "ReviewRequestedEvent": {
+        const reviewer = node.requestedReviewer?.login ?? node.requestedReviewer?.name;
+        if (reviewer) {
+          items.push({ kind: "review_requested", createdAt, author: actorOf(node), reviewer });
+        }
+        break;
+      }
+      case "MergedEvent":
+        items.push({ kind: "merged", createdAt, by: actorOf(node) });
+        break;
+      case "ClosedEvent":
+        items.push({ kind: "closed", createdAt, author: actorOf(node) });
+        break;
+      case "ReopenedEvent":
+        items.push({ kind: "reopened", createdAt, author: actorOf(node) });
+        break;
+      case "RenamedTitleEvent":
+        items.push({
+          kind: "renamed",
+          createdAt,
+          author: actorOf(node),
+          from: node.previousTitle ?? "",
+          to: node.currentTitle ?? "",
+        });
+        break;
+      default:
+        break;
+    }
+  }
+  return items;
+}
+
+export interface DetailParts {
+  detail: GhDetail["repository"];
+  pr: NonNullable<GhDetail["repository"]["pullRequest"]>;
+  threads: GhThread[];
+  threadsTotal: number;
+  files: GhFile[];
+  filesTotal: number;
+  timeline: GhTimelineNode[];
+  timelineTruncated: boolean;
+}
+
+export function toDetail(parts: DetailParts, viewer: string): PullRequestDetail {
+  const { detail, pr } = parts;
+  const summary = toSummary(pr, { viewer });
+  const threads = parts.threads.map(toThread);
+  const threadIdByCommentId = new Map(
+    threads.flatMap((t) => t.comments.map((c) => [c.id, t.id] as const)),
+  );
+  const pending = compact(pr.pendingReviews)[0];
+  const contexts = compact(compact(pr.headCommit)[0]?.commit.statusCheckRollup?.contexts);
+  return {
+    ...summary,
+    threads: threadCounts(
+      threads.map((t) => ({
+        isResolved: t.isResolved,
+        first: t.comments[0]?.author.login,
+        last: t.comments.at(-1)?.author.login,
+      })),
+      pr.author?.login,
+      viewer,
+    ),
+    bodyHtml: pr.bodyHTML,
+    viewerCanUpdate: pr.viewerCanUpdate,
+    viewerCanMerge: pr.state === "OPEN" && WRITE_PERMISSIONS.has(detail.viewerPermission ?? ""),
+    mergeMethods: [
+      ...(detail.mergeCommitAllowed ? (["merge"] as const) : []),
+      ...(detail.squashMergeAllowed ? (["squash"] as const) : []),
+      ...(detail.rebaseMergeAllowed ? (["rebase"] as const) : []),
+    ],
+    pendingReview: pending ? { id: pending.id, comments: pending.comments.totalCount } : null,
+    checks: contexts.map(toCheck).toSorted((a, b) => CHECK_ORDER[a.state] - CHECK_ORDER[b.state]),
+    files: parts.files.map(toFile),
+    reviewThreads: threads,
+    timeline: toTimeline(parts.timeline, threadIdByCommentId),
+    commits: compact(pr.commitList).map(({ commit }) => ({
+      oid: commit.oid,
+      messageHeadline: commit.messageHeadline,
+      author: commit.author?.user
+        ? toActor(commit.author.user)
+        : commit.author?.name
+          ? { login: commit.author.name, avatarUrl: "" }
+          : null,
+      committedAt: commit.committedDate,
+      ci: ciState(commit.statusCheckRollup?.state),
+    })),
+    truncated: {
+      files: parts.filesTotal > parts.files.length,
+      threads: parts.threadsTotal > parts.threads.length,
+      timeline: parts.timelineTruncated,
+      commits: pr.commitList.totalCount > pr.commitList.nodes.length,
+    },
   };
 }

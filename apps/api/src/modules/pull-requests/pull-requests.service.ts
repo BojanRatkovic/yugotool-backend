@@ -1,17 +1,34 @@
 import { Injectable } from "@nestjs/common";
-import type { PrScope, PullRequestList, PullRequestSummary } from "@zastava/contracts";
+import type {
+  PrScope,
+  PullRequestDetail,
+  PullRequestList,
+  PullRequestSummary,
+} from "@zastava/contracts";
 import { z } from "zod";
 import { ProjectsService } from "../projects/projects.service";
 import { GithubClient } from "./github/gh-client";
-import { SEARCH_PRS, VIEWER } from "./github/queries";
+import { PR_DETAIL, PR_FILES, PR_THREADS, PR_TIMELINE, SEARCH_PRS, VIEWER } from "./github/queries";
 import { type RepoSlug, repoSlug } from "./github/repo-slug";
 import {
+  type GhFiles,
   type GhPullRequest,
+  type GhTimeline,
+  type GhTimelineNode,
+  ghDetailSchema,
+  ghFilesSchema,
   ghSearchSchema,
+  ghThreadsSchema,
+  ghTimelineSchema,
   searchPullRequests,
+  toDetail,
   toSummary,
 } from "./pull-requests.mapper";
-import { PullRequestsUnavailableError } from "./pull-requests.errors";
+import {
+  GithubError,
+  PullRequestNotFoundError,
+  PullRequestsUnavailableError,
+} from "./pull-requests.errors";
 
 const REPO_TTL_MS = 5 * 60_000;
 const LIST_TTL_MS = 20_000;
@@ -20,6 +37,9 @@ const DONE_DAYS = 14;
 
 const viewerSchema = z.object({ viewer: z.object({ login: z.string() }) });
 const searchSchema = z.object({ search: ghSearchSchema });
+/** Caps from spec 0008 §4: GitHub has the rest. */
+const MAX_FILE_PAGES = 3;
+const MAX_TIMELINE_ITEMS = 250;
 
 interface Cached<T> {
   value: T;
@@ -112,6 +132,78 @@ export class PullRequestsService {
   private async search(query: string, viewer: string): Promise<GhPullRequest[]> {
     const data = await this.github.graphql(SEARCH_PRS, { viewer, query }, searchSchema);
     return searchPullRequests(data.search);
+  }
+
+  /** Everything the PR panel shows, in four parallel requests (one big one times out). */
+  async detail(projectId: string, number: number): Promise<PullRequestDetail> {
+    const [repo, viewer] = await Promise.all([this.repo(projectId), this.viewerLogin()]);
+    const vars = { owner: repo.owner, name: repo.name, number };
+    try {
+      const [detail, threads, files, timeline] = await Promise.all([
+        this.github.graphql(PR_DETAIL, { ...vars, viewer }, ghDetailSchema),
+        this.github.graphql(PR_THREADS, vars, ghThreadsSchema),
+        this.files(vars),
+        this.timeline(vars),
+      ]);
+      const pr = detail.repository.pullRequest;
+      const reviewThreads = threads.repository.pullRequest?.reviewThreads;
+      if (!pr) throw new PullRequestNotFoundError(`pull request #${number} not found`);
+      return toDetail(
+        {
+          detail: detail.repository,
+          pr,
+          threads: (reviewThreads?.nodes ?? []).filter((t) => t !== null),
+          threadsTotal: reviewThreads?.totalCount ?? 0,
+          ...files,
+          ...timeline,
+        },
+        viewer,
+      );
+    } catch (error) {
+      if (error instanceof GithubError && error.httpStatus === 404) {
+        throw new PullRequestNotFoundError(`pull request #${number} not found`);
+      }
+      throw error;
+    }
+  }
+
+  private async files(vars: { owner: string; name: string; number: number }) {
+    const files = [];
+    let filesTotal = 0;
+    let after: string | null = null;
+    for (let page = 0; page < MAX_FILE_PAGES; page++) {
+      const data: GhFiles = await this.github.graphql(PR_FILES, { ...vars, after }, ghFilesSchema);
+      const connection = data.repository.pullRequest?.files;
+      if (!connection) break;
+      filesTotal = connection.totalCount;
+      files.push(...connection.nodes.filter((f) => f !== null));
+      if (!connection.pageInfo.hasNextPage) break;
+      after = connection.pageInfo.endCursor;
+    }
+    return { files, filesTotal };
+  }
+
+  /** The newest items, read backwards a page at a time, returned oldest first. */
+  private async timeline(vars: { owner: string; name: string; number: number }) {
+    let timeline: GhTimelineNode[] = [];
+    let before: string | null = null;
+    let more = true;
+    while (more && timeline.length < MAX_TIMELINE_ITEMS) {
+      const data: GhTimeline = await this.github.graphql(
+        PR_TIMELINE,
+        { ...vars, before },
+        ghTimelineSchema,
+      );
+      const connection = data.repository.pullRequest?.timelineItems;
+      if (!connection) break;
+      timeline = [...connection.nodes.filter((n) => n !== null), ...timeline];
+      more = connection.pageInfo.hasPreviousPage;
+      before = connection.pageInfo.startCursor;
+    }
+    return {
+      timeline: timeline.slice(-MAX_TIMELINE_ITEMS),
+      timelineTruncated: more || timeline.length > MAX_TIMELINE_ITEMS,
+    };
   }
 
   /** owner/name of the project's GitHub origin; 422 when the project can't use PRs. */
