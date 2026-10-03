@@ -1140,6 +1140,284 @@ const { $schema: _qaDialect, ...qaVerdictJsonSchema } = z.toJSONSchema(qaVerdict
 });
 export const QA_VERDICT_JSON_SCHEMA: Record<string, unknown> = qaVerdictJsonSchema;
 
+// ── Pull requests ───────────────────────────────────────────────────────────
+
+/** Which board: PRs I opened, or PRs others want my review on (spec 0008). */
+export const prScopeSchema = z.enum(["mine", "assigned"]);
+export type PrScope = z.infer<typeof prScopeSchema>;
+
+export const prActorSchema = z.object({
+  login: z.string(),
+  avatarUrl: z.string(),
+});
+export type PrActor = z.infer<typeof prActorSchema>;
+
+/** The status-check rollup on the head commit; none = the repo has no CI. */
+export const prCiStateSchema = z.enum(["success", "failure", "pending", "none"]);
+export type PrCiState = z.infer<typeof prCiStateSchema>;
+
+export const prReviewStateSchema = z.enum([
+  "APPROVED",
+  "CHANGES_REQUESTED",
+  "COMMENTED",
+  "DISMISSED",
+  "PENDING",
+]);
+export type PrReviewState = z.infer<typeof prReviewStateSchema>;
+
+export const prReviewerSchema = z.union([
+  z.object({ actor: prActorSchema, state: z.union([prReviewStateSchema, z.literal("REQUESTED")]) }),
+  z.object({ team: z.string(), state: z.literal("REQUESTED") }),
+]);
+export type PrReviewer = z.infer<typeof prReviewerSchema>;
+
+/** One PR as a board card: enough to place it in a column and say why. */
+export const pullRequestSummarySchema = z.object({
+  number: z.number().int(),
+  title: z.string(),
+  url: z.string(),
+  state: z.enum(["open", "merged", "closed"]),
+  isDraft: z.boolean(),
+  author: prActorSchema,
+  headRefName: z.string(),
+  baseRefName: z.string(),
+  headOid: z.string(),
+  additions: z.number().int(),
+  deletions: z.number().int(),
+  changedFiles: z.number().int(),
+  createdAt: isoDate,
+  updatedAt: isoDate,
+  mergedAt: isoDate.nullable(),
+  reviewDecision: z.enum(["APPROVED", "CHANGES_REQUESTED", "REVIEW_REQUIRED"]).nullable(),
+  /** UNKNOWN until GitHub computes it; never block on it. */
+  mergeable: z.enum(["MERGEABLE", "CONFLICTING", "UNKNOWN"]),
+  ci: prCiStateSchema,
+  /** Names of failing checks, at most 5. */
+  failingChecks: z.array(z.string()).max(5),
+  reviewers: z.array(prReviewerSchema),
+  /** My latest review that isn't PENDING. */
+  myLastReview: z
+    .object({ state: prReviewStateSchema, commitOid: z.string(), submittedAt: isoDate })
+    .nullable(),
+  requestedFromMe: z.boolean(),
+  requestedFromMyTeam: z.boolean(),
+  assignedToMe: z.boolean(),
+  threads: z.object({
+    unresolved: z.number().int(),
+    /** Unresolved threads whose last comment isn't mine. */
+    waitingOnMe: z.number().int(),
+  }),
+  comments: z.number().int(),
+  labels: z.array(z.object({ name: z.string(), color: z.string() })),
+});
+export type PullRequestSummary = z.infer<typeof pullRequestSummarySchema>;
+
+export const pullRequestListSchema = z.object({
+  /** "owner/name". */
+  repo: z.string(),
+  /** The gh user's login: "me" in the board rules. */
+  viewer: z.string(),
+  items: z.array(pullRequestSummarySchema),
+  fetchedAt: isoDate,
+});
+export type PullRequestList = z.infer<typeof pullRequestListSchema>;
+
+export const pullRequestListQuerySchema = z.object({
+  scope: prScopeSchema,
+  /** Include team review requests (Assigned only). */
+  teams: z.stringbool().default(false),
+});
+export type PullRequestListQuery = z.infer<typeof pullRequestListQuerySchema>;
+
+export const prThreadCommentSchema = z.object({
+  id: z.string(),
+  author: prActorSchema,
+  /** GitHub's sanitized bodyHTML. */
+  bodyHtml: z.string(),
+  createdAt: isoDate,
+  /** Part of my pending review, not yet visible to others. */
+  isPending: z.boolean(),
+});
+export type PrThreadComment = z.infer<typeof prThreadCommentSchema>;
+
+export const prThreadSchema = z.object({
+  id: z.string(),
+  isResolved: z.boolean(),
+  isOutdated: z.boolean(),
+  path: z.string(),
+  /** Null when the thread is outdated and its line is gone. */
+  line: z.number().int().nullable(),
+  startLine: z.number().int().nullable(),
+  side: z.enum(["LEFT", "RIGHT"]),
+  diffHunk: z.string(),
+  viewerCanResolve: z.boolean(),
+  viewerCanReply: z.boolean(),
+  comments: z.array(prThreadCommentSchema),
+});
+export type PrThread = z.infer<typeof prThreadSchema>;
+
+export const prTimelineItemSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("comment"),
+    id: z.string(),
+    author: prActorSchema,
+    bodyHtml: z.string(),
+    createdAt: isoDate,
+  }),
+  z.object({
+    kind: z.literal("review"),
+    id: z.string(),
+    author: prActorSchema,
+    state: prReviewStateSchema,
+    bodyHtml: z.string(),
+    createdAt: isoDate,
+    threadIds: z.array(z.string()),
+  }),
+  /** Consecutive pushes grouped into one item. */
+  z.object({
+    kind: z.literal("commits"),
+    count: z.number().int(),
+    oids: z.array(z.string()),
+    createdAt: isoDate,
+    author: prActorSchema.nullable(),
+  }),
+  z.object({ kind: z.literal("force_push"), createdAt: isoDate, author: prActorSchema.nullable() }),
+  z.object({
+    kind: z.literal("ready_for_review"),
+    createdAt: isoDate,
+    author: prActorSchema.nullable(),
+  }),
+  z.object({
+    kind: z.literal("review_requested"),
+    createdAt: isoDate,
+    author: prActorSchema.nullable(),
+    /** A login or a team name. */
+    reviewer: z.string(),
+  }),
+  z.object({ kind: z.literal("merged"), createdAt: isoDate, by: prActorSchema.nullable() }),
+  z.object({ kind: z.literal("closed"), createdAt: isoDate, author: prActorSchema.nullable() }),
+  z.object({ kind: z.literal("reopened"), createdAt: isoDate, author: prActorSchema.nullable() }),
+  z.object({
+    kind: z.literal("renamed"),
+    createdAt: isoDate,
+    author: prActorSchema.nullable(),
+    from: z.string(),
+    to: z.string(),
+  }),
+]);
+export type PrTimelineItem = z.infer<typeof prTimelineItemSchema>;
+
+export const prMergeMethodSchema = z.enum(["merge", "squash", "rebase"]);
+export type PrMergeMethod = z.infer<typeof prMergeMethodSchema>;
+
+export const prCheckSchema = z.object({
+  name: z.string(),
+  state: ciBucketSchema,
+  url: z.string().nullable(),
+  /** Actions workflow name; null for commit statuses. */
+  workflow: z.string().nullable(),
+});
+export type PrCheck = z.infer<typeof prCheckSchema>;
+
+export const prFileSchema = z.object({
+  path: z.string(),
+  additions: z.number().int(),
+  deletions: z.number().int(),
+  changeType: z.enum(["ADDED", "DELETED", "MODIFIED", "RENAMED", "COPIED", "CHANGED"]),
+  /** Viewed state, synced with GitHub. */
+  viewed: z.boolean(),
+});
+export type PrFile = z.infer<typeof prFileSchema>;
+
+export const prCommitSchema = z.object({
+  oid: z.string(),
+  messageHeadline: z.string(),
+  author: prActorSchema.nullable(),
+  committedAt: isoDate,
+  ci: prCiStateSchema,
+});
+export type PrCommit = z.infer<typeof prCommitSchema>;
+
+/** Everything the PR panel needs. Lists above their caps set `truncated`. */
+export const pullRequestDetailSchema = pullRequestSummarySchema.extend({
+  bodyHtml: z.string(),
+  viewerCanUpdate: z.boolean(),
+  viewerCanMerge: z.boolean(),
+  /** Merge methods the repo allows. */
+  mergeMethods: z.array(prMergeMethodSchema),
+  /** My PENDING review, if any. */
+  pendingReview: z.object({ id: z.string(), comments: z.number().int() }).nullable(),
+  checks: z.array(prCheckSchema),
+  /** Up to 300. */
+  files: z.array(prFileSchema),
+  /** Up to 100 (the summary's `threads` holds the counts). */
+  reviewThreads: z.array(prThreadSchema),
+  /** Up to 250 items. */
+  timeline: z.array(prTimelineItemSchema),
+  commits: z.array(prCommitSchema),
+  truncated: z.object({
+    files: z.boolean(),
+    threads: z.boolean(),
+    timeline: z.boolean(),
+    commits: z.boolean(),
+  }),
+});
+export type PullRequestDetail = z.infer<typeof pullRequestDetailSchema>;
+
+export const prDiffQuerySchema = z.object({
+  /** Diff from this commit to the head (changes since my last review). */
+  since: z
+    .string()
+    .regex(/^[0-9a-f]{7,40}$/)
+    .optional(),
+});
+export type PrDiffQuery = z.infer<typeof prDiffQuerySchema>;
+
+export const prDiffSchema = z.object({
+  /** Unified diff text; cut at 5 MB. */
+  patch: z.string(),
+  truncated: z.boolean(),
+  base: z.string(),
+  head: z.string(),
+});
+export type PrDiff = z.infer<typeof prDiffSchema>;
+
+// Writes
+
+const prBody = z.string().trim().min(1).max(65_536);
+
+/** A comment in the PR conversation. */
+export const prCommentInputSchema = z.object({ body: prBody });
+export type PrCommentInput = z.infer<typeof prCommentInputSchema>;
+
+/** A reply in a review thread. */
+export const prReplyInputSchema = z.object({ body: prBody });
+export type PrReplyInput = z.infer<typeof prReplyInputSchema>;
+
+/** A line comment; it goes into my pending review. */
+export const prLineCommentInputSchema = z.object({
+  path: z.string().min(1),
+  line: z.number().int().min(1),
+  side: z.enum(["LEFT", "RIGHT"]),
+  startLine: z.number().int().min(1).optional(),
+  startSide: z.enum(["LEFT", "RIGHT"]).optional(),
+  body: prBody,
+});
+export type PrLineCommentInput = z.infer<typeof prLineCommentInputSchema>;
+
+export const prSubmitReviewInputSchema = z.object({
+  event: z.enum(["APPROVE", "REQUEST_CHANGES", "COMMENT"]),
+  /** May be empty for APPROVE, or when the pending review has comments. */
+  body: z.string().trim().max(65_536),
+});
+export type PrSubmitReviewInput = z.infer<typeof prSubmitReviewInputSchema>;
+
+export const prViewedInputSchema = z.object({ path: z.string().min(1), viewed: z.boolean() });
+export type PrViewedInput = z.infer<typeof prViewedInputSchema>;
+
+export const prMergeInputSchema = z.object({ method: prMergeMethodSchema });
+export type PrMergeInput = z.infer<typeof prMergeInputSchema>;
+
 // ── Queue & dispatcher ──────────────────────────────────────────────────────
 
 export const enqueueSchema = z.object({ mode: queueModeSchema.default("asap") });

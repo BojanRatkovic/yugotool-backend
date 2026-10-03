@@ -16,6 +16,9 @@ const KIND_TO_STATUS: Record<DomainErrorKind, number> = {
   validation: HttpStatus.BAD_REQUEST,
   unauthenticated: HttpStatus.UNAUTHORIZED,
   forbidden: HttpStatus.FORBIDDEN,
+  unprocessable: HttpStatus.UNPROCESSABLE_ENTITY,
+  bad_gateway: HttpStatus.BAD_GATEWAY,
+  rate_limited: HttpStatus.TOO_MANY_REQUESTS,
 };
 
 interface ErrorBody {

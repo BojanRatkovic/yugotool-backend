@@ -1,0 +1,192 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "files": {
+          "totalCount": 25,
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": "MjU"
+          },
+          "nodes": [
+            {
+              "path": "src/app/file-6.gts",
+              "additions": 2,
+              "deletions": 2,
+              "changeType": "MODIFIED",
+              "viewerViewedState": "UNVIEWED"
+            },
+            {
+              "path": "src/lib/file-7.gts",
+              "additions": 1,
+              "deletions": 1,
+              "changeType": "MODIFIED",
+              "viewerViewedState": "UNVIEWED"
+            },
+            {
+              "path": "src/ui/file-8.gts",
+              "additions": 1,
+              "deletions": 1,
+              "changeType": "MODIFIED",
+              "viewerViewedState": "UNVIEWED"
+            },
+            {
+              "path": "src/app/file-9.gts",
+              "additions": 1,
+              "deletions": 1,
+              "changeType": "MODIFIED",
+              "viewerViewedState": "UNVIEWED"
+            },
+            {
+              "path": "src/lib/file-10.gts",
+              "additions": 1,
+              "deletions": 1,
+              "changeType": "MODIFIED",
+              "viewerViewedState": "UNVIEWED"
+            },
+            {
+              "path": "src/ui/file-11.gts",
+              "additions": 1,
+              "deletions": 1,
+              "changeType": "MODIFIED",
+              "viewerViewedState": "UNVIEWED"
+            },
+            {
+              "path": "src/ui/file-2.ts",
+              "additions": 15,
+              "deletions": 5,
+              "changeType": "MODIFIED",
+              "viewerViewedState": "UNVIEWED"
+            },
+            {
+              "path": "src/lib/file-1.ts",
+              "additions": 17,
+              "deletions": 0,
+              "changeType": "MODIFIED",
+              "viewerViewedState": "UNVIEWED"
+            },
+            {
+              "path": "src/app/file-12.ts",
+              "additions": 19,
+              "deletions": 5,
+              "changeType": "MODIFIED",
+              "viewerViewedState": "UNVIEWED"
+            },
+            {
+              "path": "src/app/file-3.ts",
+              "additions": 10,
+              "deletions": 0,
+              "changeType": "MODIFIED",
+              "viewerViewedState": "UNVIEWED"
+            },
+            {
+              "path": "src/lib/file-4.ts",
+              "additions": 74,
+              "deletions": 0,
+              "changeType": "MODIFIED",
+              "viewerViewedState": "UNVIEWED"
+            },
+            {
+              "path": "src/lib/file-13.ts",
+              "additions": 96,
+              "deletions": 0,
+              "changeType": "MODIFIED",
+              "viewerViewedState": "UNVIEWED"
+            },
+            {
+              "path": "src/ui/file-14.js",
+              "additions": 55,
+              "deletions": 5,
+              "changeType": "MODIFIED",
+              "viewerViewedState": "UNVIEWED"
+            },
+            {
+              "path": "src/app/file-15.ts",
+              "additions": 180,
+              "deletions": 0,
+              "changeType": "ADDED",
+              "viewerViewedState": "UNVIEWED"
+            },
+            {
+              "path": "src/lib/file-16.json",
+              "additions": 4,
+              "deletions": 0,
+              "changeType": "ADDED",
+              "viewerViewedState": "UNVIEWED"
+            },
+            {
+              "path": "src/ui/file-17.json",
+              "additions": 4,
+              "deletions": 0,
+              "changeType": "ADDED",
+              "viewerViewedState": "UNVIEWED"
+            },
+            {
+              "path": "src/app/file-18.json",
+              "additions": 4,
+              "deletions": 0,
+              "changeType": "ADDED",
+              "viewerViewedState": "UNVIEWED"
+            },
+            {
+              "path": "src/lib/file-19.json",
+              "additions": 4,
+              "deletions": 0,
+              "changeType": "ADDED",
+              "viewerViewedState": "UNVIEWED"
+            },
+            {
+              "path": "src/ui/file-20.json",
+              "additions": 4,
+              "deletions": 0,
+              "changeType": "ADDED",
+              "viewerViewedState": "UNVIEWED"
+            },
+            {
+              "path": "src/app/file-21.json",
+              "additions": 2,
+              "deletions": 1,
+              "changeType": "MODIFIED",
+              "viewerViewedState": "UNVIEWED"
+            },
+            {
+              "path": "src/lib/file-22.json",
+              "additions": 2,
+              "deletions": 1,
+              "changeType": "MODIFIED",
+              "viewerViewedState": "UNVIEWED"
+            },
+            {
+              "path": "src/ui/file-23.json",
+              "additions": 2,
+              "deletions": 1,
+              "changeType": "MODIFIED",
+              "viewerViewedState": "UNVIEWED"
+            },
+            {
+              "path": "src/app/file-24.json",
+              "additions": 2,
+              "deletions": 1,
+              "changeType": "MODIFIED",
+              "viewerViewedState": "UNVIEWED"
+            },
+            {
+              "path": "src/lib/file-25.json",
+              "additions": 2,
+              "deletions": 1,
+              "changeType": "MODIFIED",
+              "viewerViewedState": "UNVIEWED"
+            },
+            {
+              "path": "src/ui/file-5.ts",
+              "additions": 1,
+              "deletions": 0,
+              "changeType": "MODIFIED",
+              "viewerViewedState": "UNVIEWED"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

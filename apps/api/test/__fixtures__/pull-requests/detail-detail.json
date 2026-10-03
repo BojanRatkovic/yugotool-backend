@@ -1,0 +1,583 @@
+{
+  "data": {
+    "repository": {
+      "viewerPermission": "MAINTAIN",
+      "mergeCommitAllowed": true,
+      "squashMergeAllowed": true,
+      "rebaseMergeAllowed": false,
+      "pullRequest": {
+        "number": 29302,
+        "title": "Change title 1",
+        "url": "https://github.com/acme/app/pull/29302",
+        "state": "OPEN",
+        "isDraft": false,
+        "author": {
+          "login": "ana",
+          "avatarUrl": "https://avatars.example/ana"
+        },
+        "headRefName": "feature/29302",
+        "baseRefName": "main",
+        "headRefOid": "f0196102f574aa3eab10e6d3c1b99ec1b0c0a922",
+        "additions": 504,
+        "deletions": 27,
+        "changedFiles": 25,
+        "createdAt": "2026-09-16T08:26:53Z",
+        "updatedAt": "2026-10-02T17:31:38Z",
+        "mergedAt": null,
+        "reviewDecision": "CHANGES_REQUESTED",
+        "mergeable": "MERGEABLE",
+        "comments": {
+          "totalCount": 0
+        },
+        "labels": {
+          "nodes": []
+        },
+        "assignees": {
+          "nodes": []
+        },
+        "reviewRequests": {
+          "nodes": [
+            {
+              "requestedReviewer": {
+                "kind": "Team",
+                "name": "team-a"
+              }
+            },
+            {
+              "requestedReviewer": {
+                "kind": "User",
+                "login": "marko",
+                "avatarUrl": "https://avatars.example/marko"
+              }
+            }
+          ]
+        },
+        "latestReviews": {
+          "nodes": [
+            {
+              "state": "CHANGES_REQUESTED",
+              "author": {
+                "login": "jovan",
+                "avatarUrl": "https://avatars.example/jovan"
+              }
+            }
+          ]
+        },
+        "myReviews": {
+          "nodes": []
+        },
+        "reviewThreads": {
+          "nodes": [
+            {
+              "isResolved": false,
+              "firstComment": {
+                "nodes": [
+                  {
+                    "author": {
+                      "login": "jovan"
+                    }
+                  }
+                ]
+              },
+              "lastComment": {
+                "nodes": [
+                  {
+                    "author": {
+                      "login": "jovan"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "isResolved": false,
+              "firstComment": {
+                "nodes": [
+                  {
+                    "author": {
+                      "login": "jovan"
+                    }
+                  }
+                ]
+              },
+              "lastComment": {
+                "nodes": [
+                  {
+                    "author": {
+                      "login": "jovan"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "isResolved": false,
+              "firstComment": {
+                "nodes": [
+                  {
+                    "author": {
+                      "login": "jovan"
+                    }
+                  }
+                ]
+              },
+              "lastComment": {
+                "nodes": [
+                  {
+                    "author": {
+                      "login": "jovan"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "isResolved": false,
+              "firstComment": {
+                "nodes": [
+                  {
+                    "author": {
+                      "login": "jovan"
+                    }
+                  }
+                ]
+              },
+              "lastComment": {
+                "nodes": [
+                  {
+                    "author": {
+                      "login": "jovan"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "isResolved": false,
+              "firstComment": {
+                "nodes": [
+                  {
+                    "author": {
+                      "login": "jovan"
+                    }
+                  }
+                ]
+              },
+              "lastComment": {
+                "nodes": [
+                  {
+                    "author": {
+                      "login": "jovan"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "isResolved": false,
+              "firstComment": {
+                "nodes": [
+                  {
+                    "author": {
+                      "login": "jovan"
+                    }
+                  }
+                ]
+              },
+              "lastComment": {
+                "nodes": [
+                  {
+                    "author": {
+                      "login": "jovan"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "statusCheckRollup": {
+                  "state": "SUCCESS",
+                  "contexts": {
+                    "nodes": [
+                      {
+                        "kind": "CheckRun",
+                        "name": "lint",
+                        "conclusion": "SKIPPED"
+                      },
+                      {
+                        "kind": "CheckRun",
+                        "name": "test",
+                        "conclusion": "SKIPPED"
+                      },
+                      {
+                        "kind": "CheckRun",
+                        "name": "build",
+                        "conclusion": "SUCCESS"
+                      },
+                      {
+                        "kind": "CheckRun",
+                        "name": "typecheck",
+                        "conclusion": "SUCCESS"
+                      },
+                      {
+                        "kind": "StatusContext",
+                        "context": "ci/status-1",
+                        "state": "SUCCESS"
+                      },
+                      {
+                        "kind": "StatusContext",
+                        "context": "ci/status-2",
+                        "state": "SUCCESS"
+                      },
+                      {
+                        "kind": "StatusContext",
+                        "context": "ci/status-3",
+                        "state": "SUCCESS"
+                      },
+                      {
+                        "kind": "StatusContext",
+                        "context": "ci/status-4",
+                        "state": "SUCCESS"
+                      },
+                      {
+                        "kind": "StatusContext",
+                        "context": "ci/status-5",
+                        "state": "SUCCESS"
+                      },
+                      {
+                        "kind": "StatusContext",
+                        "context": "ci/status-6",
+                        "state": "SUCCESS"
+                      },
+                      {
+                        "kind": "StatusContext",
+                        "context": "ci/status-7",
+                        "state": "SUCCESS"
+                      },
+                      {
+                        "kind": "StatusContext",
+                        "context": "ci/status-8",
+                        "state": "SUCCESS"
+                      },
+                      {
+                        "kind": "StatusContext",
+                        "context": "ci/status-9",
+                        "state": "SUCCESS"
+                      },
+                      {
+                        "kind": "StatusContext",
+                        "context": "ci/status-10",
+                        "state": "SUCCESS"
+                      },
+                      {
+                        "kind": "StatusContext",
+                        "context": "ci/status-11",
+                        "state": "SUCCESS"
+                      },
+                      {
+                        "kind": "StatusContext",
+                        "context": "ci/status-12",
+                        "state": "SUCCESS"
+                      },
+                      {
+                        "kind": "StatusContext",
+                        "context": "ci/status-13",
+                        "state": "SUCCESS"
+                      },
+                      {
+                        "kind": "StatusContext",
+                        "context": "ci/status-14",
+                        "state": "SUCCESS"
+                      },
+                      {
+                        "kind": "StatusContext",
+                        "context": "ci/status-15",
+                        "state": "SUCCESS"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "bodyHTML": "<p>Comment 1 with <code>code</code>.</p>",
+        "viewerCanUpdate": true,
+        "pendingReviews": {
+          "nodes": []
+        },
+        "headCommit": {
+          "nodes": [
+            {
+              "commit": {
+                "statusCheckRollup": {
+                  "contexts": {
+                    "nodes": [
+                      {
+                        "kind": "CheckRun",
+                        "name": "lint",
+                        "status": "COMPLETED",
+                        "conclusion": "SKIPPED",
+                        "detailsUrl": "https://ci.example/run/1",
+                        "checkSuite": {
+                          "workflowRun": {
+                            "workflow": {
+                              "name": "Workflow 1"
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "kind": "CheckRun",
+                        "name": "test",
+                        "status": "COMPLETED",
+                        "conclusion": "SKIPPED",
+                        "detailsUrl": "https://ci.example/run/2",
+                        "checkSuite": {
+                          "workflowRun": {
+                            "workflow": {
+                              "name": "Workflow 2"
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "kind": "CheckRun",
+                        "name": "build",
+                        "status": "COMPLETED",
+                        "conclusion": "SUCCESS",
+                        "detailsUrl": "https://ci.example/run/3",
+                        "checkSuite": {
+                          "workflowRun": {
+                            "workflow": {
+                              "name": "Workflow 3"
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "kind": "CheckRun",
+                        "name": "typecheck",
+                        "status": "COMPLETED",
+                        "conclusion": "SUCCESS",
+                        "detailsUrl": "https://ci.example/run/4",
+                        "checkSuite": {
+                          "workflowRun": {
+                            "workflow": {
+                              "name": "Workflow 4"
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "kind": "StatusContext",
+                        "context": "ci/status-1",
+                        "state": "SUCCESS",
+                        "targetUrl": "https://ci.example/run/5"
+                      },
+                      {
+                        "kind": "StatusContext",
+                        "context": "ci/status-2",
+                        "state": "SUCCESS",
+                        "targetUrl": "https://ci.example/run/5"
+                      },
+                      {
+                        "kind": "StatusContext",
+                        "context": "ci/status-3",
+                        "state": "SUCCESS",
+                        "targetUrl": "https://ci.example/run/5"
+                      },
+                      {
+                        "kind": "StatusContext",
+                        "context": "ci/status-4",
+                        "state": "SUCCESS",
+                        "targetUrl": "https://ci.example/run/5"
+                      },
+                      {
+                        "kind": "StatusContext",
+                        "context": "ci/status-5",
+                        "state": "SUCCESS",
+                        "targetUrl": "https://ci.example/run/5"
+                      },
+                      {
+                        "kind": "StatusContext",
+                        "context": "ci/status-6",
+                        "state": "SUCCESS",
+                        "targetUrl": "https://ci.example/run/5"
+                      },
+                      {
+                        "kind": "StatusContext",
+                        "context": "ci/status-7",
+                        "state": "SUCCESS",
+                        "targetUrl": "https://ci.example/run/5"
+                      },
+                      {
+                        "kind": "StatusContext",
+                        "context": "ci/status-8",
+                        "state": "SUCCESS",
+                        "targetUrl": "https://ci.example/run/5"
+                      },
+                      {
+                        "kind": "StatusContext",
+                        "context": "ci/status-9",
+                        "state": "SUCCESS",
+                        "targetUrl": "https://ci.example/run/5"
+                      },
+                      {
+                        "kind": "StatusContext",
+                        "context": "ci/status-10",
+                        "state": "SUCCESS",
+                        "targetUrl": "https://ci.example/run/5"
+                      },
+                      {
+                        "kind": "StatusContext",
+                        "context": "ci/status-11",
+                        "state": "SUCCESS",
+                        "targetUrl": "https://ci.example/run/5"
+                      },
+                      {
+                        "kind": "StatusContext",
+                        "context": "ci/status-12",
+                        "state": "SUCCESS",
+                        "targetUrl": "https://ci.example/run/5"
+                      },
+                      {
+                        "kind": "StatusContext",
+                        "context": "ci/status-13",
+                        "state": "SUCCESS",
+                        "targetUrl": "https://ci.example/run/6"
+                      },
+                      {
+                        "kind": "StatusContext",
+                        "context": "ci/status-14",
+                        "state": "SUCCESS",
+                        "targetUrl": "https://ci.example/run/5"
+                      },
+                      {
+                        "kind": "StatusContext",
+                        "context": "ci/status-15",
+                        "state": "SUCCESS",
+                        "targetUrl": "https://ci.example/run/5"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "commitList": {
+          "totalCount": 6,
+          "nodes": [
+            {
+              "commit": {
+                "oid": "8d565dba263c1b898f658c04fd2250ea0311ef3e",
+                "messageHeadline": "fix: commit 1",
+                "committedDate": "2026-09-22T12:43:48Z",
+                "author": {
+                  "name": "ana",
+                  "user": {
+                    "login": "ana",
+                    "avatarUrl": "https://avatars.example/ana"
+                  }
+                },
+                "statusCheckRollup": {
+                  "state": "SUCCESS"
+                }
+              }
+            },
+            {
+              "commit": {
+                "oid": "ad516a47619feae8e3d95ac35b369159f9e22385",
+                "messageHeadline": "fix: commit 2",
+                "committedDate": "2026-09-29T07:04:23Z",
+                "author": {
+                  "name": "ana",
+                  "user": {
+                    "login": "ana",
+                    "avatarUrl": "https://avatars.example/ana"
+                  }
+                },
+                "statusCheckRollup": null
+              }
+            },
+            {
+              "commit": {
+                "oid": "00a10663377615f60be9bfb0237462cc4f6d00aa",
+                "messageHeadline": "fix: commit 3",
+                "committedDate": "2026-09-29T07:10:21Z",
+                "author": {
+                  "name": "ana",
+                  "user": {
+                    "login": "ana",
+                    "avatarUrl": "https://avatars.example/ana"
+                  }
+                },
+                "statusCheckRollup": {
+                  "state": "SUCCESS"
+                }
+              }
+            },
+            {
+              "commit": {
+                "oid": "d5394973227cd4b024aedd97273c40b25d8109aa",
+                "messageHeadline": "fix: commit 4",
+                "committedDate": "2026-09-29T11:56:19Z",
+                "author": {
+                  "name": "ana",
+                  "user": {
+                    "login": "ana",
+                    "avatarUrl": "https://avatars.example/ana"
+                  }
+                },
+                "statusCheckRollup": {
+                  "state": "SUCCESS"
+                }
+              }
+            },
+            {
+              "commit": {
+                "oid": "e85959f39452a0c157236d519fcab0dfd858023e",
+                "messageHeadline": "fix: commit 4",
+                "committedDate": "2026-09-29T12:10:40Z",
+                "author": {
+                  "name": "ana",
+                  "user": {
+                    "login": "ana",
+                    "avatarUrl": "https://avatars.example/ana"
+                  }
+                },
+                "statusCheckRollup": {
+                  "state": "SUCCESS"
+                }
+              }
+            },
+            {
+              "commit": {
+                "oid": "f0196102f574aa3eab10e6d3c1b99ec1b0c0a922",
+                "messageHeadline": "fix: commit 5",
+                "committedDate": "2026-10-01T09:21:06Z",
+                "author": {
+                  "name": "ana",
+                  "user": {
+                    "login": "ana",
+                    "avatarUrl": "https://avatars.example/ana"
+                  }
+                },
+                "statusCheckRollup": {
+                  "state": "SUCCESS"
+                }
+              }
+            }
+          ]
+        },
+        "id": "PR_29302"
+      }
+    }
+  }
+}

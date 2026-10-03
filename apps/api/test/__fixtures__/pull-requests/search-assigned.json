@@ -1,0 +1,2686 @@
+{
+  "data": {
+    "requested": {
+      "issueCount": 4,
+      "nodes": [
+        {
+          "number": 29732,
+          "title": "Change 29732",
+          "url": "https://github.com/acme/app/pull/29732",
+          "state": "OPEN",
+          "isDraft": false,
+          "author": {
+            "login": "ana",
+            "avatarUrl": "https://avatars.example/ana"
+          },
+          "headRefName": "feature/29732",
+          "baseRefName": "main",
+          "headRefOid": "33bb6747b00de760637bdefc26dabb7af7e6ada4",
+          "additions": 6813,
+          "deletions": 1429,
+          "changedFiles": 397,
+          "createdAt": "2026-10-01T08:26:05Z",
+          "updatedAt": "2026-10-02T08:01:44Z",
+          "mergedAt": null,
+          "reviewDecision": null,
+          "mergeable": "MERGEABLE",
+          "comments": {
+            "totalCount": 0
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "reviewRequests": {
+            "nodes": [
+              {
+                "requestedReviewer": {
+                  "kind": "User",
+                  "login": "me",
+                  "avatarUrl": "https://avatars.example/me"
+                }
+              }
+            ]
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "myReviews": {
+            "nodes": []
+          },
+          "reviewThreads": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "kind": "CheckRun",
+                          "name": "typecheck",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "test",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "typecheck",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "e2e",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "lint",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-0",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-3",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-3",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "id": "PR_29732"
+        },
+        {
+          "number": 29716,
+          "title": "Change 29716",
+          "url": "https://github.com/acme/app/pull/29716",
+          "state": "OPEN",
+          "isDraft": false,
+          "author": {
+            "login": "marko",
+            "avatarUrl": "https://avatars.example/marko"
+          },
+          "headRefName": "feature/29716",
+          "baseRefName": "main",
+          "headRefOid": "d20bfb01d5788decd2b16ee93f1940b6c7003c4f",
+          "additions": 16,
+          "deletions": 8,
+          "changedFiles": 2,
+          "createdAt": "2026-10-01T03:26:46Z",
+          "updatedAt": "2026-10-01T03:28:12Z",
+          "mergedAt": null,
+          "reviewDecision": "REVIEW_REQUIRED",
+          "mergeable": "MERGEABLE",
+          "comments": {
+            "totalCount": 0
+          },
+          "labels": {
+            "nodes": [
+              {
+                "name": "label-1",
+                "color": "0366d6"
+              },
+              {
+                "name": "label-2",
+                "color": "168700"
+              }
+            ]
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "reviewRequests": {
+            "nodes": [
+              {
+                "requestedReviewer": {
+                  "kind": "Team",
+                  "name": "team-a"
+                }
+              },
+              {
+                "requestedReviewer": {
+                  "kind": "User",
+                  "login": "me",
+                  "avatarUrl": "https://avatars.example/me"
+                }
+              }
+            ]
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "myReviews": {
+            "nodes": []
+          },
+          "reviewThreads": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "FAILURE",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-3",
+                          "state": "FAILURE"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "FAILURE"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-0",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-3",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "id": "PR_29716"
+        },
+        {
+          "number": 29710,
+          "title": "Change 29710",
+          "url": "https://github.com/acme/app/pull/29710",
+          "state": "OPEN",
+          "isDraft": false,
+          "author": {
+            "login": "marko",
+            "avatarUrl": "https://avatars.example/marko"
+          },
+          "headRefName": "feature/29710",
+          "baseRefName": "main",
+          "headRefOid": "a01f6db5612ef6e1432d26bdd9d43aedc863ef44",
+          "additions": 501,
+          "deletions": 339,
+          "changedFiles": 8,
+          "createdAt": "2026-10-01T03:22:15Z",
+          "updatedAt": "2026-10-01T03:22:16Z",
+          "mergedAt": null,
+          "reviewDecision": "REVIEW_REQUIRED",
+          "mergeable": "MERGEABLE",
+          "comments": {
+            "totalCount": 0
+          },
+          "labels": {
+            "nodes": [
+              {
+                "name": "label-1",
+                "color": "0366d6"
+              },
+              {
+                "name": "label-2",
+                "color": "168700"
+              }
+            ]
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "reviewRequests": {
+            "nodes": [
+              {
+                "requestedReviewer": {
+                  "kind": "Team",
+                  "name": "team-a"
+                }
+              },
+              {
+                "requestedReviewer": {
+                  "kind": "User",
+                  "login": "me",
+                  "avatarUrl": "https://avatars.example/me"
+                }
+              }
+            ]
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "myReviews": {
+            "nodes": []
+          },
+          "reviewThreads": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "FAILURE",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "kind": "CheckRun",
+                          "name": "build",
+                          "conclusion": "FAILURE"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "typecheck",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "test",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "typecheck",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "e2e",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "typecheck",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "e2e",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "lint",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "lint",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "FAILURE"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "FAILURE"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "FAILURE"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "FAILURE"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-0",
+                          "state": "FAILURE"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "FAILURE"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "FAILURE"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "FAILURE"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-3",
+                          "state": "FAILURE"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-3",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "id": "PR_29710"
+        },
+        {
+          "number": 29704,
+          "title": "Change 29704",
+          "url": "https://github.com/acme/app/pull/29704",
+          "state": "OPEN",
+          "isDraft": false,
+          "author": {
+            "login": "marko",
+            "avatarUrl": "https://avatars.example/marko"
+          },
+          "headRefName": "feature/29704",
+          "baseRefName": "main",
+          "headRefOid": "65aba49bf95c821c5cd1ab243a0cf341c38af948",
+          "additions": 169,
+          "deletions": 40,
+          "changedFiles": 2,
+          "createdAt": "2026-10-01T03:16:34Z",
+          "updatedAt": "2026-10-01T03:18:03Z",
+          "mergedAt": null,
+          "reviewDecision": "REVIEW_REQUIRED",
+          "mergeable": "MERGEABLE",
+          "comments": {
+            "totalCount": 0
+          },
+          "labels": {
+            "nodes": [
+              {
+                "name": "label-1",
+                "color": "0366d6"
+              },
+              {
+                "name": "label-2",
+                "color": "168700"
+              }
+            ]
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "reviewRequests": {
+            "nodes": [
+              {
+                "requestedReviewer": {
+                  "kind": "Team",
+                  "name": "team-a"
+                }
+              },
+              {
+                "requestedReviewer": {
+                  "kind": "User",
+                  "login": "me",
+                  "avatarUrl": "https://avatars.example/me"
+                }
+              }
+            ]
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "myReviews": {
+            "nodes": []
+          },
+          "reviewThreads": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "FAILURE",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "ERROR"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "FAILURE"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "FAILURE"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "FAILURE"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-0",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-3",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "id": "PR_29704"
+        }
+      ]
+    },
+    "assigned": {
+      "issueCount": 2,
+      "nodes": [
+        {
+          "number": 27138,
+          "title": "Change 27138",
+          "url": "https://github.com/acme/app/pull/27138",
+          "state": "OPEN",
+          "isDraft": true,
+          "author": {
+            "login": "ana",
+            "avatarUrl": "https://avatars.example/ana"
+          },
+          "headRefName": "feature/27138",
+          "baseRefName": "main",
+          "headRefOid": "3e1f8634b9ea61942d2a65599c29959227a13f1b",
+          "additions": 8,
+          "deletions": 5,
+          "changedFiles": 1,
+          "createdAt": "2026-07-08T07:16:55Z",
+          "updatedAt": "2026-07-08T07:16:56Z",
+          "mergedAt": null,
+          "reviewDecision": "REVIEW_REQUIRED",
+          "mergeable": "MERGEABLE",
+          "comments": {
+            "totalCount": 0
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": [
+              {
+                "login": "me"
+              }
+            ]
+          },
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "myReviews": {
+            "nodes": []
+          },
+          "reviewThreads": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "kind": "CheckRun",
+                          "name": "typecheck",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "typecheck",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "e2e",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "e2e",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "lint",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "lint",
+                          "conclusion": "SKIPPED"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "id": "PR_27138"
+        },
+        {
+          "number": 27110,
+          "title": "Change 27110",
+          "url": "https://github.com/acme/app/pull/27110",
+          "state": "OPEN",
+          "isDraft": true,
+          "author": {
+            "login": "ana",
+            "avatarUrl": "https://avatars.example/ana"
+          },
+          "headRefName": "feature/27110",
+          "baseRefName": "main",
+          "headRefOid": "50a4af6f0826b7cb83a853b5f7615f541526eb47",
+          "additions": 7,
+          "deletions": 1,
+          "changedFiles": 1,
+          "createdAt": "2026-07-07T14:04:12Z",
+          "updatedAt": "2026-07-07T14:04:14Z",
+          "mergedAt": null,
+          "reviewDecision": "REVIEW_REQUIRED",
+          "mergeable": "MERGEABLE",
+          "comments": {
+            "totalCount": 0
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": [
+              {
+                "login": "me"
+              }
+            ]
+          },
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "myReviews": {
+            "nodes": []
+          },
+          "reviewThreads": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "kind": "CheckRun",
+                          "name": "typecheck",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "typecheck",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "e2e",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "e2e",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "lint",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "lint",
+                          "conclusion": "SKIPPED"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "id": "PR_27110"
+        }
+      ]
+    },
+    "reviewed": {
+      "issueCount": 3,
+      "nodes": [
+        {
+          "number": 29282,
+          "title": "Change 29282",
+          "url": "https://github.com/acme/app/pull/29282",
+          "state": "OPEN",
+          "isDraft": false,
+          "author": {
+            "login": "jovan",
+            "avatarUrl": "https://avatars.example/jovan"
+          },
+          "headRefName": "feature/29282",
+          "baseRefName": "main",
+          "headRefOid": "5a11be930c5b0927f0e66b4b2e6c5989bb293053",
+          "additions": 16,
+          "deletions": 163,
+          "changedFiles": 5,
+          "createdAt": "2026-09-15T12:59:35Z",
+          "updatedAt": "2026-09-18T16:05:16Z",
+          "mergedAt": null,
+          "reviewDecision": "APPROVED",
+          "mergeable": "MERGEABLE",
+          "comments": {
+            "totalCount": 0
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": [
+              {
+                "state": "APPROVED",
+                "author": {
+                  "login": "me",
+                  "avatarUrl": "https://avatars.example/me"
+                }
+              }
+            ]
+          },
+          "myReviews": {
+            "nodes": [
+              {
+                "state": "APPROVED",
+                "submittedAt": "2026-09-18T16:05:16Z",
+                "commit": {
+                  "oid": "5a11be930c5b0927f0e66b4b2e6c5989bb293053"
+                }
+              }
+            ]
+          },
+          "reviewThreads": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "FAILURE",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "kind": "CheckRun",
+                          "name": "typecheck",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "test",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "typecheck",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "build",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "e2e",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "e2e",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "lint",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "lint",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-3",
+                          "state": "FAILURE"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "FAILURE"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-0",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-3",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "id": "PR_29282"
+        },
+        {
+          "number": 29281,
+          "title": "Change 29281",
+          "url": "https://github.com/acme/app/pull/29281",
+          "state": "OPEN",
+          "isDraft": false,
+          "author": {
+            "login": "jovan",
+            "avatarUrl": "https://avatars.example/jovan"
+          },
+          "headRefName": "feature/29281",
+          "baseRefName": "main",
+          "headRefOid": "edb95091a78b33479d4c5bc00964ee073e58272e",
+          "additions": 5,
+          "deletions": 12,
+          "changedFiles": 3,
+          "createdAt": "2026-09-15T12:57:50Z",
+          "updatedAt": "2026-09-18T11:36:02Z",
+          "mergedAt": null,
+          "reviewDecision": "APPROVED",
+          "mergeable": "MERGEABLE",
+          "comments": {
+            "totalCount": 0
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": [
+              {
+                "state": "COMMENTED",
+                "author": {
+                  "login": "mila",
+                  "avatarUrl": "https://avatars.example/mila"
+                }
+              },
+              {
+                "state": "APPROVED",
+                "author": {
+                  "login": "me",
+                  "avatarUrl": "https://avatars.example/me"
+                }
+              }
+            ]
+          },
+          "myReviews": {
+            "nodes": [
+              {
+                "state": "APPROVED",
+                "submittedAt": "2026-09-18T11:36:02Z",
+                "commit": {
+                  "oid": "edb95091a78b33479d4c5bc00964ee073e58272e"
+                }
+              }
+            ]
+          },
+          "reviewThreads": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "kind": "CheckRun",
+                          "name": "build",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "typecheck",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "typecheck",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "test",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "build",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "e2e",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "typecheck",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "e2e",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "e2e",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "lint",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "lint",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "lint",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-0",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-3",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-3",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "id": "PR_29281"
+        },
+        {
+          "number": 28095,
+          "title": "Change 28095",
+          "url": "https://github.com/acme/app/pull/28095",
+          "state": "OPEN",
+          "isDraft": false,
+          "author": {
+            "login": "petar",
+            "avatarUrl": "https://avatars.example/petar"
+          },
+          "headRefName": "feature/28095",
+          "baseRefName": "main",
+          "headRefOid": "8d16425c9825009b96104f9a5e3eea6fa9d682fb",
+          "additions": 52,
+          "deletions": 0,
+          "changedFiles": 3,
+          "createdAt": "2026-08-06T15:20:23Z",
+          "updatedAt": "2026-08-12T11:57:47Z",
+          "mergedAt": null,
+          "reviewDecision": "APPROVED",
+          "mergeable": "MERGEABLE",
+          "comments": {
+            "totalCount": 1
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "reviewRequests": {
+            "nodes": [
+              {
+                "requestedReviewer": {
+                  "kind": "Team",
+                  "name": "team-b"
+                }
+              }
+            ]
+          },
+          "latestReviews": {
+            "nodes": [
+              {
+                "state": "APPROVED",
+                "author": {
+                  "login": "me",
+                  "avatarUrl": "https://avatars.example/me"
+                }
+              }
+            ]
+          },
+          "myReviews": {
+            "nodes": [
+              {
+                "state": "APPROVED",
+                "submittedAt": "2026-08-10T10:15:15Z",
+                "commit": {
+                  "oid": "8d16425c9825009b96104f9a5e3eea6fa9d682fb"
+                }
+              }
+            ]
+          },
+          "reviewThreads": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "kind": "CheckRun",
+                          "name": "typecheck",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "build",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "typecheck",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-0",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-3",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-3",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "id": "PR_28095"
+        }
+      ]
+    },
+    "reviewedDone": {
+      "issueCount": 2,
+      "nodes": [
+        {
+          "number": 29744,
+          "title": "Change 29744",
+          "url": "https://github.com/acme/app/pull/29744",
+          "state": "MERGED",
+          "isDraft": false,
+          "author": {
+            "login": "sara",
+            "avatarUrl": "https://avatars.example/sara"
+          },
+          "headRefName": "feature/29744",
+          "baseRefName": "main",
+          "headRefOid": "57ac01788acdef44882ad03fb0092f73e9eb2915",
+          "additions": 23,
+          "deletions": 5,
+          "changedFiles": 7,
+          "createdAt": "2026-10-01T11:57:48Z",
+          "updatedAt": "2026-10-02T07:32:24Z",
+          "mergedAt": "2026-10-02T07:32:21Z",
+          "reviewDecision": "APPROVED",
+          "mergeable": "UNKNOWN",
+          "comments": {
+            "totalCount": 0
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": [
+              {
+                "state": "APPROVED",
+                "author": {
+                  "login": "me",
+                  "avatarUrl": "https://avatars.example/me"
+                }
+              }
+            ]
+          },
+          "myReviews": {
+            "nodes": [
+              {
+                "state": "APPROVED",
+                "submittedAt": "2026-10-01T18:14:21Z",
+                "commit": {
+                  "oid": "57ac01788acdef44882ad03fb0092f73e9eb2915"
+                }
+              }
+            ]
+          },
+          "reviewThreads": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "kind": "CheckRun",
+                          "name": "typecheck",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "test",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "typecheck",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "build",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "e2e",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "e2e",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "lint",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "lint",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-0",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-3",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-3",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "id": "PR_29744"
+        },
+        {
+          "number": 29669,
+          "title": "Change 29669",
+          "url": "https://github.com/acme/app/pull/29669",
+          "state": "MERGED",
+          "isDraft": false,
+          "author": {
+            "login": "luka",
+            "avatarUrl": "https://avatars.example/luka"
+          },
+          "headRefName": "feature/29669",
+          "baseRefName": "main",
+          "headRefOid": "849f182271577396f9fe12948145c3c2bf00e931",
+          "additions": 10,
+          "deletions": 2,
+          "changedFiles": 6,
+          "createdAt": "2026-09-29T14:36:36Z",
+          "updatedAt": "2026-09-30T13:24:14Z",
+          "mergedAt": "2026-09-30T13:24:12Z",
+          "reviewDecision": "APPROVED",
+          "mergeable": "UNKNOWN",
+          "comments": {
+            "totalCount": 1
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "reviewRequests": {
+            "nodes": []
+          },
+          "latestReviews": {
+            "nodes": [
+              {
+                "state": "APPROVED",
+                "author": {
+                  "login": "me",
+                  "avatarUrl": "https://avatars.example/me"
+                }
+              }
+            ]
+          },
+          "myReviews": {
+            "nodes": [
+              {
+                "state": "APPROVED",
+                "submittedAt": "2026-09-30T09:40:17Z",
+                "commit": {
+                  "oid": "849f182271577396f9fe12948145c3c2bf00e931"
+                }
+              }
+            ]
+          },
+          "reviewThreads": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "kind": "CheckRun",
+                          "name": "test",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "typecheck",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "typecheck",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-0",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-3",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-3",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "id": "PR_29669"
+        }
+      ]
+    },
+    "team": {
+      "issueCount": 4,
+      "nodes": [
+        {
+          "number": 29770,
+          "title": "Change 29770",
+          "url": "https://github.com/acme/app/pull/29770",
+          "state": "OPEN",
+          "isDraft": false,
+          "author": {
+            "login": "nina",
+            "avatarUrl": "https://avatars.example/nina"
+          },
+          "headRefName": "feature/29770",
+          "baseRefName": "main",
+          "headRefOid": "e95993ce570e722bc93594da8d7bcae526312dcd",
+          "additions": 160,
+          "deletions": 37,
+          "changedFiles": 5,
+          "createdAt": "2026-10-02T07:22:29Z",
+          "updatedAt": "2026-10-02T09:42:51Z",
+          "mergedAt": null,
+          "reviewDecision": "REVIEW_REQUIRED",
+          "mergeable": "MERGEABLE",
+          "comments": {
+            "totalCount": 1
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": [
+              {
+                "login": "nina"
+              }
+            ]
+          },
+          "reviewRequests": {
+            "nodes": [
+              {
+                "requestedReviewer": {
+                  "kind": "User",
+                  "login": "ivan",
+                  "avatarUrl": "https://avatars.example/ivan"
+                }
+              },
+              {
+                "requestedReviewer": {
+                  "kind": "Team",
+                  "name": "team-a"
+                }
+              }
+            ]
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "myReviews": {
+            "nodes": []
+          },
+          "reviewThreads": {
+            "nodes": [
+              {
+                "isResolved": false,
+                "firstComment": {
+                  "nodes": [
+                    {
+                      "author": {
+                        "login": "nina"
+                      }
+                    }
+                  ]
+                },
+                "lastComment": {
+                  "nodes": [
+                    {
+                      "author": {
+                        "login": "nina"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "kind": "CheckRun",
+                          "name": "test",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "typecheck",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "build",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "typecheck",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-0",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-3",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-3",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "id": "PR_29770"
+        },
+        {
+          "number": 29767,
+          "title": "Change 29767",
+          "url": "https://github.com/acme/app/pull/29767",
+          "state": "OPEN",
+          "isDraft": false,
+          "author": {
+            "login": "tea",
+            "avatarUrl": "https://avatars.example/tea"
+          },
+          "headRefName": "feature/29767",
+          "baseRefName": "main",
+          "headRefOid": "27a095ab86620b7d81fbecf10bb4e06c7246d8f0",
+          "additions": 63,
+          "deletions": 0,
+          "changedFiles": 16,
+          "createdAt": "2026-10-02T05:51:19Z",
+          "updatedAt": "2026-10-02T13:46:29Z",
+          "mergedAt": null,
+          "reviewDecision": "REVIEW_REQUIRED",
+          "mergeable": "MERGEABLE",
+          "comments": {
+            "totalCount": 0
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "reviewRequests": {
+            "nodes": [
+              {
+                "requestedReviewer": {
+                  "kind": "Team",
+                  "name": "team-a"
+                }
+              },
+              {
+                "requestedReviewer": {
+                  "kind": "User",
+                  "login": "filip",
+                  "avatarUrl": "https://avatars.example/filip"
+                }
+              }
+            ]
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "myReviews": {
+            "nodes": []
+          },
+          "reviewThreads": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "kind": "CheckRun",
+                          "name": "typecheck",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "test",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "typecheck",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "build",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "e2e",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "lint",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-0",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-3",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-3",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "id": "PR_29767"
+        },
+        {
+          "number": 29747,
+          "title": "Change 29747",
+          "url": "https://github.com/acme/app/pull/29747",
+          "state": "OPEN",
+          "isDraft": false,
+          "author": {
+            "login": "maja",
+            "avatarUrl": "https://avatars.example/maja"
+          },
+          "headRefName": "feature/29747",
+          "baseRefName": "main",
+          "headRefOid": "6503e6f5246b0ac028ed7f7694676311b8f35183",
+          "additions": 101,
+          "deletions": 13,
+          "changedFiles": 15,
+          "createdAt": "2026-10-01T12:35:43Z",
+          "updatedAt": "2026-10-01T14:50:33Z",
+          "mergedAt": null,
+          "reviewDecision": "REVIEW_REQUIRED",
+          "mergeable": "MERGEABLE",
+          "comments": {
+            "totalCount": 1
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "reviewRequests": {
+            "nodes": [
+              {
+                "requestedReviewer": {
+                  "kind": "Team",
+                  "name": "team-a"
+                }
+              },
+              {
+                "requestedReviewer": {
+                  "kind": "User",
+                  "login": "nikola",
+                  "avatarUrl": "https://avatars.example/nikola"
+                }
+              },
+              {
+                "requestedReviewer": {
+                  "kind": "User",
+                  "login": "nina",
+                  "avatarUrl": "https://avatars.example/nina"
+                }
+              }
+            ]
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "myReviews": {
+            "nodes": []
+          },
+          "reviewThreads": {
+            "nodes": []
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "kind": "CheckRun",
+                          "name": "test",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "typecheck",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "build",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "typecheck",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "e2e",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "e2e",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "lint",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "lint",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-0",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-4",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-2",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-3",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-3",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        },
+                        {
+                          "kind": "StatusContext",
+                          "context": "ci/status-1",
+                          "state": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "id": "PR_29747"
+        },
+        {
+          "number": 29735,
+          "title": "Change 29735",
+          "url": "https://github.com/acme/app/pull/29735",
+          "state": "OPEN",
+          "isDraft": false,
+          "author": {
+            "login": "dora",
+            "avatarUrl": "https://avatars.example/dora"
+          },
+          "headRefName": "feature/29735",
+          "baseRefName": "main",
+          "headRefOid": "d77449246b8a27e0f07cd7c78c4c4f0dae4ac887",
+          "additions": 341,
+          "deletions": 56,
+          "changedFiles": 13,
+          "createdAt": "2026-10-01T08:32:29Z",
+          "updatedAt": "2026-10-02T09:40:42Z",
+          "mergedAt": null,
+          "reviewDecision": "REVIEW_REQUIRED",
+          "mergeable": "MERGEABLE",
+          "comments": {
+            "totalCount": 1
+          },
+          "labels": {
+            "nodes": []
+          },
+          "assignees": {
+            "nodes": []
+          },
+          "reviewRequests": {
+            "nodes": [
+              {
+                "requestedReviewer": {
+                  "kind": "User",
+                  "login": "stefan",
+                  "avatarUrl": "https://avatars.example/stefan"
+                }
+              },
+              {
+                "requestedReviewer": {
+                  "kind": "User",
+                  "login": "filip",
+                  "avatarUrl": "https://avatars.example/filip"
+                }
+              },
+              {
+                "requestedReviewer": {
+                  "kind": "Team",
+                  "name": "team-a"
+                }
+              }
+            ]
+          },
+          "latestReviews": {
+            "nodes": []
+          },
+          "myReviews": {
+            "nodes": []
+          },
+          "reviewThreads": {
+            "nodes": [
+              {
+                "isResolved": false,
+                "firstComment": {
+                  "nodes": [
+                    {
+                      "author": {
+                        "login": "dora"
+                      }
+                    }
+                  ]
+                },
+                "lastComment": {
+                  "nodes": [
+                    {
+                      "author": {
+                        "login": "dora"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "commits": {
+            "nodes": [
+              {
+                "commit": {
+                  "statusCheckRollup": {
+                    "state": "SUCCESS",
+                    "contexts": {
+                      "nodes": [
+                        {
+                          "kind": "CheckRun",
+                          "name": "test",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "typecheck",
+                          "conclusion": "SKIPPED"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "typecheck",
+                          "conclusion": "SUCCESS"
+                        },
+                        {
+                          "kind": "CheckRun",
+                          "name": "deploy",
+                          "conclusion": "SUCCESS"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "id": "PR_29735"
+        }
+      ]
+    }
+  }
+}

@@ -3,7 +3,13 @@ export type DomainErrorKind =
   | "conflict"
   | "validation"
   | "unauthenticated"
-  | "forbidden";
+  | "forbidden"
+  /** The request is fine but the setup can't serve it (422). */
+  | "unprocessable"
+  /** An upstream service (GitHub) failed (502). */
+  | "bad_gateway"
+  /** An upstream budget ran out (GitHub's rate limit) (429). */
+  | "rate_limited";
 
 /**
  * Base class for typed domain errors thrown by services. Translation to HTTP

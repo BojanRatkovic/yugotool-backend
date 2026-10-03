@@ -1,0 +1,199 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "reviewThreads": {
+          "totalCount": 6,
+          "nodes": [
+            {
+              "id": "PRRT_kwDOArdYLs6oZalG",
+              "isResolved": false,
+              "isOutdated": false,
+              "path": "src/lib/file-1.ts",
+              "line": 110,
+              "startLine": 110,
+              "originalLine": 110,
+              "diffSide": "RIGHT",
+              "viewerCanResolve": true,
+              "viewerCanUnresolve": false,
+              "viewerCanReply": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "id": "PRRC_kwDOArdYLs74ZGnh",
+                    "diffHunk": "@@ -98,6 +100,21 @@\n  line 1\n  line 2\n  line 3\n+ line 4\n+ line 5\n+ line 6\n+ line 7\n+ line 8\n+ line 9\n+ line 10\n+ line 11",
+                    "bodyHTML": "<p>Comment 2 with <code>code</code>.</p>",
+                    "createdAt": "2026-10-02T15:43:41Z",
+                    "state": "SUBMITTED",
+                    "author": {
+                      "login": "jovan",
+                      "avatarUrl": "https://avatars.example/jovan"
+                    },
+                    "pullRequestReview": {
+                      "id": "PRR_kwDOArdYLs8AAAABQX69yg"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOArdYLs6oaP3Z",
+              "isResolved": false,
+              "isOutdated": false,
+              "path": "src/ui/file-2.ts",
+              "line": 59,
+              "startLine": 59,
+              "originalLine": 59,
+              "diffSide": "RIGHT",
+              "viewerCanResolve": true,
+              "viewerCanUnresolve": false,
+              "viewerCanReply": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "id": "PRRC_kwDOArdYLs74aaA_",
+                    "diffHunk": "@@ -46,9 +47,16 @@\n  line 1\n  line 2\n  line 3\n+ line 4\n+ line 5\n+ line 6\n+ line 7\n  line 8\n  line 9\n  line 10\n+ line 11\n+ line 12\n+ line 13",
+                    "bodyHTML": "<p>Comment 3 with <code>code</code>.</p>",
+                    "createdAt": "2026-10-02T16:25:04Z",
+                    "state": "SUBMITTED",
+                    "author": {
+                      "login": "jovan",
+                      "avatarUrl": "https://avatars.example/jovan"
+                    },
+                    "pullRequestReview": {
+                      "id": "PRR_kwDOArdYLs8AAAABQX69yg"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOArdYLs6oaqZK",
+              "isResolved": false,
+              "isOutdated": false,
+              "path": "src/lib/file-1.ts",
+              "line": 114,
+              "startLine": 114,
+              "originalLine": 114,
+              "diffSide": "RIGHT",
+              "viewerCanResolve": true,
+              "viewerCanUnresolve": false,
+              "viewerCanReply": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "id": "PRRC_kwDOArdYLs74bD6X",
+                    "diffHunk": "@@ -98,6 +100,21 @@\n  line 1\n  line 2\n  line 3\n+ line 4\n+ line 5\n+ line 6\n+ line 7\n+ line 8\n+ line 9\n+ line 10\n+ line 11\n+ line 12\n+ line 13\n+ line 14\n+ line 15",
+                    "bodyHTML": "<p>Comment 4 with <code>code</code>.</p>",
+                    "createdAt": "2026-10-02T16:47:19Z",
+                    "state": "SUBMITTED",
+                    "author": {
+                      "login": "jovan",
+                      "avatarUrl": "https://avatars.example/jovan"
+                    },
+                    "pullRequestReview": {
+                      "id": "PRR_kwDOArdYLs8AAAABQX69yg"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOArdYLs6oa3NV",
+              "isResolved": false,
+              "isOutdated": false,
+              "path": "src/app/file-3.ts",
+              "line": 674,
+              "startLine": 674,
+              "originalLine": 674,
+              "diffSide": "RIGHT",
+              "viewerCanResolve": true,
+              "viewerCanUnresolve": false,
+              "viewerCanReply": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "id": "PRRC_kwDOArdYLs74bYRM",
+                    "diffHunk": "@@ -671,6 +671,16 @@\n  line 1\n  line 2\n  line 3\n+ line 4",
+                    "bodyHTML": "<p>Comment 5 with <code>code</code>.</p>",
+                    "createdAt": "2026-10-02T16:57:50Z",
+                    "state": "SUBMITTED",
+                    "author": {
+                      "login": "jovan",
+                      "avatarUrl": "https://avatars.example/jovan"
+                    },
+                    "pullRequestReview": {
+                      "id": "PRR_kwDOArdYLs8AAAABQX69yg"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOArdYLs6obDMD",
+              "isResolved": false,
+              "isOutdated": false,
+              "path": "src/lib/file-4.ts",
+              "line": 726,
+              "startLine": 726,
+              "originalLine": 726,
+              "diffSide": "RIGHT",
+              "viewerCanResolve": true,
+              "viewerCanUnresolve": false,
+              "viewerCanReply": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "id": "PRRC_kwDOArdYLs74brJk",
+                    "diffHunk": "@@ -721,6 +722,79 @@\n  line 1\n  line 2\n  line 3\n+ line 4\n+ line 5",
+                    "bodyHTML": "<p>Comment 6 with <code>code</code>.</p>",
+                    "createdAt": "2026-10-02T17:07:52Z",
+                    "state": "SUBMITTED",
+                    "author": {
+                      "login": "jovan",
+                      "avatarUrl": "https://avatars.example/jovan"
+                    },
+                    "pullRequestReview": {
+                      "id": "PRR_kwDOArdYLs8AAAABQX69yg"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_kwDOArdYLs6obIln",
+              "isResolved": false,
+              "isOutdated": false,
+              "path": "src/ui/file-5.ts",
+              "line": 312,
+              "startLine": 312,
+              "originalLine": 312,
+              "diffSide": "RIGHT",
+              "viewerCanResolve": true,
+              "viewerCanUnresolve": false,
+              "viewerCanReply": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "id": "PRRC_kwDOArdYLs74bzuj",
+                    "diffHunk": "@@ -309,6 +309,7 @@\n  line 1\n  line 2\n  line 3\n+ line 4",
+                    "bodyHTML": "<p>Comment 7 with <code>code</code>.</p>",
+                    "createdAt": "2026-10-02T17:12:39Z",
+                    "state": "SUBMITTED",
+                    "author": {
+                      "login": "jovan",
+                      "avatarUrl": "https://avatars.example/jovan"
+                    },
+                    "pullRequestReview": {
+                      "id": "PRR_kwDOArdYLs8AAAABQX69yg"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
