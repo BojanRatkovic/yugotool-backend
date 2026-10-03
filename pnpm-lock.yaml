@@ -182,10 +182,10 @@ importers:
         version: 4.6.5
     devDependencies:
       '@temporalio/client':
-        specifier: 1.24.0
+        specifier: ^1.24.0
         version: 1.24.0
       '@temporalio/testing':
-        specifier: 1.24.0
+        specifier: ^1.24.0
         version: 1.24.0(esbuild@0.28.2)
       '@types/pngjs':
         specifier: ^6.0.5
