@@ -603,3 +603,40 @@ export const MERGE_PR = /* GraphQL */ `
     }
   }
 `;
+
+/**
+ * What a ZASTAVA review freezes at start (spec 0009): the raw markdown body,
+ * both commits and the unresolved threads (first comment each). ~1 point.
+ */
+export const PR_REVIEW_SNAPSHOT = /* GraphQL */ `
+  query PrReviewSnapshot($owner: String!, $name: String!, $number: Int!) {
+    repository(owner: $owner, name: $name) {
+      pullRequest(number: $number) {
+        number
+        title
+        url
+        body
+        state
+        headRefName
+        headRefOid
+        baseRefName
+        baseRefOid
+        reviewThreads(first: 100) {
+          nodes {
+            isResolved
+            path
+            line
+            comments(first: 1) {
+              nodes {
+                body
+                author {
+                  login
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+`;

@@ -85,3 +85,15 @@ export function isRateLimit(error: unknown): boolean {
       /rate limit|abuse detection/i.test(error.message))
   );
 }
+
+/** A ZASTAVA review of this PR is still running (spec 0009). */
+export class ReviewAlreadyRunningError extends DomainError {
+  readonly code = "review_running";
+  readonly kind = "conflict";
+}
+
+/** Only open pull requests are reviewed. */
+export class PullRequestNotOpenError extends DomainError {
+  readonly code = "pull_request_not_open";
+  readonly kind = "conflict";
+}

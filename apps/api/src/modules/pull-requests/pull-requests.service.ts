@@ -13,6 +13,7 @@ import {
   PR_DETAIL,
   PR_FILES,
   PR_FINGERPRINT,
+  PR_REVIEW_SNAPSHOT,
   PR_THREADS,
   PR_TIMELINE,
   PRS_BY_ID,
@@ -69,6 +70,58 @@ const pullRefsSchema = z.object({
   head: z.object({ sha: z.string() }),
   base: z.object({ sha: z.string() }),
 });
+const reviewSnapshotSchema = z.object({
+  repository: z.object({
+    pullRequest: z
+      .object({
+        number: z.number(),
+        title: z.string(),
+        url: z.string(),
+        body: z.string(),
+        state: z.enum(["OPEN", "CLOSED", "MERGED"]),
+        headRefName: z.string(),
+        headRefOid: z.string(),
+        baseRefName: z.string(),
+        baseRefOid: z.string(),
+        reviewThreads: z.object({
+          nodes: z.array(
+            z
+              .object({
+                isResolved: z.boolean(),
+                path: z.string(),
+                line: z.number().nullable(),
+                comments: z.object({
+                  nodes: z.array(
+                    z
+                      .object({
+                        body: z.string(),
+                        author: z.object({ login: z.string() }).nullable(),
+                      })
+                      .nullable(),
+                  ),
+                }),
+              })
+              .nullable(),
+          ),
+        }),
+      })
+      .nullable(),
+  }),
+});
+
+/** What a ZASTAVA review freezes when it starts. */
+export interface PullRequestReviewSnapshot {
+  number: number;
+  title: string;
+  url: string;
+  body: string;
+  open: boolean;
+  headRefName: string;
+  headOid: string;
+  baseRefName: string;
+  baseOid: string;
+  openThreads: { path: string; line: number | null; author: string; body: string }[];
+}
 const DIFF = "application/vnd.github.diff";
 /** Caps from spec 0008 §4: GitHub has the rest. */
 const MAX_FILE_PAGES = 3;
@@ -362,6 +415,48 @@ export class PullRequestsService {
     return {
       timeline: timeline.slice(-MAX_TIMELINE_ITEMS),
       timelineTruncated: more || timeline.length > MAX_TIMELINE_ITEMS,
+    };
+  }
+
+  /** The PR as a ZASTAVA review starts from it: fresh from GitHub, never cached. */
+  async reviewSnapshot(projectId: string, number: number): Promise<PullRequestReviewSnapshot> {
+    const repo = await this.repo(projectId);
+    const data = await this.github
+      .graphql(
+        PR_REVIEW_SNAPSHOT,
+        { owner: repo.owner, name: repo.name, number },
+        reviewSnapshotSchema,
+      )
+      .catch((error: unknown) => {
+        if (error instanceof GithubError && error.httpStatus === 404) {
+          throw new PullRequestNotFoundError(`pull request #${number} not found`);
+        }
+        throw rateLimited(error);
+      });
+    const pr = data.repository.pullRequest;
+    if (!pr) throw new PullRequestNotFoundError(`pull request #${number} not found`);
+    return {
+      number: pr.number,
+      title: pr.title,
+      url: pr.url,
+      body: pr.body,
+      open: pr.state === "OPEN",
+      headRefName: pr.headRefName,
+      headOid: pr.headRefOid,
+      baseRefName: pr.baseRefName,
+      baseOid: pr.baseRefOid,
+      openThreads: pr.reviewThreads.nodes.flatMap((thread) => {
+        const first = thread?.comments.nodes[0];
+        if (!thread || thread.isResolved || !first) return [];
+        return [
+          {
+            path: thread.path,
+            line: thread.line,
+            author: first.author?.login ?? "ghost",
+            body: first.body,
+          },
+        ];
+      }),
     };
   }
 

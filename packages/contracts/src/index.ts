@@ -1522,6 +1522,9 @@ export const zastavaReviewSchema = z.object({
 export type ZastavaReview = z.infer<typeof zastavaReviewSchema>;
 
 export const zastavaReviewResultSchema = z.object({ review: zastavaReviewSchema.nullable() });
+
+/** `head`: the PR's current head commit, so the answer can say the review is stale. */
+export const zastavaReviewQuerySchema = z.object({ head: z.string().min(7).max(64).optional() });
 export type ZastavaReviewResult = z.infer<typeof zastavaReviewResultSchema>;
 
 /** Findings the human kept, as edited; they go to the pending review. */

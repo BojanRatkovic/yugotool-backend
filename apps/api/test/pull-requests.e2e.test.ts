@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { GlobalExceptionFilter } from "../src/common/filters/global-exception.filter";
 import { ProjectsService } from "../src/modules/projects/projects.service";
 import { GithubClient } from "../src/modules/pull-requests/github/gh-client";
+import { PullRequestReviewsService } from "../src/modules/pull-requests/pull-request-reviews.service";
 import { PullRequestWritesService } from "../src/modules/pull-requests/pull-request-writes.service";
 import { GhMissingError, GithubError } from "../src/modules/pull-requests/pull-requests.errors";
 import { PullRequestsController } from "../src/modules/pull-requests/pull-requests.controller";
@@ -32,6 +33,8 @@ async function start(remote: () => Promise<ProjectRemote> = () => Promise.resolv
     providers: [
       PullRequestsService,
       PullRequestWritesService,
+      // ZASTAVA reviews have their own e2e (pull-request-reviews.e2e.test.ts).
+      { provide: PullRequestReviewsService, useValue: {} },
       { provide: GithubClient, useValue: github },
       { provide: ProjectsService, useValue: { remote: vi.fn(remote) } },
     ],

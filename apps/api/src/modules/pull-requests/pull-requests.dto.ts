@@ -10,6 +10,10 @@ import {
   pullRequestDetailSchema,
   pullRequestListQuerySchema,
   pullRequestListSchema,
+  startReviewSchema,
+  zastavaReviewQuerySchema,
+  zastavaReviewResultSchema,
+  zastavaReviewSchema,
 } from "@zastava/contracts";
 import { createZodDto } from "nestjs-zod";
 
@@ -24,3 +28,7 @@ export class PrLineCommentInputDto extends createZodDto(prLineCommentInputSchema
 export class PrSubmitReviewInputDto extends createZodDto(prSubmitReviewInputSchema) {}
 export class PrViewedInputDto extends createZodDto(prViewedInputSchema) {}
 export class PrMergeInputDto extends createZodDto(prMergeInputSchema) {}
+export class StartReviewDto extends createZodDto(startReviewSchema) {}
+export class ZastavaReviewDto extends createZodDto(zastavaReviewSchema) {}
+export class ZastavaReviewResultDto extends createZodDto(zastavaReviewResultSchema) {}
+export class ZastavaReviewQueryDto extends createZodDto(zastavaReviewQuerySchema) {}

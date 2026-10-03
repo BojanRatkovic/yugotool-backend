@@ -1,6 +1,8 @@
 import { Module } from "@nestjs/common";
 import { ProjectsModule } from "../projects/projects.module";
 import { GithubClient } from "./github/gh-client";
+import { PullRequestReviewsRepository } from "./pull-request-reviews.repository";
+import { PullRequestReviewsService } from "./pull-request-reviews.service";
 import { PullRequestWritesService } from "./pull-request-writes.service";
 import { PullRequestsController } from "./pull-requests.controller";
 import { PullRequestsService } from "./pull-requests.service";
@@ -9,6 +11,12 @@ import { PullRequestsService } from "./pull-requests.service";
 @Module({
   imports: [ProjectsModule],
   controllers: [PullRequestsController],
-  providers: [PullRequestsService, PullRequestWritesService, GithubClient],
+  providers: [
+    PullRequestsService,
+    PullRequestWritesService,
+    PullRequestReviewsService,
+    PullRequestReviewsRepository,
+    GithubClient,
+  ],
 })
 export class PullRequestsModule {}

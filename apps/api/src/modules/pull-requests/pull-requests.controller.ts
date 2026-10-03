@@ -12,7 +12,13 @@ import {
   Query,
 } from "@nestjs/common";
 import { ApiNoContentResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
-import type { PrDiff, PullRequestDetail, PullRequestList } from "@zastava/contracts";
+import type {
+  PrDiff,
+  PullRequestDetail,
+  PullRequestList,
+  ZastavaReview,
+  ZastavaReviewResult,
+} from "@zastava/contracts";
 import {
   PrCommentInputDto,
   PrDiffDto,
@@ -25,7 +31,12 @@ import {
   PullRequestDetailDto,
   PullRequestListDto,
   PullRequestListQueryDto,
+  StartReviewDto,
+  ZastavaReviewDto,
+  ZastavaReviewQueryDto,
+  ZastavaReviewResultDto,
 } from "./pull-requests.dto";
+import { PullRequestReviewsService } from "./pull-request-reviews.service";
 import { PullRequestWritesService } from "./pull-request-writes.service";
 import { PullRequestsService } from "./pull-requests.service";
 
@@ -35,7 +46,30 @@ export class PullRequestsController {
   constructor(
     private readonly service: PullRequestsService,
     private readonly writes: PullRequestWritesService,
+    private readonly reviews: PullRequestReviewsService,
   ) {}
+
+  /** The latest ZASTAVA review of the PR (spec 0009); `head` = its current head, for `stale`. */
+  @Get(":number/zastava-review")
+  @ApiOkResponse({ type: ZastavaReviewResultDto })
+  async zastavaReview(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Param("number", ParseIntPipe) number: number,
+    @Query() query: ZastavaReviewQueryDto,
+  ): Promise<ZastavaReviewResult> {
+    return { review: await this.reviews.latest(projectId, number, query.head) };
+  }
+
+  /** Starts a ZASTAVA review on the PR's current head; 409 `review_running` while one runs. */
+  @Post(":number/zastava-review")
+  @ApiOkResponse({ type: ZastavaReviewDto })
+  startZastavaReview(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Param("number", ParseIntPipe) number: number,
+    @Body() body: StartReviewDto,
+  ): Promise<ZastavaReview> {
+    return this.reviews.start(projectId, number, body);
+  }
 
   /** A board: my PRs, or the ones that want my review (spec 0008 §3). */
   @Get()
