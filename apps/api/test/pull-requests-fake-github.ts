@@ -46,6 +46,9 @@ export class FakeGithub {
       repository: { pullRequest: { id: "PR_1", pendingReviews: { nodes: [] } } },
     },
     AddReview: { addPullRequestReview: { pullRequestReview: { id: "PRR_new" } } },
+    AddReviewThread: (v) => ({
+      addPullRequestReviewThread: { thread: { id: `PRRT_${String(v.path)}:${String(v.line)}` } },
+    }),
   };
 
   graphql(query: string, variables: Record<string, unknown>, schema: Schema): Promise<unknown> {

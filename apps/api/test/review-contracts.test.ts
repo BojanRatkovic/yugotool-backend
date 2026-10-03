@@ -3,6 +3,7 @@ import {
   REVIEW_LINE_STATIONS,
   REVIEW_VERDICT_JSON_SCHEMA,
   postFindingsSchema,
+  reviewPullRequestSchema,
   reviewVerdictSchema,
   updateLineSchema,
   updateReviewLineSchema,
@@ -37,6 +38,40 @@ describe("reviewVerdictSchema", () => {
     expect(REVIEW_VERDICT_JSON_SCHEMA).not.toHaveProperty("$schema");
     expect(REVIEW_VERDICT_JSON_SCHEMA).toMatchObject({ type: "object" });
     expect(JSON.stringify(REVIEW_VERDICT_JSON_SCHEMA)).toContain("recommendation");
+  });
+
+  it("defaults previous to [] and makes it required for the agent", () => {
+    const parsed = reviewVerdictSchema.parse({
+      recommendation: "approve",
+      summary: "",
+      findings: [],
+    });
+    expect(parsed.previous).toEqual([]);
+    expect(REVIEW_VERDICT_JSON_SCHEMA.required).toContain("previous");
+  });
+
+  it("accepts a status per previous finding and rejects unknown statuses", () => {
+    const base = { recommendation: "comment", summary: "", findings: [] };
+    const ok = { id: "f1", status: "partly", note: "src/a.ts:14 guards only one call" };
+    expect(reviewVerdictSchema.parse({ ...base, previous: [ok] }).previous).toEqual([ok]);
+    expect(
+      reviewVerdictSchema.safeParse({ ...base, previous: [{ ...ok, status: "wontfix" }] }).success,
+    ).toBe(false);
+  });
+});
+
+describe("reviewPullRequestSchema", () => {
+  it("fills the re-review fields on rows from before spec 0010", () => {
+    const parsed = reviewPullRequestSchema.parse({
+      number: 1,
+      url: "u",
+      headRefName: "h",
+      headOid: "a",
+      baseRefName: "main",
+      baseOid: "b",
+      sinceOid: null,
+    });
+    expect(parsed).toMatchObject({ posted: [], postedThreads: {}, previousFindings: [] });
   });
 });
 

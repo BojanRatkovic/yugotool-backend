@@ -109,6 +109,8 @@ export class PullRequestReviewsService {
           sinceOid: lastHead && lastHead !== pr.headOid ? lastHead : null,
           openThreads: pr.openThreads,
           posted: [],
+          postedThreads: {},
+          previousFindings: [],
         },
       });
     });
@@ -163,8 +165,13 @@ export class PullRequestReviewsService {
       ...(result.bodyAdded ? plan.bodyIds : []),
       ...result.added.map((i) => plan.commentIds[i]).filter((id) => id !== undefined),
     ];
+    const threads: Record<string, string> = {};
+    for (const [index, threadId] of Object.entries(result.threads)) {
+      const id = plan.commentIds[Number(index)];
+      if (id !== undefined) threads[id] = threadId;
+    }
     if (posted.length > 0) {
-      await this.repository.markPosted(db, row.workOrderId, posted);
+      await this.repository.markPosted(db, row.workOrderId, posted, threads);
       await this.events.publish({ type: "invalidate", collection: "reviews" });
     }
     if (result.refused) {

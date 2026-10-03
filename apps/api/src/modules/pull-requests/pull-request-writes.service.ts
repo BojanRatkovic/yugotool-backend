@@ -59,6 +59,9 @@ const anySchema = z.unknown();
 const addReviewSchema = z.object({
   addPullRequestReview: z.object({ pullRequestReview: z.object({ id: z.string() }) }),
 });
+const addReviewThreadSchema = z.object({
+  addPullRequestReviewThread: z.object({ thread: z.object({ id: z.string() }).nullable() }),
+});
 
 /** GraphQL error types that mean "GitHub said no", not "GitHub is broken". */
 const REFUSALS = new Set(["UNPROCESSABLE", "FORBIDDEN", "UNAUTHORIZED", "NOT_FOUND"]);
@@ -72,6 +75,8 @@ interface Target {
 /** What went into the pending review: comments by input index, and the first refusal. */
 export interface PendingReviewResult {
   added: number[];
+  /** Thread id per added comment, by input index (missing when GitHub sent none). */
+  threads: Record<number, string>;
   bodyAdded: boolean;
   refused: string | null;
 }
@@ -138,7 +143,12 @@ export class PullRequestWritesService {
     input: { comments: PrLineCommentInput[]; body: string | null; expectHead?: string },
     onHeadMoved: (head: string) => Error,
   ): Promise<PendingReviewResult> {
-    const result: PendingReviewResult = { added: [], bodyAdded: false, refused: null };
+    const result: PendingReviewResult = {
+      added: [],
+      threads: {},
+      bodyAdded: false,
+      refused: null,
+    };
     await this.write(projectId, number, async (target) => {
       if (input.expectHead && target.headOid && target.headOid !== input.expectHead) {
         throw onHeadMoved(target.headOid);
@@ -167,7 +177,7 @@ export class PullRequestWritesService {
         }
         for (const [index, comment] of input.comments.entries()) {
           reviewId ??= await this.startReview(target.pullRequestId);
-          await this.mutate(
+          const data = await this.mutate(
             ADD_REVIEW_THREAD,
             {
               reviewId,
@@ -178,9 +188,11 @@ export class PullRequestWritesService {
               startSide: comment.startLine ? (comment.startSide ?? comment.side) : null,
               body: comment.body,
             },
-            anySchema,
+            addReviewThreadSchema,
           );
           result.added.push(index);
+          const threadId = data.addPullRequestReviewThread.thread?.id;
+          if (threadId) result.threads[index] = threadId;
         }
       } catch (error) {
         if (!(error instanceof GithubRefusedError)) throw error;

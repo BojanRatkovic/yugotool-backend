@@ -22,7 +22,12 @@ function localTemporal(): string | null {
   }
 }
 
-const review: ReviewVerdict = { recommendation: "approve", summary: "Fine.", findings: [] };
+const review: ReviewVerdict = {
+  recommendation: "approve",
+  summary: "Fine.",
+  findings: [],
+  previous: [],
+};
 const lint: Station = { key: "lint", kind: "checks", name: "Lint", command: "pnpm lint" };
 
 function context(stations: Station[]): ReviewRunContext {

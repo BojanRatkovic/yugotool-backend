@@ -137,12 +137,23 @@ class MemoryReviews {
         posted: r.pullRequest.posted.length,
       })),
   );
-  markPosted = vi.fn(async (_db: unknown, workOrderId: string, ids: string[]) => {
-    const row = this.rows.get(workOrderId);
-    if (!row) return;
-    const posted = [...new Set([...row.pullRequest.posted, ...ids])];
-    this.rows.set(workOrderId, { ...row, pullRequest: { ...row.pullRequest, posted } });
-  });
+  markPosted = vi.fn(
+    async (
+      _db: unknown,
+      workOrderId: string,
+      ids: string[],
+      threads: Record<string, string> = {},
+    ) => {
+      const row = this.rows.get(workOrderId);
+      if (!row) return;
+      const posted = [...new Set([...row.pullRequest.posted, ...ids])];
+      const postedThreads = { ...row.pullRequest.postedThreads, ...threads };
+      this.rows.set(workOrderId, {
+        ...row,
+        pullRequest: { ...row.pullRequest, posted, postedThreads },
+      });
+    },
+  );
   markFailed = vi.fn(async (_db: unknown, workOrderId: string) => {
     const row = this.rows.get(workOrderId);
     if (row) this.rows.set(workOrderId, { ...row, status: "failed", runStatus: "failed" });
@@ -312,6 +323,7 @@ const VERDICT: ReviewVerdict = {
     finding({}),
     finding({ id: "f2", severity: "minor", file: null, line: null, title: "No tests" }),
   ],
+  previous: [],
 };
 const target = (pending: { id: string; body: string } | null, head = HEAD) => ({
   repository: {
@@ -358,6 +370,8 @@ describe("posting findings", () => {
     github.answers.PrWriteTarget = target(null);
     const res = await http.post(POST).send({ findings: edits }).expect(200);
     expect(res.body.pullRequest.posted.toSorted()).toEqual(["f1", "f2"]);
+    // The line finding's thread is remembered; the summary finding has none.
+    expect(res.body.pullRequest.postedThreads).toEqual({ f1: "PRRT_src/a.ts:12" });
     expect(github.operations().filter((o) => o.startsWith("Add"))).toEqual([
       "AddReview",
       "AddReviewThread",
@@ -408,6 +422,7 @@ describe("posting findings", () => {
     expect(res.body.error.code).toBe("github_refused");
     expect(res.body.error.message).toContain("1 of 2 added");
     expect(reviews.rows.get(workOrderId)?.pullRequest.posted).toEqual(["f2"]);
+    expect(reviews.rows.get(workOrderId)?.pullRequest.postedThreads).toEqual({});
   });
 
   it("is 422 finding_unknown for ids the review doesn't have", async () => {

@@ -8,7 +8,12 @@ function reviewerStation(): AgentStation {
   return station;
 }
 const reviewer = reviewerStation();
-const clean: ReviewVerdict = { recommendation: "approve", summary: "Fine.", findings: [] };
+const clean: ReviewVerdict = {
+  recommendation: "approve",
+  summary: "Fine.",
+  findings: [],
+  previous: [],
+};
 
 describe("buildReviewPrompt", () => {
   it("points at the brief and never asks for edits", () => {
@@ -41,6 +46,7 @@ describe("mergeFindings", () => {
         recommendation: "approve",
         summary: "s",
         findings: [{ ...checks, id: "f1", severity: "minor", category: "convention" }],
+        previous: [],
       },
       [checks],
     );

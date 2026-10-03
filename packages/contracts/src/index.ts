@@ -694,6 +694,23 @@ export type QueueMode = z.infer<typeof queueModeSchema>;
 export const workOrderKindSchema = z.enum(["build", "review"]);
 export type WorkOrderKind = z.infer<typeof workOrderKindSchema>;
 
+/** A finding of the previous review, as a re-review sees it (spec 0010). */
+export const previousFindingSchema = z.object({
+  id: z.string(),
+  severity: z.enum(["critical", "important", "minor"]),
+  category: z.string(),
+  file: z.string().nullable(),
+  /** Line at the previous review's head. */
+  line: z.number().int().nullable(),
+  title: z.string(),
+  body: z.string(),
+  posted: z.boolean(),
+  threadId: z.string().nullable(),
+  /** The thread's state on GitHub when the re-review started; null without a thread. */
+  threadResolved: z.boolean().nullable(),
+});
+export type PreviousFinding = z.infer<typeof previousFindingSchema>;
+
 /** The PR a review work order looks at, frozen when the review starts. */
 export const reviewPullRequestSchema = z.object({
   number: z.number().int().min(1),
@@ -717,6 +734,10 @@ export const reviewPullRequestSchema = z.object({
     .default([]),
   /** Finding ids already added to the pending review on GitHub. */
   posted: z.array(z.string()).default([]),
+  /** Review thread each posted line finding became (findingId → threadId); spec 0010. */
+  postedThreads: z.record(z.string(), z.string()).default({}),
+  /** The previous done review's findings, frozen at start so the re-review checks each one. */
+  previousFindings: z.array(previousFindingSchema).max(30).default([]),
 });
 export type ReviewPullRequest = z.infer<typeof reviewPullRequestSchema>;
 
@@ -1482,13 +1503,25 @@ export const reviewFindingSchema = z.object({
 });
 export type ReviewFinding = z.infer<typeof reviewFindingSchema>;
 
+/** Whether a previous finding was fixed on the new head. */
+export const previousStatusSchema = z.object({
+  /** The previous finding's id. */
+  id: z.string(),
+  status: z.enum(["fixed", "partly", "open"]),
+  /** One line of evidence: file:line or commit. */
+  note: z.string(),
+});
+export type PreviousStatus = z.infer<typeof previousStatusSchema>;
+
 /** What a review station returns (also its JSON schema). */
 export const reviewVerdictSchema = z.object({
   recommendation: z.enum(["approve", "comment", "request_changes"]),
   /** 2–5 sentences: what the PR does and what matters. */
   summary: z.string(),
-  /** Most severe first. */
+  /** Most severe first. On a re-review: new problems only. */
   findings: z.array(reviewFindingSchema).max(30),
+  /** One status per previous finding (spec 0010); empty on a first review. */
+  previous: z.array(previousStatusSchema).max(30).default([]),
 });
 export type ReviewVerdict = z.infer<typeof reviewVerdictSchema>;
 

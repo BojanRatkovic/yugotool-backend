@@ -1,9 +1,11 @@
 import { Injectable } from "@nestjs/common";
-import type {
-  ReviewPullRequest,
-  ReviewVerdict,
-  RunStatus,
-  ZastavaReviewBrief,
+import {
+  type ReviewPullRequest,
+  type ReviewVerdict,
+  type RunStatus,
+  type ZastavaReviewBrief,
+  reviewPullRequestSchema,
+  reviewVerdictSchema,
 } from "@zastava/contracts";
 import { type Executor, runEvents, runs, stationRuns, workOrders } from "@zastava/db";
 import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
@@ -73,6 +75,8 @@ export class PullRequestReviewsRepository {
     run: typeof runs.$inferSelect | null,
     createdAt: Date,
   ): Promise<ReviewRow> {
+    // Rows from before spec 0010 lack the re-review fields; parsing fills the defaults.
+    pullRequest = reviewPullRequestSchema.parse(pullRequest);
     if (!run) {
       return {
         workOrderId,
@@ -112,7 +116,7 @@ export class PullRequestReviewsRepository {
       runStatus: run.status === "changes_requested" ? "running" : run.status,
       pullRequest,
       costUsd: cost?.usd ?? 0,
-      verdict: review?.review ?? null,
+      verdict: review?.review ? reviewVerdictSchema.parse(review.review) : null,
       error: error?.message ?? null,
       startedAt: run.startedAt,
       finishedAt: run.finishedAt,
@@ -218,8 +222,16 @@ export class PullRequestReviewsRepository {
     return { workOrderId: workOrder.id, runId: run.id, workflowId };
   }
 
-  /** Remembers which findings are in the pending review on GitHub (set union). */
-  async markPosted(db: Executor, workOrderId: string, ids: string[]): Promise<void> {
+  /**
+   * Remembers which findings are in the pending review on GitHub (set union)
+   * and the review thread each line finding became.
+   */
+  async markPosted(
+    db: Executor,
+    workOrderId: string,
+    ids: string[],
+    threads: Record<string, string> = {},
+  ): Promise<void> {
     const [row] = await db
       .select({ pullRequest: workOrders.pullRequest })
       .from(workOrders)
@@ -228,7 +240,13 @@ export class PullRequestReviewsRepository {
     const posted = [...new Set([...row.pullRequest.posted, ...ids])];
     await db
       .update(workOrders)
-      .set({ pullRequest: { ...row.pullRequest, posted } })
+      .set({
+        pullRequest: {
+          ...row.pullRequest,
+          posted,
+          postedThreads: { ...row.pullRequest.postedThreads, ...threads },
+        },
+      })
       .where(eq(workOrders.id, workOrderId));
   }
 
