@@ -42,7 +42,11 @@ describe("ghFailureError", () => {
       }),
       stderr: "gh: Could not resolve to a PullRequest",
     });
-    expect(error).toMatchObject({ message: "Could not resolve to a PullRequest", httpStatus: 404 });
+    expect(error).toMatchObject({
+      message: "Could not resolve to a PullRequest",
+      httpStatus: 404,
+      type: "NOT_FOUND",
+    });
   });
 
   it("falls back to stderr when there is no JSON body", () => {

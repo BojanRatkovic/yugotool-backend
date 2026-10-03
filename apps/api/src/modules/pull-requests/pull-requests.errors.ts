@@ -29,6 +29,8 @@ export class GithubError extends DomainError {
     message: string,
     /** HTTP status GitHub answered with, when gh reported one. */
     readonly httpStatus: number | null = null,
+    /** GraphQL error type (NOT_FOUND, UNPROCESSABLE, FORBIDDEN…), when any. */
+    readonly type: string | null = null,
   ) {
     super(message);
   }
@@ -47,5 +49,23 @@ export class PullRequestsProjectNotFoundError extends DomainError {
 /** The `since` commit isn't on GitHub any more (force push); the UI falls back to the full diff. */
 export class SinceUnknownError extends DomainError {
   readonly code = "since_unknown";
+  readonly kind = "conflict";
+}
+
+/** GitHub refused a write (e.g. approving your own PR); the message is GitHub's. */
+export class GithubRefusedError extends DomainError {
+  readonly code = "github_refused";
+  readonly kind = "unprocessable";
+}
+
+/** REQUEST_CHANGES / COMMENT without a body or pending comments (GitHub's rule). */
+export class ReviewBodyRequiredError extends DomainError {
+  readonly code = "review_body_required";
+  readonly kind = "unprocessable";
+}
+
+/** GitHub won't merge (checks, reviews, conflicts…); the message is GitHub's. */
+export class MergeRefusedError extends DomainError {
+  readonly code = "merge_refused";
   readonly kind = "conflict";
 }

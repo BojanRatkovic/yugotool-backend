@@ -1,5 +1,11 @@
 import {
+  prCommentInputSchema,
   prDiffQuerySchema,
+  prLineCommentInputSchema,
+  prMergeInputSchema,
+  prReplyInputSchema,
+  prSubmitReviewInputSchema,
+  prViewedInputSchema,
   prDiffSchema,
   pullRequestDetailSchema,
   pullRequestListQuerySchema,
@@ -12,3 +18,9 @@ export class PullRequestListQueryDto extends createZodDto(pullRequestListQuerySc
 export class PullRequestDetailDto extends createZodDto(pullRequestDetailSchema) {}
 export class PrDiffDto extends createZodDto(prDiffSchema) {}
 export class PrDiffQueryDto extends createZodDto(prDiffQuerySchema) {}
+export class PrCommentInputDto extends createZodDto(prCommentInputSchema) {}
+export class PrReplyInputDto extends createZodDto(prReplyInputSchema) {}
+export class PrLineCommentInputDto extends createZodDto(prLineCommentInputSchema) {}
+export class PrSubmitReviewInputDto extends createZodDto(prSubmitReviewInputSchema) {}
+export class PrViewedInputDto extends createZodDto(prViewedInputSchema) {}
+export class PrMergeInputDto extends createZodDto(prMergeInputSchema) {}

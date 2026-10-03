@@ -394,3 +394,143 @@ export const PR_TIMELINE = /* GraphQL */ `
     }
   }
 `;
+
+// ── Writes ──────────────────────────────────────────────────────────────────
+
+/** The PR's node id and my pending review, which every write starts from. */
+export const PR_WRITE_TARGET = /* GraphQL */ `
+  query PrWriteTarget($owner: String!, $name: String!, $number: Int!, $viewer: String!) {
+    repository(owner: $owner, name: $name) {
+      pullRequest(number: $number) {
+        id
+        pendingReviews: reviews(first: 1, states: PENDING, author: $viewer) {
+          nodes {
+            id
+            comments {
+              totalCount
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+export const ADD_COMMENT = /* GraphQL */ `
+  mutation AddComment($subjectId: ID!, $body: String!) {
+    addComment(input: { subjectId: $subjectId, body: $body }) {
+      clientMutationId
+    }
+  }
+`;
+
+export const ADD_THREAD_REPLY = /* GraphQL */ `
+  mutation AddThreadReply($threadId: ID!, $body: String!) {
+    addPullRequestReviewThreadReply(input: { pullRequestReviewThreadId: $threadId, body: $body }) {
+      clientMutationId
+    }
+  }
+`;
+
+export const RESOLVE_THREAD = /* GraphQL */ `
+  mutation ResolveThread($threadId: ID!) {
+    resolveReviewThread(input: { threadId: $threadId }) {
+      clientMutationId
+    }
+  }
+`;
+
+export const UNRESOLVE_THREAD = /* GraphQL */ `
+  mutation UnresolveThread($threadId: ID!) {
+    unresolveReviewThread(input: { threadId: $threadId }) {
+      clientMutationId
+    }
+  }
+`;
+
+/** Without `event` the review stays PENDING (mine, invisible to others). */
+export const ADD_REVIEW = /* GraphQL */ `
+  mutation AddReview($pullRequestId: ID!, $event: PullRequestReviewEvent, $body: String) {
+    addPullRequestReview(input: { pullRequestId: $pullRequestId, event: $event, body: $body }) {
+      pullRequestReview {
+        id
+      }
+    }
+  }
+`;
+
+export const ADD_REVIEW_THREAD = /* GraphQL */ `
+  mutation AddReviewThread(
+    $reviewId: ID!
+    $path: String!
+    $line: Int!
+    $side: DiffSide!
+    $startLine: Int
+    $startSide: DiffSide
+    $body: String!
+  ) {
+    addPullRequestReviewThread(
+      input: {
+        pullRequestReviewId: $reviewId
+        path: $path
+        line: $line
+        side: $side
+        startLine: $startLine
+        startSide: $startSide
+        body: $body
+      }
+    ) {
+      thread {
+        id
+      }
+    }
+  }
+`;
+
+export const SUBMIT_REVIEW = /* GraphQL */ `
+  mutation SubmitReview($reviewId: ID!, $event: PullRequestReviewEvent!, $body: String) {
+    submitPullRequestReview(input: { pullRequestReviewId: $reviewId, event: $event, body: $body }) {
+      clientMutationId
+    }
+  }
+`;
+
+export const DELETE_REVIEW = /* GraphQL */ `
+  mutation DeleteReview($reviewId: ID!) {
+    deletePullRequestReview(input: { pullRequestReviewId: $reviewId }) {
+      clientMutationId
+    }
+  }
+`;
+
+export const MARK_FILE_VIEWED = /* GraphQL */ `
+  mutation MarkFileViewed($pullRequestId: ID!, $path: String!) {
+    markFileAsViewed(input: { pullRequestId: $pullRequestId, path: $path }) {
+      clientMutationId
+    }
+  }
+`;
+
+export const UNMARK_FILE_VIEWED = /* GraphQL */ `
+  mutation UnmarkFileViewed($pullRequestId: ID!, $path: String!) {
+    unmarkFileAsViewed(input: { pullRequestId: $pullRequestId, path: $path }) {
+      clientMutationId
+    }
+  }
+`;
+
+export const MARK_READY = /* GraphQL */ `
+  mutation MarkReady($pullRequestId: ID!) {
+    markPullRequestReadyForReview(input: { pullRequestId: $pullRequestId }) {
+      clientMutationId
+    }
+  }
+`;
+
+export const MERGE_PR = /* GraphQL */ `
+  mutation MergePr($pullRequestId: ID!, $method: PullRequestMergeMethod!) {
+    mergePullRequest(input: { pullRequestId: $pullRequestId, mergeMethod: $method }) {
+      clientMutationId
+    }
+  }
+`;

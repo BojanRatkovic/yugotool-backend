@@ -48,20 +48,20 @@ export function ghFailureError(failure: GhFailure): Error {
   }
   const status = /\(HTTP (\d{3})\)/.exec(stderr);
   const body = githubBody(failure.stdout);
-  const httpStatus = status ? Number(status[1]) : body.notFound ? 404 : null;
+  const httpStatus = status ? Number(status[1]) : body.type === "NOT_FOUND" ? 404 : null;
   const message = body.message ?? (stderr.replace(/^gh: /, "") || "GitHub request failed");
-  return new GithubError(message, httpStatus);
+  return new GithubError(message, httpStatus, body.type);
 }
 
-/** GitHub's error from a JSON body: GraphQL `errors[]` (NOT_FOUND typed) or REST `message`. */
-function githubBody(stdout: string): { message: string | null; notFound: boolean } {
+/** GitHub's error from a JSON body: GraphQL `errors[]` (with a type) or REST `message`. */
+function githubBody(stdout: string): { message: string | null; type: string | null } {
   const parsed = errorBodySchema.safeParse(parseJson(stdout));
-  if (!parsed.success) return { message: null, notFound: false };
+  if (!parsed.success) return { message: null, type: null };
   const body = parsed.data;
   const messages = body.errors?.map((e) => e.message).filter(Boolean) ?? [];
   return {
     message: messages.length ? messages.join("; ") : (body.message ?? null),
-    notFound: body.errors?.some((e) => e.type === "NOT_FOUND") ?? false,
+    type: body.errors?.find((e) => e.type)?.type ?? null,
   };
 }
 
@@ -84,7 +84,12 @@ export class GithubClient {
     if (!envelope.success) throw new GithubError("GitHub returned an unreadable response");
     const { errors, data } = envelope.data;
     if (errors?.length) {
-      throw new GithubError(errors.map((e) => e.message ?? "GraphQL error").join("; "));
+      const type = errors.find((e) => e.type)?.type ?? null;
+      throw new GithubError(
+        errors.map((e) => e.message ?? "GraphQL error").join("; "),
+        type === "NOT_FOUND" ? 404 : null,
+        type,
+      );
     }
     return this.check(schema, data);
   }
