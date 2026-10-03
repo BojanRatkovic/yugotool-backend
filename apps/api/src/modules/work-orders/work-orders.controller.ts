@@ -41,6 +41,13 @@ export class WorkOrdersController {
     return this.service.needsYou();
   }
 
+  /** Read live from the database (the dispatcher's state can lag a tick). */
+  @Get("running")
+  @ApiOkResponse({ type: [NeedsYouItemDto] })
+  running(): Promise<NeedsYouItem[]> {
+    return this.service.running();
+  }
+
   /** Push a locally delivered branch and open a PR (draft or ready). */
   @Post(":id/pull-request")
   @HttpCode(200)

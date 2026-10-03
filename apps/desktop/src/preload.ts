@@ -9,6 +9,8 @@ contextBridge.exposeInMainWorld("zastavaDesktop", {
   /** Native folder picker; resolves to the chosen path or null. */
   pickFolder: (current?: string): Promise<string | null> =>
     ipcRenderer.invoke("zastava:pick-folder", current),
+  /** The web app's theme, so the next loading screen and the window chrome match it. */
+  setTheme: (theme: "dark" | "light"): void => ipcRenderer.send("zastava:theme", theme),
   // Loading screen only.
   onStatus: (callback: (status: unknown) => void) =>
     ipcRenderer.on("zastava:status", (_event, status: unknown) => callback(status)),

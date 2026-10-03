@@ -1,6 +1,7 @@
 import type { SupervisorStatus } from "@zastava/supervisor";
 import { describe, expect, it, vi } from "vitest";
 import { parseSse } from "../src/events";
+import { quitWarning, readPrefs } from "../src/prefs";
 import { parseShellPath } from "../src/shell-env";
 import { flagBitmap, trayMenuTemplate, trayTitle } from "../src/tray-menu";
 
@@ -91,5 +92,23 @@ describe("tray", () => {
     const bitmap = flagBitmap(32);
     expect(bitmap).toHaveLength(32 * 32 * 4);
     expect(bitmap.some((byte) => byte === 255)).toBe(true);
+  });
+});
+
+describe("quitWarning", () => {
+  it("stays quiet when nothing runs", () => {
+    expect(quitWarning([])).toBeNull();
+  });
+  it("names the work orders it would cut, at most three", () => {
+    expect(quitWarning(["Fix login"])?.message).toBe("A work order is running");
+    const many = quitWarning(["a", "b", "c", "d", "e"]);
+    expect(many?.message).toBe("5 work orders are running");
+    expect(many?.detail).toContain("• c\n• and 2 more");
+  });
+});
+
+describe("readPrefs", () => {
+  it("falls back to dark for a missing or broken file", () => {
+    expect(readPrefs("/nonexistent/desktop.json")).toEqual({ theme: "dark" });
   });
 });

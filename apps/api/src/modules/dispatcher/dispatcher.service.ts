@@ -98,7 +98,10 @@ export class DispatcherService implements OnModuleInit, OnModuleDestroy {
     }
 
     // Probe the plan only when there is work to start: the probe spawns a process.
-    const block = usageBlock(await this.planUsage.get(), settings);
+    // On an API key, agents do not draw from the plan, so its limits do not apply.
+    const block = (await this.settings.apiKey())
+      ? null
+      : usageBlock(await this.planUsage.get(), settings);
     if (block)
       return { ...base, status: "paused_usage", reason: block.reason, resumesAt: block.resumesAt };
 

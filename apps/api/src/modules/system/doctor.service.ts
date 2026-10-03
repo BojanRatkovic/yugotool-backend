@@ -18,6 +18,7 @@ import type { Env } from "../../core/config/env.schema";
 import { DatabaseService } from "../../core/database/database.service";
 import { TEMPORAL_CLIENT } from "../../core/temporal/temporal.module";
 import { ReposService } from "../repos/repos.service";
+import { SettingsService } from "../settings/settings.service";
 import { PlanUsageService } from "./plan-usage.service";
 
 const exec = promisify(execFile);
@@ -54,6 +55,7 @@ export class DoctorService {
     private readonly database: DatabaseService,
     private readonly planUsage: PlanUsageService,
     private readonly repos: ReposService,
+    private readonly settings: SettingsService,
     @Inject(TEMPORAL_CLIENT) private readonly temporal: Client,
   ) {}
 
@@ -150,15 +152,15 @@ export class DoctorService {
   }
 
   private async claude(): Promise<Result> {
-    if (this.config.get("ANTHROPIC_API_KEY", { infer: true })) {
-      return ok("API key (ANTHROPIC_API_KEY)");
-    }
+    const { anthropicApiKeySource: keySource } = await this.settings.get();
+    if (keySource)
+      return ok(keySource === "settings" ? "API key (Settings)" : "API key (ANTHROPIC_API_KEY)");
     const usage = await this.planUsage.get();
     if (usage.subscriptionType) return ok(`Logged in · ${capitalize(usage.subscriptionType)} plan`);
     return problem(
       "fail",
       usage.error ? `Not logged in (${usage.error})` : "Not logged in",
-      "Run claude in a terminal and log in with /login, or set ANTHROPIC_API_KEY.",
+      "Run claude in a terminal and log in with /login, or add an API key in Settings.",
       "claude",
     );
   }

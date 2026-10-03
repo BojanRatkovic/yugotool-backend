@@ -1,5 +1,4 @@
 import { Controller, Get } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import {
   type DoctorReport,
@@ -10,8 +9,8 @@ import {
   systemInfoSchema,
 } from "@zastava/contracts";
 import { createZodDto } from "nestjs-zod";
-import type { Env } from "../../core/config/env.schema";
 import { ReposService } from "../repos/repos.service";
+import { SettingsService } from "../settings/settings.service";
 import { DoctorService } from "./doctor.service";
 import { PlanUsageService } from "./plan-usage.service";
 
@@ -23,10 +22,10 @@ class PlanUsageDto extends createZodDto(planUsageSchema) {}
 @Controller("system")
 export class SystemController {
   constructor(
-    private readonly config: ConfigService<Env, true>,
     private readonly planUsage: PlanUsageService,
     private readonly doctor: DoctorService,
     private readonly repos: ReposService,
+    private readonly settings: SettingsService,
   ) {}
 
   /** First-run checks; each runs fresh (the Claude probe is cached for a minute). */
@@ -43,8 +42,8 @@ export class SystemController {
   }
 
   /**
-   * The worker shares this machine and shell, so the API's view of the key is
-   * the worker's. Each station run also records the source the SDK reported.
+   * The worker reads the same key (Settings, else its ANTHROPIC_API_KEY). Each
+   * station run also records the source the SDK reported.
    */
   @Get()
   @ApiOkResponse({ type: SystemInfoDto })
@@ -52,9 +51,7 @@ export class SystemController {
     return {
       reposRoot: await this.repos.root(),
       reposRootDefault: this.repos.defaultRoot,
-      authSource: this.config.get("ANTHROPIC_API_KEY", { infer: true })
-        ? "api_key"
-        : "subscription",
+      authSource: (await this.settings.apiKey()) ? "api_key" : "subscription",
     };
   }
 }

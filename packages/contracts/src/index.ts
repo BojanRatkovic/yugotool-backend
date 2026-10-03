@@ -1003,11 +1003,21 @@ export const settingsSchema = z.object({
   telegramChatId: z.string().nullable(),
   /** Folder the repo picker scans (absolute or ~/…); null = the default from SystemInfo. */
   reposRoot: z.string().trim().min(1).nullable(),
+  /** Masked API key ("sk-ant-…x7Qd"); the key itself is never returned. Null = Claude plan login. */
+  anthropicApiKeyHint: z.string().nullable(),
+  /** "env" = ANTHROPIC_API_KEY of the environment (not removable here); "settings" = saved in Settings. */
+  anthropicApiKeySource: z.enum(["settings", "env"]).nullable(),
   updatedAt: isoDate,
 });
 export type Settings = z.infer<typeof settingsSchema>;
 
-export const updateSettingsSchema = settingsSchema.omit({ updatedAt: true }).partial();
+export const updateSettingsSchema = settingsSchema
+  .omit({ updatedAt: true, anthropicApiKeyHint: true, anthropicApiKeySource: true })
+  .partial()
+  .extend({
+    /** Write-only: a key saves it (checked with Anthropic first), null removes the saved key. */
+    anthropicApiKey: z.string().trim().min(1).nullable().optional(),
+  });
 export type UpdateSettings = z.infer<typeof updateSettingsSchema>;
 
 export const dispatcherStateSchema = z.object({

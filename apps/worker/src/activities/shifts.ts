@@ -14,6 +14,7 @@ import {
 import { type Database, runs, shifts, stationRuns, workOrders } from "@zastava/db";
 import { eq, sql } from "drizzle-orm";
 import { localRunner } from "../runner/local-runner";
+import { withApiKey } from "../claude-env";
 import { sandboxFor } from "../runner/sandbox";
 import { shiftMemory } from "../runner/shift-memory";
 import {
@@ -296,7 +297,7 @@ export function createShiftActivities(db: Database, deps: ShiftDeps) {
         gitLog: await localRunner.recentLog(input.worktreePath),
       });
 
-      const sandboxed = await sandboxFor(input.worktreePath);
+      const sandboxed = await withApiKey(await sandboxFor(input.worktreePath));
       const baseOptions = {
         cwd: input.worktreePath,
         model,

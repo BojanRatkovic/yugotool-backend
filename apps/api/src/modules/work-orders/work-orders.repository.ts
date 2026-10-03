@@ -26,7 +26,19 @@ export class WorkOrdersRepository {
   }
 
   /** Every work order waiting at a gate, oldest first. */
-  async listAwaitingApproval(db: Executor): Promise<NeedsYouItem[]> {
+  listAwaitingApproval(db: Executor): Promise<NeedsYouItem[]> {
+    return this.listBrief(db, "awaiting_approval");
+  }
+
+  /** Orders with an agent at work right now (what quitting the desktop app would cut). */
+  listRunning(db: Executor): Promise<NeedsYouItem[]> {
+    return this.listBrief(db, "running");
+  }
+
+  private async listBrief(
+    db: Executor,
+    status: "awaiting_approval" | "running",
+  ): Promise<NeedsYouItem[]> {
     const rows = await db
       .select({
         workOrderId: workOrders.id,
@@ -37,7 +49,7 @@ export class WorkOrdersRepository {
       })
       .from(workOrders)
       .innerJoin(projects, eq(projects.id, workOrders.projectId))
-      .where(eq(workOrders.status, "awaiting_approval"))
+      .where(eq(workOrders.status, status))
       .orderBy(asc(workOrders.updatedAt));
     return rows.map((r) => ({ ...r, since: iso(r.since) }));
   }

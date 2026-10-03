@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- macOS icon grid: 824px body on a 1024 canvas, room for the system shadow. -->
+  <defs>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" style="stop-color: oklch(0.31 0.008 260)" />
+      <stop offset="1" style="stop-color: oklch(0.17 0.006 260)" />
+    </linearGradient>
+    <linearGradient id="flag" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" style="stop-color: oklch(0.64 0.22 25)" />
+      <stop offset="1" style="stop-color: oklch(0.54 0.21 25)" />
+    </linearGradient>
+    <linearGradient id="pole" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" style="stop-color: oklch(0.97 0.003 260)" />
+      <stop offset="1" style="stop-color: oklch(0.82 0.006 260)" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#000" flood-opacity="0.35" />
+    </filter>
+    <filter id="lift" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#000" flood-opacity="0.45" />
+    </filter>
+  </defs>
+  <g filter="url(#shadow)">
+    <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#body)" />
+    <!-- Hairline edge: steel, not plastic. -->
+    <rect x="101" y="101" width="822" height="822" rx="184" fill="none" stroke="#fff" stroke-opacity="0.09" stroke-width="2" />
+  </g>
+  <!-- The mark from the app (16-unit grid), scaled ×36 and centred. -->
+  <g transform="translate(206 242) scale(36)" filter="url(#lift)">
+    <path fill="url(#pole)" d="M3 1.5h1.5V15H3z" />
+    <path fill="url(#flag)" d="M4.5 2h9l-3 3.5 3 3.5h-9z" />
+  </g>
+</svg>

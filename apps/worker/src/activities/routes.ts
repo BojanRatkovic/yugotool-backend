@@ -13,6 +13,7 @@ import { type Database, projects } from "@zastava/db";
 import { eq } from "drizzle-orm";
 import { localRunner } from "../runner/local-runner";
 import { buildDiscoveryPrompt, normalizeDiscovery, routeSourceHash } from "../runner/route-map";
+import { withApiKey } from "../claude-env";
 import { sandboxFor } from "../runner/sandbox";
 
 const HEARTBEAT_MS = 10_000;
@@ -55,7 +56,7 @@ export async function runStructuredSession(args: {
   const ctx = Context.current();
   const abortController = new AbortController();
   args.signal?.addEventListener("abort", () => abortController.abort());
-  const sandboxed = await sandboxFor(args.cwd);
+  const sandboxed = await withApiKey(await sandboxFor(args.cwd));
   const session = query({
     prompt: args.prompt,
     options: {

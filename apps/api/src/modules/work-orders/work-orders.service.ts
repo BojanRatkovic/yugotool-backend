@@ -109,6 +109,10 @@ export class WorkOrdersService {
     return this.repository.listAwaitingApproval(this.database.db);
   }
 
+  running(): Promise<NeedsYouItem[]> {
+    return this.repository.listRunning(this.database.db);
+  }
+
   list(projectId: string): Promise<WorkOrder[]> {
     return this.repository.list(this.database.db, projectId);
   }

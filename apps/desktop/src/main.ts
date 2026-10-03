@@ -1,19 +1,23 @@
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { type NeedsYouItem, needsYouItemSchema, type ServerEvent } from "@zastava/contracts";
-import { loadConfig, Supervisor, type SupervisorStatus } from "@zastava/supervisor";
+import { LogFile, loadConfig, Supervisor, type SupervisorStatus } from "@zastava/supervisor";
 import {
   app,
   BrowserWindow,
+  crashReporter,
   dialog,
   ipcMain,
   Menu,
   nativeImage,
   Notification,
+  nativeTheme,
+  powerMonitor,
   shell,
   Tray,
 } from "electron";
 import { followEvents } from "./events";
+import { quitWarning, readPrefs, themeSchema, WINDOW_BACKGROUND, writePrefs } from "./prefs";
 import { loginShellPath } from "./shell-env";
 import { flagBitmap, trayMenuTemplate, trayTitle } from "./tray-menu";
 
@@ -28,8 +32,24 @@ if (!app.requestSingleInstanceLock()) app.quit();
 // Finder-launched apps get launchd's PATH; take the login shell's so git, gh,
 // nvm and temporal resolve. API and worker run on Electron's own Node.
 process.env["PATH"] = loginShellPath() ?? process.env["PATH"];
+/**
+ * Packaged app layout (scripts/dist.mjs): code in Resources/app, the web UI in
+ * Resources/web, the temporal CLI in Resources/bin. A checkout uses its siblings.
+ */
+const packagedPaths = app.isPackaged
+  ? {
+      ZASTAVA_BACKEND_ROOT: app.getAppPath(),
+      ZASTAVA_WEB_DIST: path.join(process.resourcesPath, "web"),
+      ZASTAVA_TEMPORAL_BIN: path.join(process.resourcesPath, "bin", "temporal"),
+    }
+  : {};
 const config = {
-  ...loadConfig({ ...process.env, ZASTAVA_NODE: process.execPath, ZASTAVA_DESKTOP_NOTICES: "app" }),
+  ...loadConfig({
+    ...process.env,
+    ...packagedPaths,
+    ZASTAVA_NODE: process.execPath,
+    ZASTAVA_DESKTOP_NOTICES: "app",
+  }),
   // The Electron binary runs API and worker as plain Node.
   extraEnv: { ELECTRON_RUN_AS_NODE: "1" },
 };
@@ -41,6 +61,29 @@ let status: SupervisorStatus | null = null;
 let needsYou: NeedsYouItem[] = [];
 let stopEvents: (() => void) | null = null;
 let quitting = false;
+/** Set when the OS or a signal asks to quit: no prompt then. */
+let forceQuit = false;
+/** A quit/restart prompt is open; repeated quit requests wait for it. */
+let asking = false;
+
+// Crash logs stay on this Mac: minidumps in ~/.zastava/crashes, the rest in logs/desktop.log.
+const log = new LogFile(config.logsDir, "desktop");
+app.setPath("crashDumps", path.join(config.home, "crashes"));
+crashReporter.start({ uploadToServer: false });
+process.on("uncaughtException", (error) => log.line(`uncaught: ${error.stack ?? String(error)}`));
+process.on("unhandledRejection", (reason) =>
+  log.line(
+    `unhandled rejection: ${reason instanceof Error ? (reason.stack ?? reason.message) : String(reason)}`,
+  ),
+);
+app.on("child-process-gone", (_event, details) =>
+  log.line(`child process gone: ${details.type} ${details.reason} (exit ${details.exitCode})`),
+);
+
+const prefsFile = path.join(config.home, "desktop.json");
+let prefs = readPrefs(prefsFile);
+// The loading screen follows prefers-color-scheme, which follows this.
+nativeTheme.themeSource = prefs.theme;
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -49,7 +92,7 @@ function createWindow(): BrowserWindow {
     minWidth: 960,
     minHeight: 600,
     title: "ZASTAVA",
-    backgroundColor: "#1c1d21",
+    backgroundColor: WINDOW_BACKGROUND[prefs.theme],
     show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -75,6 +118,11 @@ function createWindow(): BrowserWindow {
       event.preventDefault();
       win.hide();
     }
+  });
+  // A crashed or killed page would leave a blank window: log it and reload.
+  win.webContents.on("render-process-gone", (_event, details) => {
+    log.line(`renderer gone: ${details.reason} (exit ${details.exitCode})`);
+    if (details.reason !== "clean-exit" && !quitting) win.webContents.reload();
   });
   void win.loadFile(path.join(STATIC, "loading.html"));
   return win;
@@ -176,7 +224,7 @@ function refreshTray(): void {
       trayMenuTemplate(status, needsYou, {
         open,
         openLogs: () => void shell.openPath(config.logsDir),
-        restart: () => void restartServices(),
+        restart: () => void restartIfConfirmed(),
         quit: () => app.quit(),
       }),
     ),
@@ -211,10 +259,28 @@ ipcMain.handle("zastava:pick-folder", async (_event, current: unknown) => {
 });
 ipcMain.handle("zastava:retry", () => restartServices());
 ipcMain.handle("zastava:open-logs", () => shell.openPath(config.logsDir));
+ipcMain.on("zastava:theme", (_event, value: unknown) => {
+  const theme = themeSchema.safeParse(value);
+  if (!theme.success || theme.data === prefs.theme) return;
+  prefs = { ...prefs, theme: theme.data };
+  nativeTheme.themeSource = theme.data;
+  window?.setBackgroundColor(WINDOW_BACKGROUND[theme.data]);
+  try {
+    writePrefs(prefsFile, prefs);
+  } catch (error) {
+    log.line(`could not save ${prefsFile}: ${String(error)}`);
+  }
+});
 
 // Without these, a signal (kill, logout) exits before services are stopped.
-process.on("SIGTERM", () => app.quit());
-process.on("SIGINT", () => app.quit());
+/** OS shutdown (and signals, where Chromium does not take them first): no prompt. */
+const quitNow = (): void => {
+  forceQuit = true;
+  log.line("quit: requested by the system");
+  stopAndExit();
+};
+process.on("SIGTERM", quitNow);
+process.on("SIGINT", quitNow);
 app.on("second-instance", () => open());
 app.on("activate", () => open());
 /**
@@ -225,19 +291,82 @@ app.on("activate", () => open());
 app.on("before-quit", (event) => {
   event.preventDefault();
   if (quitting) return;
+  // Chromium turns SIGTERM into a plain quit request, so a second request
+  // while the prompt is open (⌘Q again, a script, logout) means quit anyway.
+  if (forceQuit || asking) {
+    if (asking) log.line("quit: requested again while asking, quitting");
+    stopAndExit();
+  } else void quitIfConfirmed();
+});
+
+/** Asks before quitting while agents are working; the OS logging out is never held up. */
+async function quitIfConfirmed(): Promise<void> {
+  if (await confirmInterrupt("Quit anyway")) stopAndExit();
+}
+
+async function restartIfConfirmed(): Promise<void> {
+  if ((await confirmInterrupt("Restart anyway")) && !quitting) await restartServices();
+}
+
+async function confirmInterrupt(proceed: string): Promise<boolean> {
+  const warning = quitWarning((await runningWorkOrders()).map((order) => order.title));
+  if (!warning) return true;
+  asking = true;
+  try {
+    open();
+    const options: Electron.MessageBoxOptions = {
+      type: "warning",
+      ...warning,
+      buttons: [proceed, "Keep running"],
+      defaultId: 1,
+      cancelId: 1,
+    };
+    log.line(`prompt: ${warning.message}`);
+    const { response } = window
+      ? await dialog.showMessageBox(window, options)
+      : await dialog.showMessageBox(options);
+    log.line(`prompt answer: ${options.buttons?.[response] ?? response}`);
+    return response === 0;
+  } finally {
+    asking = false;
+  }
+}
+
+async function runningWorkOrders(): Promise<NeedsYouItem[]> {
+  if (!status || !supervisorReady()) return [];
+  try {
+    const res = await fetch(`${status.appUrl}/api/work-orders/running`, {
+      signal: AbortSignal.timeout(2_000),
+    });
+    const parsed = needsYouListSchema.safeParse(res.ok ? await res.json() : null);
+    return parsed.success ? parsed.data : [];
+  } catch {
+    return [];
+  }
+}
+
+function stopAndExit(): void {
+  if (quitting) return;
   quitting = true;
   stopEvents?.();
   window?.destroy();
   window = null;
-  console.log("quit: stopping services");
+  log.line("quit: stopping services");
   void (supervisor?.stop() ?? Promise.resolve()).finally(() => {
-    console.log("quit: services stopped");
-    app.exit(0);
+    log.line("quit: services stopped");
+    void log.close().finally(() => app.exit(0));
   });
-});
+}
 
 void (async () => {
   await app.whenReady();
+  powerMonitor.on("shutdown", quitNow);
+  app.setAboutPanelOptions({
+    applicationName: "ZASTAVA",
+    applicationVersion: app.getVersion(),
+    copyright: "Copyright © 2026 Bojan Ratković",
+    credits: "A software factory: work orders through a line of Claude Code agent stations.",
+  });
   tray = createTray();
   refreshTray();
   window = createWindow();

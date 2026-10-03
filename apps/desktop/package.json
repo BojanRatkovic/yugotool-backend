@@ -1,6 +1,6 @@
 {
   "name": "@zastava/desktop",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "ZASTAVA desktop app: starts the supervisor and opens the UI",
   "type": "commonjs",
@@ -10,13 +10,20 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "build": "tsc -p tsconfig.build.json",
-    "start": "electron ."
+    "start": "electron .",
+    "stage": "node scripts/stage.mjs",
+    "dist": "node scripts/dist.mjs --arch arm64 --arch x64",
+    "dist:dir": "node scripts/dist.mjs --dir",
+    "icon": "NODE_PATH=../worker/node_modules node build/render.cjs"
   },
   "dependencies": {
     "@zastava/contracts": "workspace:*",
-    "@zastava/supervisor": "workspace:*"
+    "@zastava/supervisor": "workspace:*",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
-    "electron": "^44.5.1"
-  }
+    "electron": "^44.5.1",
+    "electron-builder": "26.15.3"
+  },
+  "productName": "ZASTAVA"
 }

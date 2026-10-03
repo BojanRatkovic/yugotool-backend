@@ -1,8 +1,11 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
 import { NativeConnection, Worker } from "@temporalio/worker";
 import { TASK_QUEUE } from "@zastava/contracts";
 import { createDbClient } from "@zastava/db";
 import { z } from "zod";
 import { createActivities } from "./activities";
+import { readApiKeyFrom } from "./claude-env";
 
 // The worker's single process.env read, validated with defaults for local dev.
 const envSchema = z.object({
@@ -13,6 +16,8 @@ const envSchema = z.object({
   DESKTOP_NOTICES: z.enum(["osascript", "app"]).default("osascript"),
 });
 
+const PREBUILT_BUNDLE = path.join(__dirname, "workflow-bundle.js");
+
 async function main(): Promise<void> {
   const env = envSchema.parse(process.env);
   // Inside the desktop app this process is Electron running as Node; previews
@@ -20,6 +25,7 @@ async function main(): Promise<void> {
   // preview would start as plain Node).
   delete process.env["ELECTRON_RUN_AS_NODE"];
   const dbClient = createDbClient(env.DATABASE_URL);
+  readApiKeyFrom(dbClient.db);
   const connection = await NativeConnection.connect({ address: env.TEMPORAL_ADDRESS });
 
   try {
@@ -27,7 +33,10 @@ async function main(): Promise<void> {
       connection,
       namespace: env.TEMPORAL_NAMESPACE,
       taskQueue: TASK_QUEUE,
-      workflowsPath: require.resolve("./workflows"),
+      // The desktop app ships a prebuilt bundle (scripts/bundle-workflows.mjs); dev bundles at start.
+      ...(existsSync(PREBUILT_BUNDLE)
+        ? { workflowBundle: { codePath: PREBUILT_BUNDLE } }
+        : { workflowsPath: require.resolve("./workflows") }),
       activities: createActivities(dbClient.db, { desktopNotices: env.DESKTOP_NOTICES }),
       // Activities learn about a cancel only when a heartbeat reaches the
       // server; the default throttle (up to 60 s) let agents keep editing

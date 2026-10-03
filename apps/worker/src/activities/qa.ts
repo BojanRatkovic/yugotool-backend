@@ -64,6 +64,7 @@ import {
 } from "../runner/qa-logic";
 import { needsDiscovery, routeSourceHash } from "../runner/route-map";
 import { discoverRouteMap, runStructuredSession } from "./routes";
+import { withApiKey } from "../claude-env";
 import { sandboxFor } from "../runner/sandbox";
 
 const HEARTBEAT_MS = 10_000;
@@ -893,7 +894,9 @@ export function createQaActivities(db: Database, deps: QaDeps) {
     const ctx = Context.current();
     const abortController = new AbortController();
     args.signal.addEventListener("abort", () => abortController.abort());
-    const sandboxed = await sandboxFor(args.worktreePath, { readRoots: [args.artifacts] });
+    const sandboxed = await withApiKey(
+      await sandboxFor(args.worktreePath, { readRoots: [args.artifacts] }),
+    );
     let initScriptFile: string | null = null;
     if (station.interactive && args.initScript) {
       initScriptFile = path.join(path.dirname(args.agentDir), "browser-init.js");

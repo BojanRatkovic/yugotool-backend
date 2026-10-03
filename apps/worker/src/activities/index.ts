@@ -34,6 +34,7 @@ import { broadcast, type DesktopSink, truncateNotice } from "@zastava/notify";
 import { eq, sql } from "drizzle-orm";
 import { localRunner } from "../runner/local-runner";
 import { runRoots, strayListeners, tcpListeners } from "../runner/orphans";
+import { authRejection, withApiKey } from "../claude-env";
 import { sandboxFor } from "../runner/sandbox";
 import { createCiActivities } from "./ci";
 import { createPrBodyComposer } from "./pr-body";
@@ -490,7 +491,7 @@ export function createActivities(
       const abortController = new AbortController();
       ctx.cancellationSignal.addEventListener("abort", () => abortController.abort());
 
-      const sandboxed = await sandboxFor(input.worktreePath);
+      const sandboxed = await withApiKey(await sandboxFor(input.worktreePath));
       const session = query({
         prompt: input.prompt,
         options: {
@@ -522,6 +523,14 @@ export function createActivities(
       let contextTokens = 0;
       for await (const message of session) {
         ctx.heartbeat();
+        const rejected = authRejection(message);
+        if (rejected) {
+          isError = true;
+          output = rejected;
+          await appendEvent(input.runId, input.stationRunId, "system", rejected);
+          abortController.abort();
+          break;
+        }
         if (message.type === "system" && message.subtype === "init") {
           sessionId = message.session_id;
           await db
