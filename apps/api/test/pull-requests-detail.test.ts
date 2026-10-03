@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { ProjectsService } from "../src/modules/projects/projects.service";
 import type { GithubClient } from "../src/modules/pull-requests/github/gh-client";
 import {
@@ -7,12 +7,12 @@ import {
 } from "../src/modules/pull-requests/pull-requests.errors";
 import { toTimeline } from "../src/modules/pull-requests/pull-requests.mapper";
 import { PullRequestsService } from "../src/modules/pull-requests/pull-requests.service";
-import detailFixture from "./__fixtures__/pull-requests/detail-detail.json";
-import filesFixture from "./__fixtures__/pull-requests/detail-files.json";
-import threadsFixture from "./__fixtures__/pull-requests/detail-threads.json";
-import timelineFixture from "./__fixtures__/pull-requests/detail-timeline.json";
+import { FakeGithub } from "./pull-requests-fake-github";
 
-type Schema = { parse(v: unknown): unknown };
+const commit = (oid: string, login: string) => ({
+  kind: "PullRequestCommit",
+  commit: { oid, committedDate: "2026-10-01T10:00:00Z", author: { user: { login } } },
+});
 
 const remote = () =>
   Promise.resolve({
@@ -23,31 +23,13 @@ const remote = () =>
     reason: null,
   });
 
-const commit = (oid: string, login: string) => ({
-  kind: "PullRequestCommit",
-  commit: { oid, committedDate: "2026-10-01T10:00:00Z", author: { user: { login } } },
-});
-
-function setup(overrides: Partial<Record<string, unknown>> = {}) {
-  const responses: Record<string, unknown> = {
-    "query Viewer": { viewer: { login: "me" } },
-    "query PrDetail": detailFixture.data,
-    "query PrThreads": threadsFixture.data,
-    "query PrFiles": filesFixture.data,
-    "query PrTimeline": timelineFixture.data,
-    ...overrides,
-  };
-  const graphql = vi.fn((query: string, _vars: unknown, schema: Schema) => {
-    const key = Object.keys(responses).find((k) => query.includes(k));
-    const value = key ? responses[key] : undefined;
-    if (value instanceof Error) return Promise.reject(value);
-    return Promise.resolve(schema.parse(value));
-  });
+function setup() {
+  const fake = new FakeGithub();
   const service = new PullRequestsService(
-    { graphql } as unknown as GithubClient,
+    fake as unknown as GithubClient,
     { remote } as unknown as ProjectsService,
   );
-  return { service, graphql };
+  return { service, fake };
 }
 
 describe("PullRequestsService.detail", () => {
@@ -118,10 +100,31 @@ describe("PullRequestsService.detail", () => {
   });
 
   it("is 404 when GitHub doesn't know the PR", async () => {
-    const { service } = setup({
-      "query PrDetail": new GithubError("Could not resolve to a PullRequest", 404),
-    });
+    const { service, fake } = setup();
+    fake.answers.PrFingerprint = new GithubError("Could not resolve to a PullRequest", 404);
     await expect(service.detail("p1", 1)).rejects.toBeInstanceOf(PullRequestNotFoundError);
+    fake.answers.PrFingerprint = { repository: { pullRequest: null } };
+    await expect(service.detail("p1", 2)).rejects.toBeInstanceOf(PullRequestNotFoundError);
+  });
+
+  it("returns the cached panel while the fingerprint holds, and refetches when it moves", async () => {
+    const { service, fake } = setup();
+    await service.detail("p1", 29302);
+    await service.detail("p1", 29302);
+    expect(fake.count("PrFingerprint")).toBe(2);
+    expect(fake.count("PrDetail")).toBe(1);
+    fake.answers.PrFingerprint = {
+      repository: { pullRequest: { updatedAt: "2026-10-03T10:00:00Z" } },
+    };
+    await service.detail("p1", 29302);
+    expect(fake.count("PrDetail")).toBe(2);
+  });
+
+  it("serves the cached panel when GitHub refuses", async () => {
+    const { service, fake } = setup();
+    const first = await service.detail("p1", 29302);
+    fake.answers.PrFingerprint = new GithubError("API rate limit exceeded", null, "RATE_LIMITED");
+    await expect(service.detail("p1", 29302)).resolves.toBe(first);
   });
 });
 

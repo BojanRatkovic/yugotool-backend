@@ -11,12 +11,7 @@ import { PullRequestWritesService } from "../src/modules/pull-requests/pull-requ
 import { GhMissingError, GithubError } from "../src/modules/pull-requests/pull-requests.errors";
 import { PullRequestsController } from "../src/modules/pull-requests/pull-requests.controller";
 import { PullRequestsService } from "../src/modules/pull-requests/pull-requests.service";
-import detailFixture from "./__fixtures__/pull-requests/detail-detail.json";
-import filesFixture from "./__fixtures__/pull-requests/detail-files.json";
-import threadsFixture from "./__fixtures__/pull-requests/detail-threads.json";
-import timelineFixture from "./__fixtures__/pull-requests/detail-timeline.json";
-import assignedFixture from "./__fixtures__/pull-requests/search-assigned.json";
-import mineFixture from "./__fixtures__/pull-requests/search-mine.json";
+import { FakeGithub } from "./pull-requests-fake-github";
 
 const PROJECT = "85156849-2497-47fa-a2bd-494c776f572b";
 const BASE = `/projects/${PROJECT}/pull-requests`;
@@ -27,51 +22,6 @@ const GITHUB: ProjectRemote = {
   prPossible: true,
   reason: null,
 };
-
-type Schema = { parse(v: unknown): unknown };
-type Answer = ((variables: Record<string, unknown>) => unknown) | object | Error;
-
-/** The fake GitHub: answers by operation name; an Error answer is thrown. */
-class FakeGithub {
-  calls: { operation: string; variables: Record<string, unknown> }[] = [];
-  answers: Record<string, Answer> = {
-    Viewer: { viewer: { login: "me" } },
-    SearchPrs: (v) => ({ search: searchFixture(String(v.query)) }),
-    PrDetail: detailFixture.data,
-    PrThreads: threadsFixture.data,
-    PrFiles: filesFixture.data,
-    PrTimeline: timelineFixture.data,
-    PrWriteTarget: {
-      repository: { pullRequest: { id: "PR_1", pendingReviews: { nodes: [] } } },
-    },
-    AddReview: { addPullRequestReview: { pullRequestReview: { id: "PRR_new" } } },
-  };
-
-  graphql(query: string, variables: Record<string, unknown>, schema: Schema): Promise<unknown> {
-    const operation = /(?:query|mutation) (\w+)/.exec(query)?.[1] ?? "?";
-    this.calls.push({ operation, variables });
-    const answer = this.answers[operation] ?? {};
-    const value = typeof answer === "function" ? answer(variables) : answer;
-    if (value instanceof Error) return Promise.reject(value);
-    return Promise.resolve(schema.parse(value));
-  }
-
-  operations(): string[] {
-    return this.calls.map((c) => c.operation);
-  }
-}
-
-function searchFixture(q: string): unknown {
-  const { data: mine } = mineFixture;
-  const { data: assigned } = assignedFixture;
-  if (q.includes(" author:@me")) return q.includes("is:open") ? mine.open : mine.done;
-  if (q.includes("user-review-requested:@me")) return assigned.requested;
-  if (q.includes("assignee:@me")) return assigned.assigned;
-  if (q.includes("reviewed-by:@me")) {
-    return q.includes("is:closed") ? assigned.reviewedDone : assigned.reviewed;
-  }
-  return assigned.team;
-}
 
 let app: INestApplication | undefined;
 
@@ -152,10 +102,9 @@ describe("pull requests API", () => {
       subjectId: "PR_1",
       body: "Looks good",
     });
-    const searches = () => github.operations().filter((o) => o === "SearchPrs").length;
-    const before = searches();
+    const before = github.count("SearchFingerprints");
     await http.get(`${BASE}?scope=mine`).expect(200);
-    expect(searches()).toBe(before + 2);
+    expect(github.count("SearchFingerprints")).toBe(before + 2);
   });
 
   it("validates write bodies", async () => {
@@ -262,6 +211,17 @@ describe("pull requests API", () => {
       "AddThreadReply",
       "MarkReady",
     ]);
+  });
+
+  it("is 429 github_rate_limited when GitHub's budget is used up", async () => {
+    const { http, github } = await start();
+    github.answers.SearchFingerprints = new GithubError(
+      "API rate limit already exceeded for user ID 1.",
+      null,
+      "RATE_LIMITED",
+    );
+    const res = await http.get(`${BASE}?scope=mine`).expect(429);
+    expect(res.body.error.code).toBe("github_rate_limited");
   });
 
   it("is 404 for an unknown pull request", async () => {

@@ -1,14 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   type GhPullRequest,
-  ghSearchSchema,
-  searchPullRequests,
+  ghNodesSchema,
+  pullRequestNodes,
   toSummary,
 } from "../src/modules/pull-requests/pull-requests.mapper";
 import assignedFixture from "./__fixtures__/pull-requests/search-assigned.json";
 import mineFixture from "./__fixtures__/pull-requests/search-mine.json";
 
-const search = (raw: unknown) => searchPullRequests(ghSearchSchema.parse(raw));
+const search = (raw: { nodes: unknown[] }) =>
+  pullRequestNodes(ghNodesSchema.parse({ nodes: raw.nodes }));
 const mine = { open: search(mineFixture.data.open), done: search(mineFixture.data.done) };
 const assigned = Object.fromEntries(
   Object.entries(assignedFixture.data).map(([key, value]) => [key, search(value)]),
@@ -99,8 +100,8 @@ describe("toSummary", () => {
   });
 });
 
-describe("searchPullRequests", () => {
+describe("pullRequestNodes", () => {
   it("drops nodes that aren't pull requests", () => {
-    expect(search({ issueCount: 2, nodes: [{}, null] })).toEqual([]);
+    expect(search({ nodes: [{}, null] })).toEqual([]);
   });
 });

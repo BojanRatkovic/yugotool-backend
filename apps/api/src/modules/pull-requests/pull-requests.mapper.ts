@@ -35,6 +35,7 @@ const ghRollupSchema = z
   .nullable();
 
 export const ghPullRequestSchema = z.object({
+  id: z.string(),
   number: z.number().int(),
   title: z.string(),
   url: z.string(),
@@ -86,15 +87,46 @@ export const ghPullRequestSchema = z.object({
 });
 export type GhPullRequest = z.infer<typeof ghPullRequestSchema>;
 
-/** A search result; nodes that aren't pull requests come back as `{}` and are dropped. */
-export const ghSearchSchema = z.object({
-  issueCount: z.number().int(),
+/** PRS_BY_ID: full fields per node id; ids that aren't (or no longer are) PRs come back null or `{}`. */
+export const ghNodesSchema = z.object({
   nodes: z.array(z.union([ghPullRequestSchema, z.object({}).strict()]).nullable()),
 });
-export type GhSearch = z.infer<typeof ghSearchSchema>;
 
-export function searchPullRequests(search: GhSearch | null | undefined): GhPullRequest[] {
-  return (search?.nodes ?? []).filter((n): n is GhPullRequest => n !== null && "number" in n);
+export function pullRequestNodes(data: z.infer<typeof ghNodesSchema>): GhPullRequest[] {
+  return data.nodes.filter((n): n is GhPullRequest => n !== null && "number" in n);
+}
+
+/** SEARCH_FINGERPRINTS: just what tells that a PR changed. */
+const ghFingerprintSchema = z.object({
+  id: z.string(),
+  number: z.number().int(),
+  state: z.string(),
+  updatedAt: z.string(),
+  headRefOid: z.string(),
+  mergeable: z.string(),
+  reviewDecision: z.string().nullable(),
+  commits: nodes(
+    z.object({
+      commit: z.object({ statusCheckRollup: z.object({ state: z.string() }).nullable() }),
+    }),
+  ),
+});
+export type GhFingerprint = z.infer<typeof ghFingerprintSchema>;
+
+export const ghFingerprintSearchSchema = z.object({
+  search: z.object({
+    nodes: z.array(z.union([ghFingerprintSchema, z.object({}).strict()]).nullable()),
+  }),
+});
+
+export function fingerprints(data: z.infer<typeof ghFingerprintSearchSchema>): GhFingerprint[] {
+  return data.search.nodes.filter((n): n is GhFingerprint => n !== null && "number" in n);
+}
+
+/** One string that changes whenever the PR's card would. */
+export function fingerprintKey(pr: GhFingerprint): string {
+  const rollup = pr.commits.nodes[0]?.commit.statusCheckRollup?.state ?? "none";
+  return [pr.state, pr.updatedAt, pr.headRefOid, pr.mergeable, pr.reviewDecision, rollup].join("|");
 }
 
 // ── Mapping ─────────────────────────────────────────────────────────────────
@@ -341,6 +373,7 @@ export const ghThreadsSchema = z.object({
                     createdAt: z.string(),
                     state: z.string(),
                     author: ghActorSchema,
+                    pullRequestReview: z.object({ id: z.string() }).nullable(),
                   }),
                 ),
               })
@@ -389,7 +422,6 @@ const ghTimelineNodeSchema = z.object({
   state: z.string().optional(),
   author: ghActorSchema.optional(),
   actor: ghActorSchema.optional(),
-  comments: nodes(z.object({ id: z.string() })).optional(),
   commit: z
     .object({
       oid: z.string(),
@@ -518,7 +550,7 @@ const actorOf = (node: GhTimelineNode): PrActor | null => (node.actor ? toActor(
  */
 export function toTimeline(
   timelineNodes: GhTimelineNode[],
-  threadIdByCommentId: Map<string, string>,
+  threadIdsByReviewId: ReadonlyMap<string, string[]>,
 ): PrTimelineItem[] {
   const items: PrTimelineItem[] = [];
   for (const node of timelineNodes) {
@@ -536,10 +568,7 @@ export function toTimeline(
       case "PullRequestReview": {
         const state = reviewState(node.state ?? "");
         if (!state || state === "PENDING") break;
-        const threadIds = compact(node.comments).flatMap((c) => {
-          const id = threadIdByCommentId.get(c.id);
-          return id ? [id] : [];
-        });
+        const threadIds = threadIdsByReviewId.get(node.id ?? "") ?? [];
         items.push({
           kind: "review",
           id: node.id ?? "",
@@ -622,9 +651,16 @@ export function toDetail(parts: DetailParts, viewer: string): PullRequestDetail 
   const { detail, pr } = parts;
   const summary = toSummary(pr, { viewer });
   const threads = parts.threads.map(toThread);
-  const threadIdByCommentId = new Map(
-    threads.flatMap((t) => t.comments.map((c) => [c.id, t.id] as const)),
-  );
+  const threadIdsByReviewId = new Map<string, string[]>();
+  for (const thread of parts.threads) {
+    for (const comment of compact(thread.comments)) {
+      const reviewId = comment.pullRequestReview?.id;
+      if (!reviewId) continue;
+      const ids = threadIdsByReviewId.get(reviewId) ?? [];
+      if (!ids.includes(thread.id)) ids.push(thread.id);
+      threadIdsByReviewId.set(reviewId, ids);
+    }
+  }
   const pending = compact(pr.pendingReviews)[0];
   const contexts = compact(compact(pr.headCommit)[0]?.commit.statusCheckRollup?.contexts);
   return {
@@ -650,7 +686,7 @@ export function toDetail(parts: DetailParts, viewer: string): PullRequestDetail 
     checks: contexts.map(toCheck).toSorted((a, b) => CHECK_ORDER[a.state] - CHECK_ORDER[b.state]),
     files: parts.files.map(toFile),
     reviewThreads: threads,
-    timeline: toTimeline(parts.timeline, threadIdByCommentId),
+    timeline: toTimeline(parts.timeline, threadIdsByReviewId),
     commits: compact(pr.commitList).map(({ commit }) => ({
       oid: commit.oid,
       messageHeadline: commit.messageHeadline,

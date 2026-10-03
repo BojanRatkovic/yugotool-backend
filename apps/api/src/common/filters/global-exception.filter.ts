@@ -18,6 +18,7 @@ const KIND_TO_STATUS: Record<DomainErrorKind, number> = {
   forbidden: HttpStatus.FORBIDDEN,
   unprocessable: HttpStatus.UNPROCESSABLE_ENTITY,
   bad_gateway: HttpStatus.BAD_GATEWAY,
+  rate_limited: HttpStatus.TOO_MANY_REQUESTS,
 };
 
 interface ErrorBody {

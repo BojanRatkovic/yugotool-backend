@@ -157,28 +157,6 @@
               "author": {
                 "login": "jovan",
                 "avatarUrl": "https://avatars.example/jovan"
-              },
-              "comments": {
-                "nodes": [
-                  {
-                    "id": "PRRC_kwDOArdYLs74ZGnh"
-                  },
-                  {
-                    "id": "PRRC_kwDOArdYLs74aaA_"
-                  },
-                  {
-                    "id": "PRRC_kwDOArdYLs74bD6X"
-                  },
-                  {
-                    "id": "PRRC_kwDOArdYLs74bYRM"
-                  },
-                  {
-                    "id": "PRRC_kwDOArdYLs74brJk"
-                  },
-                  {
-                    "id": "PRRC_kwDOArdYLs74bzuj"
-                  }
-                ]
               }
             },
             {
@@ -203,9 +181,6 @@
               "author": {
                 "login": "jovan",
                 "avatarUrl": "https://avatars.example/jovan"
-              },
-              "comments": {
-                "nodes": []
               }
             }
           ]

@@ -37,18 +37,18 @@ export const PR_FIELDS = /* GraphQL */ `
     comments {
       totalCount
     }
-    labels(first: 10) {
+    labels(first: 5) {
       nodes {
         name
         color
       }
     }
-    assignees(first: 20) {
+    assignees(first: 10) {
       nodes {
         login
       }
     }
-    reviewRequests(first: 20) {
+    reviewRequests(first: 10) {
       nodes {
         requestedReviewer {
           kind: __typename
@@ -62,7 +62,7 @@ export const PR_FIELDS = /* GraphQL */ `
         }
       }
     }
-    latestReviews(first: 20) {
+    latestReviews(first: 10) {
       nodes {
         state
         author {
@@ -71,7 +71,7 @@ export const PR_FIELDS = /* GraphQL */ `
         }
       }
     }
-    myReviews: reviews(last: 10, author: $viewer) {
+    myReviews: reviews(last: 5, author: $viewer) {
       nodes {
         state
         submittedAt
@@ -80,7 +80,7 @@ export const PR_FIELDS = /* GraphQL */ `
         }
       }
     }
-    reviewThreads(first: 50) {
+    reviewThreads(first: 30) {
       nodes {
         isResolved
         firstComment: comments(first: 1) {
@@ -104,7 +104,7 @@ export const PR_FIELDS = /* GraphQL */ `
         commit {
           statusCheckRollup {
             state
-            contexts(first: 30) {
+            contexts(first: 20) {
               nodes {
                 kind: __typename
                 ... on CheckRun {
@@ -125,17 +125,45 @@ export const PR_FIELDS = /* GraphQL */ `
 `;
 
 /**
- * One search (a board runs several in parallel: a single request with all of
- * them times out on GitHub for busy repos).
+ * GitHub's GraphQL budget is 5000 points an hour and a search that pulls full
+ * PR fields costs ~130 (50 PRs × their nested lists). So a board polls with a
+ * cheap search (~1 point) that returns only what tells a PR changed, and
+ * fetches full fields (PRS_BY_ID) just for the PRs whose fingerprint moved.
  */
-export const SEARCH_PRS = /* GraphQL */ `
-  query SearchPrs($viewer: String!, $query: String!) {
+export const SEARCH_FINGERPRINTS = /* GraphQL */ `
+  query SearchFingerprints($query: String!) {
     search(query: $query, type: ISSUE, first: 50) {
-      issueCount
       nodes {
         ... on PullRequest {
-          ...PrFields
+          id
+          number
+          state
+          updatedAt
+          headRefOid
+          mergeable
+          reviewDecision
+          commits(last: 1) {
+            nodes {
+              commit {
+                statusCheckRollup {
+                  state
+                }
+              }
+            }
+          }
         }
+      }
+    }
+  }
+`;
+
+/** Full card fields for up to 25 PRs at a time (cost grows with the count). */
+export const PRS_BY_ID = /* GraphQL */ `
+  query PrsById($ids: [ID!]!, $viewer: String!) {
+    nodes(ids: $ids) {
+      ... on PullRequest {
+        id
+        ...PrFields
       }
     }
   }
@@ -221,6 +249,49 @@ export const PR_DETAIL = /* GraphQL */ `
   ${PR_FIELDS}
 `;
 
+/**
+ * What tells an open panel that something changed (~1 point): activity moves
+ * updatedAt, but CI progress and resolving a thread don't, so they're here too.
+ */
+export const PR_FINGERPRINT = /* GraphQL */ `
+  query PrFingerprint($owner: String!, $name: String!, $number: Int!) {
+    repository(owner: $owner, name: $name) {
+      pullRequest(number: $number) {
+        updatedAt
+        headRefOid
+        mergeable
+        reviewDecision
+        state
+        isDraft
+        reviewThreads(first: 100) {
+          nodes {
+            isResolved
+          }
+        }
+        commits(last: 1) {
+          nodes {
+            commit {
+              statusCheckRollup {
+                state
+                contexts(first: 1) {
+                  checkRunCountsByState {
+                    state
+                    count
+                  }
+                  statusContextCountsByState {
+                    state
+                    count
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
 export const PR_THREADS = /* GraphQL */ `
   query PrThreads($owner: String!, $name: String!, $number: Int!) {
     repository(owner: $owner, name: $name) {
@@ -239,7 +310,7 @@ export const PR_THREADS = /* GraphQL */ `
             viewerCanResolve
             viewerCanUnresolve
             viewerCanReply
-            comments(first: 50) {
+            comments(first: 30) {
               nodes {
                 id
                 diffHunk
@@ -249,6 +320,9 @@ export const PR_THREADS = /* GraphQL */ `
                 author {
                   login
                   avatarUrl
+                }
+                pullRequestReview {
+                  id
                 }
               }
             }
@@ -330,11 +404,6 @@ export const PR_TIMELINE = /* GraphQL */ `
               author {
                 login
                 avatarUrl
-              }
-              comments(first: 100) {
-                nodes {
-                  id
-                }
               }
             }
             ... on PullRequestCommit {

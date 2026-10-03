@@ -69,3 +69,19 @@ export class MergeRefusedError extends DomainError {
   readonly code = "merge_refused";
   readonly kind = "conflict";
 }
+
+/** GitHub's API budget for this gh user ran out; the message says when it resets. */
+export class GithubRateLimitedError extends DomainError {
+  readonly code = "github_rate_limited";
+  readonly kind = "rate_limited";
+}
+
+/** A rate limit, primary (RATE_LIMITED, 403/429 "rate limit") or secondary ("abuse"). */
+export function isRateLimit(error: unknown): boolean {
+  return (
+    error instanceof GithubError &&
+    (error.type === "RATE_LIMITED" ||
+      error.type === "RATE_LIMIT" ||
+      /rate limit|abuse detection/i.test(error.message))
+  );
+}

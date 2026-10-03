@@ -2,10 +2,13 @@ import type { ProjectRemote } from "@zastava/contracts";
 import { describe, expect, it, vi } from "vitest";
 import type { ProjectsService } from "../src/modules/projects/projects.service";
 import type { GithubClient } from "../src/modules/pull-requests/github/gh-client";
-import { PullRequestsUnavailableError } from "../src/modules/pull-requests/pull-requests.errors";
+import {
+  GithubError,
+  GithubRateLimitedError,
+  PullRequestsUnavailableError,
+} from "../src/modules/pull-requests/pull-requests.errors";
 import { PullRequestsService } from "../src/modules/pull-requests/pull-requests.service";
-import assignedFixture from "./__fixtures__/pull-requests/search-assigned.json";
-import mineFixture from "./__fixtures__/pull-requests/search-mine.json";
+import { FakeGithub } from "./pull-requests-fake-github";
 
 const github = {
   origin: "git@github.com:acme/app.git",
@@ -15,50 +18,28 @@ const github = {
   reason: null,
 } satisfies ProjectRemote;
 
-/** The fixture search a query string asks for. */
-function fixtureFor(q: string): unknown {
-  const { data: mine } = mineFixture;
-  const { data: assigned } = assignedFixture;
-  if (q.includes("author:@me") && !q.includes("-author:@me")) {
-    return q.includes("is:open") ? mine.open : mine.done;
-  }
-  if (q.includes("user-review-requested:@me")) return assigned.requested;
-  if (q.includes("assignee:@me")) return assigned.assigned;
-  if (q.includes("reviewed-by:@me"))
-    return q.includes("is:closed") ? assigned.reviewedDone : assigned.reviewed;
-  if (q.includes("review-requested:@me")) return assigned.team;
-  throw new Error(`unexpected search ${q}`);
-}
-
 function setup(remote: ProjectRemote = github) {
-  const graphql = vi.fn(
-    (query: string, variables: Record<string, unknown>, schema: { parse(v: unknown): unknown }) =>
-      Promise.resolve(
-        schema.parse(
-          query.includes("query Viewer")
-            ? { viewer: { login: "me" } }
-            : { search: fixtureFor(String(variables.query)) },
-        ),
-      ),
-  );
+  const fake = new FakeGithub();
   const remoteFn = vi.fn(() => Promise.resolve(remote));
   const service = new PullRequestsService(
-    { graphql } as unknown as GithubClient,
+    fake as unknown as GithubClient,
     { remote: remoteFn } as unknown as ProjectsService,
   );
-  return { service, graphql, remoteFn };
+  return { service, fake };
 }
 
 describe("PullRequestsService.list", () => {
   it("returns my PRs newest first with the repo and viewer", async () => {
-    const { service, graphql } = setup();
+    const { service, fake } = setup();
     const list = await service.list("p1", "mine", false);
     expect(list.repo).toBe("acme/app");
     expect(list.viewer).toBe("me");
-    expect(list.items.map((i) => i.number)).toHaveLength(5);
+    expect(list.items).toHaveLength(5);
     const updated = list.items.map((i) => i.updatedAt);
     expect(updated).toEqual(updated.toSorted().toReversed());
-    const queries = graphql.mock.calls.map(([, v]) => v.query).filter(Boolean);
+    const queries = fake.calls
+      .filter((c) => c.operation === "SearchFingerprints")
+      .map((c) => c.variables.query);
     expect(queries).toEqual([
       expect.stringMatching(/^repo:acme\/app is:pr .*is:open author:@me$/),
       expect.stringMatching(/is:closed author:@me closed:>=\d{4}-\d{2}-\d{2}$/),
@@ -77,14 +58,42 @@ describe("PullRequestsService.list", () => {
   });
 
   it("caches a list for 20 s and drops it on bust", async () => {
-    const { service, graphql } = setup();
+    const { service, fake } = setup();
     await service.list("p1", "mine", false);
     await service.list("p1", "mine", false);
-    const searches = () => graphql.mock.calls.filter(([q]) => q.includes("SearchPrs")).length;
-    expect(searches()).toBe(2);
+    expect(fake.count("SearchFingerprints")).toBe(2);
     service.bust("p1");
     await service.list("p1", "mine", false);
-    expect(searches()).toBe(4);
+    expect(fake.count("SearchFingerprints")).toBe(4);
+  });
+
+  it("fetches full fields only for PRs whose fingerprint moved", async () => {
+    const { service, fake } = setup();
+    await service.list("p1", "mine", false);
+    expect(fake.count("PrsById")).toBe(1);
+    service.bust("p1");
+    await service.list("p1", "mine", false);
+    expect(fake.count("PrsById")).toBe(1);
+    // The assigned board shares the cache: only its own PRs are fetched.
+    await service.list("p1", "assigned", false);
+    expect(fake.calls.filter((c) => c.operation === "PrsById").at(-1)?.variables.ids).toHaveLength(
+      11,
+    );
+  });
+
+  it("serves the last good list when GitHub refuses, and 429 without one", async () => {
+    const { service, fake } = setup();
+    const first = await service.list("p1", "mine", false);
+    service.bust("p1");
+    fake.answers.SearchFingerprints = new GithubError(
+      "API rate limit exceeded",
+      null,
+      "RATE_LIMITED",
+    );
+    await expect(service.list("p1", "mine", false)).resolves.toEqual(first);
+    await expect(service.list("p1", "assigned", false)).rejects.toBeInstanceOf(
+      GithubRateLimitedError,
+    );
   });
 
   it("is unavailable when the project can't use PRs", async () => {
