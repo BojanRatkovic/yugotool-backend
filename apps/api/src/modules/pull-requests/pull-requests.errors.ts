@@ -43,3 +43,9 @@ export class PullRequestsProjectNotFoundError extends DomainError {
   readonly code = "project_not_found";
   readonly kind = "not_found";
 }
+
+/** The `since` commit isn't on GitHub any more (force push); the UI falls back to the full diff. */
+export class SinceUnknownError extends DomainError {
+  readonly code = "since_unknown";
+  readonly kind = "conflict";
+}

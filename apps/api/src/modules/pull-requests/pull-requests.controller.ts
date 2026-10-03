@@ -1,7 +1,9 @@
 import { Controller, Get, Param, ParseIntPipe, ParseUUIDPipe, Query } from "@nestjs/common";
 import { ApiOkResponse, ApiTags } from "@nestjs/swagger";
-import type { PullRequestDetail, PullRequestList } from "@zastava/contracts";
+import type { PrDiff, PullRequestDetail, PullRequestList } from "@zastava/contracts";
 import {
+  PrDiffDto,
+  PrDiffQueryDto,
   PullRequestDetailDto,
   PullRequestListDto,
   PullRequestListQueryDto,
@@ -31,5 +33,16 @@ export class PullRequestsController {
     @Param("number", ParseIntPipe) number: number,
   ): Promise<PullRequestDetail> {
     return this.service.detail(projectId, number);
+  }
+
+  /** The unified diff; `since` = only the changes after that commit (409 `since_unknown` if gone). */
+  @Get(":number/diff")
+  @ApiOkResponse({ type: PrDiffDto })
+  diff(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Param("number", ParseIntPipe) number: number,
+    @Query() query: PrDiffQueryDto,
+  ): Promise<PrDiff> {
+    return this.service.diff(projectId, number, query.since);
   }
 }

@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import type {
+  PrDiff,
   PrScope,
   PullRequestDetail,
   PullRequestList,
@@ -28,7 +29,9 @@ import {
   GithubError,
   PullRequestNotFoundError,
   PullRequestsUnavailableError,
+  SinceUnknownError,
 } from "./pull-requests.errors";
+import { capPatch, onlyPrFiles } from "./pull-requests.diff";
 
 const REPO_TTL_MS = 5 * 60_000;
 const LIST_TTL_MS = 20_000;
@@ -37,6 +40,11 @@ const DONE_DAYS = 14;
 
 const viewerSchema = z.object({ viewer: z.object({ login: z.string() }) });
 const searchSchema = z.object({ search: ghSearchSchema });
+const pullRefsSchema = z.object({
+  head: z.object({ sha: z.string() }),
+  base: z.object({ sha: z.string() }),
+});
+const DIFF = "application/vnd.github.diff";
 /** Caps from spec 0008 §4: GitHub has the rest. */
 const MAX_FILE_PAGES = 3;
 const MAX_TIMELINE_ITEMS = 250;
@@ -163,6 +171,43 @@ export class PullRequestsService {
       if (error instanceof GithubError && error.httpStatus === 404) {
         throw new PullRequestNotFoundError(`pull request #${number} not found`);
       }
+      throw error;
+    }
+  }
+
+  /**
+   * The PR's unified diff, or with `since` only what changed after that commit
+   * (my last review). GitHub refuses diffs over its own limits (406): then the
+   * patch is empty and truncated, and the UI links to GitHub.
+   */
+  async diff(projectId: string, number: number, since?: string): Promise<PrDiff> {
+    const repo = await this.repo(projectId);
+    const base = `repos/${repo.owner}/${repo.name}`;
+    const refs = await this.github
+      .rest(`${base}/pulls/${number}`, pullRefsSchema)
+      .catch((error: unknown) => {
+        if (error instanceof GithubError && error.httpStatus === 404) {
+          throw new PullRequestNotFoundError(`pull request #${number} not found`);
+        }
+        throw error;
+      });
+    const head = refs.head.sha;
+    const from = since ?? refs.base.sha;
+    try {
+      const full = await this.github.restText(`${base}/pulls/${number}`, { accept: DIFF });
+      const text = since
+        ? onlyPrFiles(
+            await this.github.restText(`${base}/compare/${since}...${head}`, { accept: DIFF }),
+            full,
+          )
+        : full;
+      return { ...capPatch(text), base: from, head };
+    } catch (error) {
+      if (!(error instanceof GithubError)) throw error;
+      if (since && error.httpStatus === 404) {
+        throw new SinceUnknownError(`commit ${since} is no longer on GitHub`);
+      }
+      if (error.httpStatus === 406) return { patch: "", truncated: true, base: from, head };
       throw error;
     }
   }
