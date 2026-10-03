@@ -46,6 +46,7 @@ describe("mergeFindings", () => {
     expect(merged.recommendation).toBe("comment");
     expect(merged.findings.map((f) => f.id)).toEqual(["c1", "f1"]);
     expect(checks.body).toContain("error x");
+    expect(mergeFindings(merged, [checks])).toBe(merged);
   });
 
   it("asks for changes when an extra finding is critical", () => {

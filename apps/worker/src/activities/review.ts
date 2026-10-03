@@ -9,8 +9,10 @@ import {
   changedFiles,
   fetchPullRequest,
   mergeBase,
+  pullRequestPatch,
   writeReviewBrief,
 } from "../runner/review-workspace";
+import { anchorFindings, parseHunks } from "../runner/diff-anchors";
 import { mergeFindings } from "../workflows/review-logic";
 import type { ShiftDeps } from "./shifts";
 
@@ -111,11 +113,36 @@ export function createReviewActivities(db: Database, deps: ReviewDeps) {
       extra: ReviewFinding[];
     }): Promise<ReviewVerdict> {
       const [row] = await db
-        .select({ review: stationRuns.review })
+        .select({
+          review: stationRuns.review,
+          worktreePath: runs.worktreePath,
+          pullRequest: workOrders.pullRequest,
+        })
         .from(stationRuns)
+        .innerJoin(runs, eq(runs.id, stationRuns.runId))
+        .innerJoin(workOrders, eq(workOrders.id, runs.workOrderId))
         .where(eq(stationRuns.id, input.stationRunId));
       if (!row?.review) throw ApplicationFailure.nonRetryable("The reviewer returned no review");
-      const review = mergeFindings(row.review, input.extra);
+      const merged = mergeFindings(row.review, input.extra);
+      // GitHub refuses line comments outside the PR diff's hunks.
+      let review = merged;
+      if (row.worktreePath && row.pullRequest) {
+        const { baseOid, headOid } = row.pullRequest;
+        const base = await mergeBase(row.worktreePath, baseOid, headOid);
+        const hunks = parseHunks(await pullRequestPatch(row.worktreePath, base, headOid));
+        review = { ...merged, findings: anchorFindings(merged.findings, hunks) };
+        const moved = review.findings.filter(
+          (f, i) => f.line === null && merged.findings[i]?.line !== null,
+        ).length;
+        if (moved > 0) {
+          await deps.appendEvent(
+            input.runId,
+            input.stationRunId,
+            "system",
+            `${moved} finding${moved === 1 ? "" : "s"} pointed outside the PR diff; they go to the review body instead of a line.`,
+          );
+        }
+      }
       await db.update(stationRuns).set({ review }).where(eq(stationRuns.id, input.stationRunId));
       await deps.notify({ type: "invalidate", collection: "reviews" });
       const count = review.findings.length;

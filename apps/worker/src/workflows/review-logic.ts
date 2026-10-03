@@ -83,8 +83,10 @@ export function qaFinding(
  * Extra findings can only make the recommendation stricter.
  */
 export function mergeFindings(verdict: ReviewVerdict, extra: ReviewFinding[]): ReviewVerdict {
-  if (extra.length === 0) return verdict;
-  const findings = [...verdict.findings, ...extra].toSorted(
+  // Idempotent: a retried completeReview finds its extras already merged.
+  const fresh = extra.filter((e) => !verdict.findings.some((f) => f.id === e.id));
+  if (fresh.length === 0) return verdict;
+  const findings = [...verdict.findings, ...fresh].toSorted(
     (a, b) => RANK[a.severity] - RANK[b.severity],
   );
   const recommendation = findings.some((f) => f.severity === "critical")

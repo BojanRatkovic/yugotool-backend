@@ -136,3 +136,11 @@ export async function writeReviewBrief(worktreePath: string, brief: string): Pro
   await writeFile(file, brief);
   return file;
 }
+
+/** The PR diff as GitHub shows it (merge-base to head, 3 lines of context). */
+export async function pullRequestPatch(cwd: string, base: string, head: string): Promise<string> {
+  const { stdout } = await exec("git", ["-C", cwd, "diff", "--unified=3", `${base}...${head}`], {
+    maxBuffer: 100 * 1024 * 1024,
+  });
+  return stdout;
+}
