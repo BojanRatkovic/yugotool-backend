@@ -52,6 +52,14 @@ export class WorkOrdersController {
     return this.service.openPullRequest(id, body);
   }
 
+  /** Check the PR's CI again; the result arrives on the work order (`ci`). */
+  @Post(":id/ci/refresh")
+  @ApiNoContentResponse()
+  @HttpCode(204)
+  refreshCi(@Param("id", ParseUUIDPipe) id: string): Promise<void> {
+    return this.service.refreshCi(id);
+  }
+
   @Post()
   @ApiCreatedResponse({ type: WorkOrderDto })
   create(@Body() body: CreateWorkOrderDto): Promise<WorkOrder> {

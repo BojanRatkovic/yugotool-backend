@@ -18,6 +18,7 @@ import { DatabaseService } from "../../core/database/database.service";
 import { EventsService } from "../../core/events/events.service";
 import { TEMPORAL_CLIENT } from "../../core/temporal/temporal.module";
 import {
+  CiNotAvailableError,
   PullRequestFailedError,
   PullRequestNotPossibleError,
   WorkOrderNotFoundError,
@@ -29,6 +30,7 @@ import { WorkOrdersRepository } from "./work-orders.repository";
 
 /** Workflow type name registered by the worker. */
 const WORK_ORDER_RUN_WORKFLOW = "workOrderRun";
+const WATCH_CI_WORKFLOW = "watchCi";
 const STARTABLE = new Set<WorkOrder["status"]>([
   "backlog",
   "queued",
@@ -84,6 +86,23 @@ export class WorkOrdersService {
     }
     if (!result.prUrl) throw new PullRequestFailedError(result.error ?? "Pull request failed.");
     return { prUrl: result.prUrl };
+  }
+
+  /**
+   * Look at the PR's CI again (a rerun on Semaphore/Actions, a new push). The
+   * worker records the result; one watch per work order, so a refresh while
+   * one runs is a no-op.
+   */
+  async refreshCi(id: string): Promise<void> {
+    const workOrder = await this.repository.find(this.database.db, id);
+    if (!workOrder) throw new WorkOrderNotFoundError(`work order ${id} not found`);
+    if (!workOrder.prUrl) throw new CiNotAvailableError("This work order has no pull request.");
+    await this.temporal.workflow.start(WATCH_CI_WORKFLOW, {
+      taskQueue: TASK_QUEUE,
+      workflowId: `ci-${id}`,
+      workflowIdConflictPolicy: "USE_EXISTING",
+      args: [{ workOrderId: id, mode: "refresh" }],
+    });
   }
 
   needsYou(): Promise<NeedsYouItem[]> {

@@ -29,3 +29,8 @@ export class PullRequestFailedError extends DomainError {
   readonly code = "pull_request_failed";
   readonly kind = "conflict";
 }
+
+export class CiNotAvailableError extends DomainError {
+  readonly code = "ci_not_available";
+  readonly kind = "conflict";
+}

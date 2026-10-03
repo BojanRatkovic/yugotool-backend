@@ -1,0 +1,47 @@
+[
+  {
+    "bucket": "skipping",
+    "completedAt": "2026-10-03T13:12:47Z",
+    "link": "https://github.com/acme/storefront/actions/runs/37125407919/job/111209606973",
+    "name": "Deploy to the review environment",
+    "startedAt": "2026-10-03T13:12:47Z",
+    "state": "SKIPPED",
+    "workflow": "Review deployment"
+  },
+  {
+    "bucket": "skipping",
+    "completedAt": "2026-10-03T13:12:47Z",
+    "link": "https://github.com/acme/storefront/actions/runs/37125407919/job/111209607133",
+    "name": "Comment the preview link",
+    "startedAt": "2026-10-03T13:12:47Z",
+    "state": "SKIPPED",
+    "workflow": "Review deployment"
+  },
+  {
+    "bucket": "skipping",
+    "completedAt": "2026-10-03T13:12:47Z",
+    "link": "https://github.com/acme/storefront/actions/runs/37125407919/job/111209607247",
+    "name": "Write the preview link to the task",
+    "startedAt": "2026-10-03T13:12:47Z",
+    "state": "SKIPPED",
+    "workflow": "Review deployment"
+  },
+  {
+    "bucket": "pass",
+    "completedAt": "2026-10-03T13:12:46Z",
+    "link": "https://github.com/acme/storefront/actions/runs/37125407919/job/111209590885",
+    "name": "Check the review deployment box",
+    "startedAt": "2026-10-03T13:12:43Z",
+    "state": "SUCCESS",
+    "workflow": "Review deployment"
+  },
+  {
+    "bucket": "fail",
+    "completedAt": "0001-01-01T00:00:00Z",
+    "link": "https://acme.semaphoreci.com/workflows/8932a650-4c78-48f2-abb6-0be7d78a9663?pipeline_id=ebb86e13-c4b3-4d06-b79e-852edc62c354",
+    "name": "ci/semaphoreci/push: storefront",
+    "startedAt": "0001-01-01T00:00:00Z",
+    "state": "FAILURE",
+    "workflow": ""
+  }
+]

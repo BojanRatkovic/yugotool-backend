@@ -479,6 +479,45 @@ export const workOrderStatusSchema = z.enum([
 ]);
 export type WorkOrderStatus = z.infer<typeof workOrderStatusSchema>;
 
+// ── CI ──────────────────────────────────────────────────────────────────────
+
+/** gh's grouping of a check's state (`gh pr checks --json bucket`). */
+export const ciBucketSchema = z.enum(["pass", "fail", "pending", "skipping", "cancel"]);
+export type CiBucket = z.infer<typeof ciBucketSchema>;
+
+/** One check on the PR: a GitHub Actions job or a commit status (Semaphore…). */
+export const ciCheckSchema = z.object({
+  name: z.string(),
+  /** Actions workflow name; null for commit statuses. */
+  workflow: z.string().nullable(),
+  bucket: ciBucketSchema,
+  link: z.string().nullable(),
+  startedAt: isoDate.nullable(),
+  completedAt: isoDate.nullable(),
+});
+export type CiCheck = z.infer<typeof ciCheckSchema>;
+
+export const ciStateSchema = z.enum(["pending", "passed", "failed", "no_ci", "timed_out"]);
+export type CiState = z.infer<typeof ciStateSchema>;
+
+/** The repo's CI on a work order's pull request, as last seen by ZASTAVA. */
+export const ciStatusSchema = z.object({
+  state: ciStateSchema,
+  /** One line, e.g. "3/4 passed · 1 failed". */
+  summary: z.string(),
+  prState: z.enum(["open", "closed", "merged"]),
+  /** The PR head the checks ran on. */
+  headSha: z.string().nullable(),
+  /** The head when ZASTAVA delivered; differs from headSha once someone pushed. */
+  deliveredSha: z.string().nullable(),
+  checks: z.array(ciCheckSchema),
+  /** When the current watch started (delivery, or a refresh that found work pending). */
+  startedAt: isoDate,
+  checkedAt: isoDate,
+  finishedAt: isoDate.nullable(),
+});
+export type CiStatus = z.infer<typeof ciStatusSchema>;
+
 /** asap = next free slot; night = only inside the night-shift window. */
 export const queueModeSchema = z.enum(["asap", "night"]);
 export type QueueMode = z.infer<typeof queueModeSchema>;
@@ -501,6 +540,8 @@ export const workOrderSchema = z.object({
   /** Run-level cap: the line stops before a station once spend reaches it. */
   maxBudgetUsd: z.number().nullable(),
   prUrl: z.string().nullable(),
+  /** CI on the pull request; null until ZASTAVA has looked. */
+  ci: ciStatusSchema.nullable(),
   queueMode: queueModeSchema.nullable(),
   queuedAt: isoDate.nullable(),
   createdAt: isoDate,
@@ -1082,6 +1123,13 @@ export const DEFAULT_STATIONS: Station[] = [
  * when a run has station runs with this key.
  */
 export const REPO_HOOKS_STATION_KEY = "repo_hooks";
+
+/**
+ * Station key of the CI watch after delivery (the PR's checks: GitHub
+ * Actions, Semaphore…). Like repo hooks it is not a line station: clients draw
+ * it after the last station when a run has station runs with this key.
+ */
+export const CI_STATION_KEY = "ci";
 
 /**
  * Where "Request changes" at a gate sends the work: the closest earlier

@@ -85,6 +85,20 @@
       "when": 1791031392970,
       "tag": "0011_drop_local_only_draft_prs",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791032862276,
+      "tag": "0012_add_anthropic_api_key",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791033424001,
+      "tag": "0013_add_work_order_ci",
+      "breakpoints": true
     }
   ]
 }

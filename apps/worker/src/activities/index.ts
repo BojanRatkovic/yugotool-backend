@@ -35,6 +35,7 @@ import { eq, sql } from "drizzle-orm";
 import { localRunner } from "../runner/local-runner";
 import { runRoots, strayListeners, tcpListeners } from "../runner/orphans";
 import { sandboxFor } from "../runner/sandbox";
+import { createCiActivities } from "./ci";
 import { createPrBodyComposer } from "./pr-body";
 import { createQaActivities } from "./qa";
 import { createRouteActivities } from "./routes";
@@ -280,6 +281,7 @@ export function createActivities(
     ...createShiftActivities(db, { appendEvent, notify, invalidateBoard, notifyHumans }),
     ...createQaActivities(db, { appendEvent, notify }),
     ...createRouteActivities(db, { notify }),
+    ...createCiActivities(db, { appendEvent, invalidateBoard, notifyHumans }),
 
     async prepareRun(input: { runId: string; workOrderId: string }): Promise<RunContext> {
       const [row] = await db
@@ -689,8 +691,11 @@ export function createActivities(
       title: string;
       /** Chosen at the final gate; omitted = the project's local-only / draft settings. */
       delivery?: DeliveryMode;
-    }): Promise<{ ok: boolean; error: string | null }> {
-      let outcome: { ok: boolean; error: string | null } = { ok: true, error: null };
+    }): Promise<{ ok: boolean; error: string | null; prUrl?: string | null }> {
+      let outcome: { ok: boolean; error: string | null; prUrl?: string | null } = {
+        ok: true,
+        error: null,
+      };
       try {
         const [project] = await db
           .select({ deliveryDefault: projects.deliveryDefault })
@@ -702,6 +707,7 @@ export function createActivities(
         const draft = mode === "draft_pr";
         const body = localOnly ? "" : await composePrBody(input);
         const result = await localRunner.deliver({ ...input, body, localOnly, draft });
+        outcome.prUrl = result.prUrl;
         if (result.prUrl) {
           await db
             .update(workOrders)

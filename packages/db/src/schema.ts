@@ -1,4 +1,5 @@
 import type {
+  CiStatus,
   Handoff,
   Preview,
   QaStep,
@@ -155,6 +156,8 @@ export const workOrders = pgTable(
     effortOverride: effortLevel("effort_override"),
     maxBudgetUsd: doublePrecision("max_budget_usd"),
     prUrl: text("pr_url"),
+    /** CI on the pull request, as last seen (see CiStatus). */
+    ci: jsonb("ci").$type<CiStatus>(),
     queueMode: queueMode("queue_mode"),
     queuedAt: timestamp("queued_at", { withTimezone: true }),
     createdAt: createdAt(),
@@ -325,5 +328,7 @@ export const settings = pgTable("settings", {
   telegramChatId: text("telegram_chat_id"),
   /** Folder the repo picker scans; null falls back to the REPOS_ROOT env default. */
   reposRoot: text("repos_root"),
+  /** Anthropic API key saved in Settings; wins over ANTHROPIC_API_KEY. Never returned by the API. */
+  anthropicApiKey: text("anthropic_api_key"),
   updatedAt: updatedAt(),
 });

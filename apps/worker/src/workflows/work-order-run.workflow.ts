@@ -28,6 +28,7 @@ import {
   validatorPassed,
 } from "./line-logic";
 import { handoffFromFeedback, isStuck, type ShiftTally } from "./shift-logic";
+import { startCiWatch } from "./watch-ci.workflow";
 
 export const gateDecisionSignal =
   defineSignal<[GateDecision & { stationKey: string }]>(GATE_DECISION_SIGNAL);
@@ -474,6 +475,8 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
       return;
     }
     await finish("succeeded");
+    // After finishRun, which fails any station row still running.
+    if (delivered.prUrl && patched("ci-watch")) await startCiWatch(input.workOrderId);
   } catch (error) {
     if (isCancellation(error)) {
       await finish("cancelled", "Cancelled by user");
