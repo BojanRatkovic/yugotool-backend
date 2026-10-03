@@ -7,6 +7,8 @@ import type {
   RouteMap,
   Station,
   Verdict,
+  ReviewPullRequest,
+  ReviewVerdict,
 } from "@zastava/contracts";
 import { sql } from "drizzle-orm";
 import {
@@ -112,6 +114,10 @@ export const qaCheckStatus = pgEnum("qa_check_status", [
 ]);
 export const findingSeverity = pgEnum("finding_severity", ["critical", "important", "minor"]);
 
+/** `build` runs down the line; `review` reviews a pull request (spec 0009). */
+export const workOrderKind = pgEnum("work_order_kind", ["build", "review"]);
+export const lineKind = pgEnum("line_kind", ["build", "review"]);
+
 export const authSource = pgEnum("auth_source", ["subscription", "api_key", "unknown"]);
 
 export const projects = pgTable("projects", {
@@ -138,12 +144,13 @@ export const lines = pgTable(
     projectId: uuid("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
+    kind: lineKind("kind").notNull().default("build"),
     name: text("name").notNull(),
     stations: jsonb("stations").$type<Station[]>().notNull(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (t) => [uniqueIndex("lines_project_id_idx").on(t.projectId)],
+  (t) => [uniqueIndex("lines_project_id_kind_idx").on(t.projectId, t.kind)],
 );
 
 export const workOrders = pgTable(
@@ -153,8 +160,11 @@ export const workOrders = pgTable(
     projectId: uuid("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
+    kind: workOrderKind("kind").notNull().default("build"),
     title: text("title").notNull(),
     description: text("description").notNull().default(""),
+    /** Review work orders: the PR under review (spec 0009). */
+    pullRequest: jsonb("pull_request").$type<ReviewPullRequest>(),
     status: workOrderStatus("status").notNull().default("backlog"),
     stationKey: text("station_key"),
     position: doublePrecision("position").notNull().default(0),
@@ -211,6 +221,8 @@ export const stationRuns = pgTable(
     authSource: authSource("auth_source"),
     output: text("output"),
     verdict: jsonb("verdict").$type<Verdict>(),
+    /** Review stations (structuredVerdict "review"): the PR review verdict. */
+    review: jsonb("review").$type<ReviewVerdict>(),
     error: text("error"),
     costUsd: doublePrecision("cost_usd").notNull().default(0),
     inputTokens: integer("input_tokens").notNull().default(0),

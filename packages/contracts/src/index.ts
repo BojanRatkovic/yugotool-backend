@@ -161,6 +161,10 @@ export type ChecksStation = z.infer<typeof checksStationSchema>;
 export type ShiftStation = z.infer<typeof shiftStationSchema>;
 export type QaStation = z.infer<typeof qaStationSchema>;
 
+/** A project has one line per kind. */
+export const lineKindSchema = z.enum(["build", "review"]);
+export type LineKind = z.infer<typeof lineKindSchema>;
+
 export const updateLineSchema = z.object({
   stations: z
     .array(stationSchema)
@@ -180,6 +184,7 @@ export type UpdateLine = z.infer<typeof updateLineSchema>;
 export const lineSchema = z.object({
   id: z.uuid(),
   projectId: z.uuid(),
+  kind: lineKindSchema,
   name: z.string(),
   stations: z.array(stationSchema),
   createdAt: isoDate,
@@ -685,11 +690,33 @@ export type CiStatus = z.infer<typeof ciStatusSchema>;
 export const queueModeSchema = z.enum(["asap", "night"]);
 export type QueueMode = z.infer<typeof queueModeSchema>;
 
+/** `build` runs down the project's line; `review` reviews a pull request. */
+export const workOrderKindSchema = z.enum(["build", "review"]);
+export type WorkOrderKind = z.infer<typeof workOrderKindSchema>;
+
+/** The PR a review work order looks at, frozen when the review starts. */
+export const reviewPullRequestSchema = z.object({
+  number: z.number().int().min(1),
+  url: z.string(),
+  headRefName: z.string(),
+  headOid: z.string(),
+  baseRefName: z.string(),
+  baseOid: z.string(),
+  /** Head of the previous ZASTAVA review: a re-review focuses on what came after. */
+  sinceOid: z.string().nullable(),
+  /** Finding ids already added to the pending review on GitHub. */
+  posted: z.array(z.string()).default([]),
+});
+export type ReviewPullRequest = z.infer<typeof reviewPullRequestSchema>;
+
 export const workOrderSchema = z.object({
   id: z.uuid(),
   projectId: z.uuid(),
+  kind: workOrderKindSchema,
   title: z.string(),
   description: z.string(),
+  /** Review work orders: the PR under review (spec 0009). */
+  pullRequest: reviewPullRequestSchema.nullable(),
   status: workOrderStatusSchema,
   /** Station the order is at; null while in backlog or done. */
   stationKey: z.string().nullable(),
@@ -1422,29 +1449,6 @@ export const prMergeInputSchema = z.object({ method: prMergeMethodSchema });
 export type PrMergeInput = z.infer<typeof prMergeInputSchema>;
 
 // ── PR review (spec 0009) ───────────────────────────────────────────────────
-
-/** `build` runs down the project's line; `review` reviews a pull request. */
-export const workOrderKindSchema = z.enum(["build", "review"]);
-export type WorkOrderKind = z.infer<typeof workOrderKindSchema>;
-
-/** A project has one line per kind. */
-export const lineKindSchema = z.enum(["build", "review"]);
-export type LineKind = z.infer<typeof lineKindSchema>;
-
-/** The PR a review work order looks at, frozen when the review starts. */
-export const reviewPullRequestSchema = z.object({
-  number: z.number().int().min(1),
-  url: z.string(),
-  headRefName: z.string(),
-  headOid: z.string(),
-  baseRefName: z.string(),
-  baseOid: z.string(),
-  /** Head of the previous ZASTAVA review: a re-review focuses on what came after. */
-  sinceOid: z.string().nullable(),
-  /** Finding ids already added to the pending review on GitHub. */
-  posted: z.array(z.string()).default([]),
-});
-export type ReviewPullRequest = z.infer<typeof reviewPullRequestSchema>;
 
 export const reviewFindingSchema = z.object({
   /** Stable within the verdict, e.g. "f1". */

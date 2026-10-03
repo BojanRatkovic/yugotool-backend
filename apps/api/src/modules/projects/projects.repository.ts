@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import type {
   Line,
+  LineKind,
   Project,
   ProjectStats,
   RouteMap,
@@ -138,15 +139,34 @@ export class ProjectsRepository {
     return row ? toProject(row) : null;
   }
 
-  async insertLine(db: Executor, projectId: string, stations: Station[]): Promise<void> {
-    await db.insert(lines).values({ projectId, name: "Default line", stations });
+  async insertLine(
+    db: Executor,
+    projectId: string,
+    stations: Station[],
+    kind: LineKind = "build",
+  ): Promise<void> {
+    await db
+      .insert(lines)
+      .values({
+        projectId,
+        kind,
+        name: kind === "review" ? "Review line" : "Default line",
+        stations,
+      })
+      // Lazily seeded review lines can race (two first reviews at once).
+      .onConflictDoNothing();
   }
 
-  async updateLine(db: Executor, projectId: string, stations: Station[]): Promise<Line | null> {
+  async updateLine(
+    db: Executor,
+    projectId: string,
+    stations: Station[],
+    kind: LineKind = "build",
+  ): Promise<Line | null> {
     const [row] = await db
       .update(lines)
       .set({ stations })
-      .where(eq(lines.projectId, projectId))
+      .where(and(eq(lines.projectId, projectId), eq(lines.kind, kind)))
       .returning();
     return row ? toLine(row) : null;
   }
@@ -174,8 +194,11 @@ export class ProjectsRepository {
     };
   }
 
-  async findLine(db: Executor, projectId: string): Promise<Line | null> {
-    const [row] = await db.select().from(lines).where(eq(lines.projectId, projectId));
+  async findLine(db: Executor, projectId: string, kind: LineKind = "build"): Promise<Line | null> {
+    const [row] = await db
+      .select()
+      .from(lines)
+      .where(and(eq(lines.projectId, projectId), eq(lines.kind, kind)));
     return row ? toLine(row) : null;
   }
 }

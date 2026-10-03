@@ -20,7 +20,8 @@ export class WorkOrdersRepository {
     const rows = await db
       .select()
       .from(workOrders)
-      .where(eq(workOrders.projectId, projectId))
+      // Review work orders live with their pull request, not on the board.
+      .where(and(eq(workOrders.projectId, projectId), eq(workOrders.kind, "build")))
       .orderBy(asc(workOrders.position), asc(workOrders.createdAt));
     return rows.map(toWorkOrder);
   }

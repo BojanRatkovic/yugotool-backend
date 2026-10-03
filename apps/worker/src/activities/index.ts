@@ -34,7 +34,7 @@ import {
   workOrders,
 } from "@zastava/db";
 import { broadcast, type DesktopSink, truncateNotice } from "@zastava/notify";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { runArtifactsDir } from "../runner/artifacts";
 import { localRunner } from "../runner/local-runner";
 import { runRoots, strayListeners, tcpListeners } from "../runner/orphans";
@@ -167,7 +167,7 @@ export function createActivities(
     const [row] = await db
       .select({ workOrder: workOrders, line: lines })
       .from(workOrders)
-      .innerJoin(lines, eq(lines.projectId, workOrders.projectId))
+      .innerJoin(lines, and(eq(lines.projectId, workOrders.projectId), eq(lines.kind, "build")))
       .where(eq(workOrders.id, workOrderId));
     if (!row) return;
     await db.insert(settings).values({ id: "default" }).onConflictDoNothing();
@@ -297,7 +297,7 @@ export function createActivities(
         .select({ workOrder: workOrders, project: projects, line: lines })
         .from(workOrders)
         .innerJoin(projects, eq(projects.id, workOrders.projectId))
-        .innerJoin(lines, eq(lines.projectId, projects.id))
+        .innerJoin(lines, and(eq(lines.projectId, projects.id), eq(lines.kind, "build")))
         .where(eq(workOrders.id, input.workOrderId));
       if (!row) throw new Error(`work order ${input.workOrderId} not found`);
 

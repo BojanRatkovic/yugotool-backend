@@ -8,7 +8,7 @@ import {
   stationRuns,
   workOrders,
 } from "@zastava/db";
-import { asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { localRunner } from "../runner/local-runner";
 import { type PrQa, type PrStation, renderPrBody } from "../runner/pr-body";
 
@@ -23,7 +23,7 @@ export function createPrBodyComposer(db: Database) {
     const [row] = await db
       .select({ description: workOrders.description, line: lines.stations })
       .from(workOrders)
-      .innerJoin(lines, eq(lines.projectId, workOrders.projectId))
+      .innerJoin(lines, and(eq(lines.projectId, workOrders.projectId), eq(lines.kind, "build")))
       .where(eq(workOrders.id, input.workOrderId));
     const line = row?.line ?? [];
     const runRows = await db
