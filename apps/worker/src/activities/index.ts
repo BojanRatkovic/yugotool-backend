@@ -17,6 +17,8 @@ import {
   type StationRunStatus,
   type Station,
   REVIEW_VERDICT_JSON_SCHEMA,
+  type ReviewVerdict,
+  reviewVerdictSchema,
   VERDICT_JSON_SCHEMA,
   type Verdict,
   verdictSchema,
@@ -45,6 +47,7 @@ import { createKnowledgeActivities } from "./knowledge";
 import { createPrBodyComposer } from "./pr-body";
 import { createPreviewSignInActivities } from "./preview-sign-in";
 import { createQaActivities } from "./qa";
+import { createReviewActivities } from "./review";
 import { createRouteActivities } from "./routes";
 import { createShiftActivities } from "./shifts";
 
@@ -65,6 +68,7 @@ export function deliveryReason(message: string): string {
 const ANSI_COLOR = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
 
 export type { QaResult } from "./qa";
+export type { ReviewRunContext } from "./review";
 export type { ShiftResult } from "./shifts";
 
 /** Log lines longer than this are truncated: the board is not a log archive. */
@@ -88,6 +92,8 @@ export interface AgentStationResult {
   isError: boolean;
   costUsd: number;
   verdict: Verdict | null;
+  /** Review stations (structuredVerdict "review", spec 0009). */
+  review: ReviewVerdict | null;
 }
 
 export interface ChecksResult {
@@ -175,7 +181,11 @@ export function createActivities(
     if (!config) return;
     const { workOrder } = row;
     const message = compose(workOrder.title, row.line.stations, workOrder.prUrl);
-    const url = `${config.appUrl}/projects/${workOrder.projectId}?view=board&wo=${workOrder.id}`;
+    // A review opens its pull request; everything else the work order on the board.
+    const appPath = workOrder.pullRequest
+      ? `/projects/${workOrder.projectId}/pulls/assigned?pr=${workOrder.pullRequest.number}`
+      : `/projects/${workOrder.projectId}?view=board&wo=${workOrder.id}`;
+    const url = `${config.appUrl}${appPath}`;
     const results = await broadcast(config, { ...message, url }, desktopSink);
     for (const failed of results.filter((r) => r.error)) {
       if (workOrder.currentRunId) {
@@ -190,6 +200,14 @@ export function createActivities(
   }
 
   const composePrBody = createPrBodyComposer(db);
+
+  async function isReview(workOrderId: string): Promise<boolean> {
+    const [row] = await db
+      .select({ kind: workOrders.kind })
+      .from(workOrders)
+      .where(eq(workOrders.id, workOrderId));
+    return row?.kind === "review";
+  }
 
   /**
    * Agent stations are told to commit nothing, but builders commit anyway —
@@ -291,6 +309,7 @@ export function createActivities(
     ...createPreviewSignInActivities(db, { notify }),
     ...createCiActivities(db, { appendEvent, invalidateBoard, notifyHumans }),
     ...createKnowledgeActivities(db, { appendEvent, notify }),
+    ...createReviewActivities(db, { appendEvent, invalidateBoard, notify, notifyHumans }),
 
     async prepareRun(input: { runId: string; workOrderId: string }): Promise<RunContext> {
       const [row] = await db
@@ -512,7 +531,8 @@ export function createActivities(
           title: `Run failed: ${title}`,
           body: input.reason ?? "The run stopped with an error.",
         }));
-      } else if (input.status === "succeeded") {
+      } else if (input.status === "succeeded" && !(await isReview(input.workOrderId))) {
+        // A finished review notifies from completeReview, with its findings.
         await notifyHumans(input.workOrderId, (title, _line, prUrl) => ({
           title: `Done: ${title}`,
           body: prUrl ? `Pull request: ${prUrl}` : "Committed on its branch.",
@@ -582,6 +602,7 @@ export function createActivities(
       let isError = false;
       let costUsd = 0;
       let verdict: Verdict | null = null;
+      let review: ReviewVerdict | null = null;
       /** Context size = everything the model read on its latest top-level turn. */
       let contextTokens = 0;
       for await (const message of session) {
@@ -636,15 +657,24 @@ export function createActivities(
           output =
             message.subtype === "success" ? message.result : `Station ended: ${message.subtype}`;
           if (message.subtype === "success" && message.structured_output !== undefined) {
-            const parsed = verdictSchema.safeParse(message.structured_output);
-            verdict = parsed.success ? parsed.data : null;
-            if (verdict) output = `${verdict.verdict.toUpperCase()}: ${verdict.summary}`;
+            if (input.station.structuredVerdict === "review") {
+              const parsed = reviewVerdictSchema.safeParse(message.structured_output);
+              review = parsed.success ? parsed.data : null;
+              if (review) {
+                output = `${review.recommendation.toUpperCase().replace("_", " ")}: ${review.summary} (${review.findings.length} finding${review.findings.length === 1 ? "" : "s"})`;
+              }
+            } else {
+              const parsed = verdictSchema.safeParse(message.structured_output);
+              verdict = parsed.success ? parsed.data : null;
+              if (verdict) output = `${verdict.verdict.toUpperCase()}: ${verdict.summary}`;
+            }
           }
           await db
             .update(stationRuns)
             .set({
               costUsd: message.total_cost_usd,
               verdict,
+              review,
               inputTokens: message.usage.input_tokens,
               outputTokens: message.usage.output_tokens,
               cacheReadTokens: message.usage.cache_read_input_tokens,
@@ -668,7 +698,7 @@ export function createActivities(
         const stat = await localRunner.diffStat(input.worktreePath);
         if (stat) await appendEvent(input.runId, input.stationRunId, "system", `Changes:\n${stat}`);
       }
-      return { sessionId, output, isError, costUsd, verdict };
+      return { sessionId, output, isError, costUsd, verdict, review };
     },
 
     /** Runs the station's shell command in the worktree; non-zero exit = failed. */

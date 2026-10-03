@@ -5,3 +5,4 @@ export { discoverRoutes } from "./discover-routes.workflow";
 export { openPullRequest } from "./open-pull-request.workflow";
 export { watchCi } from "./watch-ci.workflow";
 export { syncKnowledge } from "./sync-knowledge.workflow";
+export { reviewRun } from "./review-run.workflow";

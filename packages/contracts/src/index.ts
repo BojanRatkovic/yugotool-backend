@@ -1609,6 +1609,8 @@ export const collectionNameSchema = z.enum([
   "shifts",
   "qa",
   "knowledge_sources",
+  /** ZASTAVA reviews of pull requests (spec 0009). */
+  "reviews",
 ]);
 export type CollectionName = z.infer<typeof collectionNameSchema>;
 
@@ -1754,13 +1756,24 @@ export const QA_STATION_TEMPLATE: Extract<Station, { kind: "qa" }> = {
 // ── Review line (spec 0009) ─────────────────────────────────────────────────
 
 /** A review line only reads: no station edits code, works in shifts or waits at a gate. */
-export const updateReviewLineSchema = updateLineSchema.refine(
-  ({ stations }) =>
-    stations.every(
-      (s) => s.kind !== "gate" && s.kind !== "shift" && (s.kind !== "agent" || !s.canEdit),
-    ),
-  { message: "a review line has no gates, shifts or stations that edit code", path: ["stations"] },
-);
+export const updateReviewLineSchema = updateLineSchema
+  .refine(
+    ({ stations }) =>
+      stations.every(
+        (s) => s.kind !== "gate" && s.kind !== "shift" && (s.kind !== "agent" || !s.canEdit),
+      ),
+    {
+      message: "a review line has no gates, shifts or stations that edit code",
+      path: ["stations"],
+    },
+  )
+  .refine(
+    ({ stations }) => stations.some((s) => s.kind === "agent" && s.structuredVerdict === "review"),
+    {
+      message: "a review line needs a reviewer station (structured review)",
+      path: ["stations"],
+    },
+  );
 
 /** The review line every project starts with: one read-only reviewer. */
 export const REVIEW_LINE_STATIONS: Station[] = [

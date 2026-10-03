@@ -181,6 +181,12 @@ importers:
         specifier: ^4.4.3
         version: 4.6.5
     devDependencies:
+      '@temporalio/client':
+        specifier: 1.24.0
+        version: 1.24.0
+      '@temporalio/testing':
+        specifier: 1.24.0
+        version: 1.24.0(esbuild@0.28.2)
       '@types/pngjs':
         specifier: ^6.0.5
         version: 6.0.5
@@ -1611,6 +1617,10 @@ packages:
 
   '@temporalio/proto@1.24.0':
     resolution: {integrity: sha512-vhlhB9GpoyJx+78r3lDahHywpdri6LKx7kt7djLIw6XzHyb8FQTIi4lX8DSJBqKp3+HVfL1CLwiqO26KFRzg/g==}
+    engines: {node: '>= 20.3.0'}
+
+  '@temporalio/testing@1.24.0':
+    resolution: {integrity: sha512-XKCuvgb7smKR3oXy5nDgwYSFX/hmg9zTJ2rZQQsVwJzFkga1TbnWDiuT5YMU0INKjoLhnM6c5YA/uLKlp8sdfg==}
     engines: {node: '>= 20.3.0'}
 
   '@temporalio/worker@1.24.0':
@@ -4861,6 +4871,34 @@ snapshots:
     dependencies:
       long: 5.3.2
       protobufjs: 8.8.0
+
+  '@temporalio/testing@1.24.0(esbuild@0.28.2)':
+    dependencies:
+      '@temporalio/activity': 1.24.0
+      '@temporalio/client': 1.24.0
+      '@temporalio/common': 1.24.0
+      '@temporalio/core-bridge': 1.24.0
+      '@temporalio/proto': 1.24.0
+      '@temporalio/worker': 1.24.0(esbuild@0.28.2)
+      '@temporalio/workflow': 1.24.0
+    transitivePeerDependencies:
+      - '@minify-html/node'
+      - '@napi-rs/image'
+      - '@swc/css'
+      - '@swc/helpers'
+      - '@swc/html'
+      - clean-css
+      - cssnano
+      - csso
+      - esbuild
+      - html-minifier-terser
+      - imagemin
+      - lightningcss
+      - postcss
+      - sharp
+      - svgo
+      - uglify-js
+      - webpack-cli
 
   '@temporalio/worker@1.24.0(esbuild@0.28.2)':
     dependencies:
