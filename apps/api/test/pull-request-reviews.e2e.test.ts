@@ -52,12 +52,14 @@ const snapshot = (patch: Record<string, unknown> = {}) => ({
       reviewThreads: {
         nodes: [
           {
+            id: "PRRT_ana",
             isResolved: false,
             path: "src/a.ts",
             line: 3,
             comments: { nodes: [{ body: "Why not a map?", author: { login: "ana" } }] },
           },
           {
+            id: "PRRT_done",
             isResolved: true,
             path: "src/b.ts",
             line: 9,
@@ -90,11 +92,9 @@ class MemoryReviews {
   isRunning = vi.fn(async (_db: unknown, projectId: string, number: number) =>
     this.forPr(projectId, number).some((r) => r.status === "running"),
   );
-  lastReviewedHead = vi.fn(async (_db: unknown, projectId: string, number: number) => {
-    return (
-      this.forPr(projectId, number).findLast((r) => r.status === "done")?.pullRequest.headOid ??
-      null
-    );
+  lastDoneReview = vi.fn(async (_db: unknown, projectId: string, number: number) => {
+    const row = this.forPr(projectId, number).findLast((r) => r.status === "done");
+    return row ? { pullRequest: row.pullRequest, findings: row.verdict?.findings ?? [] } : null;
   });
   insertRunning = vi.fn(
     async (
@@ -233,6 +233,8 @@ describe("ZASTAVA review API", () => {
         baseRefName: "main",
         sinceOid: null,
         posted: [],
+        postedThreads: {},
+        previousFindings: [],
         openThreads: [{ path: "src/a.ts", line: 3, author: "ana", body: "Why not a map?" }],
       },
     });
@@ -444,5 +446,53 @@ describe("review briefs", () => {
     expect(list.body).toEqual({
       items: [{ number: 42, status: "succeeded", headOid: HEAD, findings: 2, posted: 0 }],
     });
+  });
+});
+
+describe("re-review (spec 0010)", () => {
+  it("freezes the last done review's findings with their threads' state", async () => {
+    const { http, github } = await finished();
+    github.answers.PrWriteTarget = target(null);
+    await http.post(POST).send({ findings: edits }).expect(200);
+    const next = "c".repeat(40);
+    const mine = {
+      id: "PRRT_src/a.ts:12",
+      isResolved: true,
+      path: "src/a.ts",
+      line: 14,
+      comments: { nodes: [{ body: "**Null deref**", author: { login: "me" } }] },
+    };
+    const base = snapshot().repository.pullRequest.reviewThreads.nodes;
+    github.answers.PrReviewSnapshot = snapshot({
+      headRefOid: next,
+      reviewThreads: { nodes: [...base, { ...mine, isResolved: false }] },
+    });
+    const res = await http.post(BASE).send({}).expect(201);
+    expect(res.body.pullRequest.sinceOid).toBe(HEAD);
+    expect(res.body.pullRequest.previousFindings).toEqual([
+      {
+        id: "f1",
+        severity: "critical",
+        category: "bug",
+        file: "src/a.ts",
+        line: 12,
+        title: "Null deref",
+        body: "items[0] is undefined when empty.",
+        posted: true,
+        threadId: "PRRT_src/a.ts:12",
+        threadResolved: false,
+      },
+      expect.objectContaining({ id: "f2", posted: true, threadId: null, threadResolved: null }),
+    ]);
+    // My own thread is checked as a previous finding, not passed as "do not repeat".
+    expect(res.body.pullRequest.openThreads).toEqual([
+      { path: "src/a.ts", line: 3, author: "ana", body: "Why not a map?" },
+    ]);
+  });
+
+  it("has no previous findings on a first review", async () => {
+    const { http } = await start();
+    const res = await http.post(BASE).send({}).expect(201);
+    expect(res.body.pullRequest.previousFindings).toEqual([]);
   });
 });

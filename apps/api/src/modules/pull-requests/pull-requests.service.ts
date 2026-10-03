@@ -87,6 +87,7 @@ const reviewSnapshotSchema = z.object({
           nodes: z.array(
             z
               .object({
+                id: z.string(),
                 isResolved: z.boolean(),
                 path: z.string(),
                 line: z.number().nullable(),
@@ -120,7 +121,16 @@ export interface PullRequestReviewSnapshot {
   headOid: string;
   baseRefName: string;
   baseOid: string;
-  openThreads: { path: string; line: number | null; author: string; body: string }[];
+  /** Unresolved threads, by first comment. */
+  openThreads: {
+    id: string;
+    path: string;
+    line: number | null;
+    author: string;
+    body: string;
+  }[];
+  /** Every thread's resolved state by thread id (re-reviews look up their own). */
+  threadResolved: Record<string, boolean>;
 }
 const DIFF = "application/vnd.github.diff";
 /** Caps from spec 0008 §4: GitHub has the rest. */
@@ -450,6 +460,7 @@ export class PullRequestsService {
         if (!thread || thread.isResolved || !first) return [];
         return [
           {
+            id: thread.id,
             path: thread.path,
             line: thread.line,
             author: first.author?.login ?? "ghost",
@@ -457,6 +468,11 @@ export class PullRequestsService {
           },
         ];
       }),
+      threadResolved: Object.fromEntries(
+        pr.reviewThreads.nodes.flatMap((thread) =>
+          thread ? [[thread.id, thread.isResolved] as const] : [],
+        ),
+      ),
     };
   }
 

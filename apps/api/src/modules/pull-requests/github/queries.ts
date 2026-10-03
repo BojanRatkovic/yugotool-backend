@@ -625,6 +625,7 @@ export const PR_REVIEW_SNAPSHOT = /* GraphQL */ `
         baseRefOid
         reviewThreads(first: 100) {
           nodes {
+            id
             isResolved
             path
             line

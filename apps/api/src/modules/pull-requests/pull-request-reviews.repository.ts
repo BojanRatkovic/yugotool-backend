@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import {
+  type ReviewFinding,
   type ReviewPullRequest,
   type ReviewVerdict,
   type RunStatus,
@@ -174,14 +175,31 @@ export class PullRequestReviewsRepository {
   }
 
   /** Head commit of the PR's last successful review: a re-review starts from there. */
-  async lastReviewedHead(db: Executor, projectId: string, number: number): Promise<string | null> {
+  /** The PR's latest done review: its head, what was posted, and its findings. */
+  async lastDoneReview(
+    db: Executor,
+    projectId: string,
+    number: number,
+  ): Promise<{ pullRequest: ReviewPullRequest; findings: ReviewFinding[] } | null> {
     const [row] = await db
-      .select({ pullRequest: workOrders.pullRequest })
+      .select({ pullRequest: workOrders.pullRequest, runId: workOrders.currentRunId })
       .from(workOrders)
       .where(and(forPr(projectId, number), eq(workOrders.status, "done")))
       .orderBy(desc(workOrders.createdAt))
       .limit(1);
-    return row?.pullRequest?.headOid ?? null;
+    if (!row?.pullRequest) return null;
+    const [review] = row.runId
+      ? await db
+          .select({ review: stationRuns.review })
+          .from(stationRuns)
+          .where(and(eq(stationRuns.runId, row.runId), isNotNull(stationRuns.review)))
+          .orderBy(desc(stationRuns.startedAt))
+          .limit(1)
+      : [];
+    return {
+      pullRequest: reviewPullRequestSchema.parse(row.pullRequest),
+      findings: review?.review ? reviewVerdictSchema.parse(review.review).findings : [],
+    };
   }
 
   async exists(db: Executor, workOrderId: string): Promise<boolean> {

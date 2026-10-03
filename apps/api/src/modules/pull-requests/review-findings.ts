@@ -1,4 +1,10 @@
-import type { PostFindings, PrLineCommentInput, ReviewFinding } from "@zastava/contracts";
+import type {
+  PostFindings,
+  PreviousFinding,
+  PrLineCommentInput,
+  ReviewFinding,
+  ReviewPullRequest,
+} from "@zastava/contracts";
 
 /** The findings a human kept, as GitHub writes: line comments and a summary addition. */
 export interface PendingReviewPlan {
@@ -59,4 +65,44 @@ export function planPendingReview(
   }
   if (notes.length > 0) plan.body = notes.join("\n\n---\n\n");
   return { plan, unknown };
+}
+
+type OpenThread = ReviewPullRequest["openThreads"][number];
+
+/**
+ * A re-review checks the previous done review's findings (spec 0010): each one
+ * is frozen with its thread and that thread's state on GitHub now. Their threads
+ * leave `openThreads`, which the reviewer reads as "already raised, do not repeat".
+ */
+export function freezePrevious(
+  last: { pullRequest: ReviewPullRequest; findings: ReviewFinding[] } | null,
+  snapshot: {
+    openThreads: (OpenThread & { id: string })[];
+    threadResolved: Record<string, boolean>;
+  },
+): { previousFindings: PreviousFinding[]; openThreads: OpenThread[] } {
+  const posted = new Set(last?.pullRequest.posted ?? []);
+  const threads = last?.pullRequest.postedThreads ?? {};
+  const previousFindings = (last?.findings ?? []).slice(0, 30).map((f) => {
+    const threadId = threads[f.id] ?? null;
+    return {
+      id: f.id,
+      severity: f.severity,
+      category: f.category,
+      file: f.file,
+      line: f.line,
+      title: f.title,
+      body: f.body,
+      posted: posted.has(f.id),
+      threadId,
+      threadResolved: threadId === null ? null : (snapshot.threadResolved[threadId] ?? null),
+    };
+  });
+  const mine = new Set(previousFindings.flatMap((f) => (f.threadId ? [f.threadId] : [])));
+  return {
+    previousFindings,
+    openThreads: snapshot.openThreads
+      .filter((t) => !mine.has(t.id))
+      .map(({ id: _id, ...thread }) => thread),
+  };
 }

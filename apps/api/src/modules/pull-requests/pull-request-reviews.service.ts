@@ -21,7 +21,7 @@ import {
   ReviewNotReadyError,
   ReviewStaleError,
 } from "./pull-requests.errors";
-import { planPendingReview } from "./review-findings";
+import { freezePrevious, planPendingReview } from "./review-findings";
 import { PullRequestsService } from "./pull-requests.service";
 
 /** Workflow type name registered by the worker. */
@@ -92,7 +92,9 @@ export class PullRequestReviewsService {
       if (await this.repository.isRunning(tx, projectId, number)) {
         throw new ReviewAlreadyRunningError(`a ZASTAVA review of #${number} is already running`);
       }
-      const lastHead = await this.repository.lastReviewedHead(tx, projectId, number);
+      const last = await this.repository.lastDoneReview(tx, projectId, number);
+      const lastHead = last?.pullRequest.headOid ?? null;
+      const { previousFindings, openThreads } = freezePrevious(last, pr);
       return this.repository.insertRunning(tx, {
         id: input.id,
         projectId,
@@ -107,10 +109,10 @@ export class PullRequestReviewsService {
           baseOid: pr.baseOid,
           // Same head again = a fresh full review, not an empty re-review.
           sinceOid: lastHead && lastHead !== pr.headOid ? lastHead : null,
-          openThreads: pr.openThreads,
+          openThreads,
           posted: [],
           postedThreads: {},
-          previousFindings: [],
+          previousFindings,
         },
       });
     });
