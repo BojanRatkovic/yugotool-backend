@@ -1,0 +1,29 @@
+{
+  "name": "@zastava/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "dev": "tsx watch src/worker.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.287",
+    "@temporalio/activity": "^1.22.0",
+    "@temporalio/worker": "^1.22.0",
+    "@temporalio/workflow": "^1.22.0",
+    "@zastava/contracts": "workspace:*",
+    "@zastava/db": "workspace:*",
+    "@zastava/notify": "workspace:*",
+    "drizzle-orm": "^0.45.2",
+    "pixelmatch": "^7.2.0",
+    "playwright": "^1.63.0",
+    "pngjs": "^7.0.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/pngjs": "^6.0.5"
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1790965286615,
+      "tag": "0000_quiet_caretaker",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790966301845,
+      "tag": "0001_natural_dracula",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790966919456,
+      "tag": "0002_sturdy_infant_terrible",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790968641583,
+      "tag": "0003_smooth_vindicator",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790968641916,
+      "tag": "0004_brave_thundra",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790974183325,
+      "tag": "0005_add_shifts",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790980307311,
+      "tag": "0006_add_qa",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791008383654,
+      "tag": "0007_add_qa_planner",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791013333070,
+      "tag": "0008_add_draft_prs",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791026371849,
+      "tag": "0009_first_run_defaults",
+      "breakpoints": true
+    }
+  ]
+}

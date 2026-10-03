@@ -1,0 +1,312 @@
+import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
+import { readdir } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { promisify } from "node:util";
+import { Inject, Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import type { Client } from "@temporalio/client";
+import {
+  type DoctorCheck,
+  type DoctorCheckKey,
+  type DoctorReport,
+  TASK_QUEUE,
+} from "@zastava/contracts";
+import { sql } from "drizzle-orm";
+import type { Env } from "../../core/config/env.schema";
+import { DatabaseService } from "../../core/database/database.service";
+import { TEMPORAL_CLIENT } from "../../core/temporal/temporal.module";
+import { ReposService } from "../repos/repos.service";
+import { PlanUsageService } from "./plan-usage.service";
+
+const exec = promisify(execFile);
+const CHECK_TIMEOUT_MS = 8_000;
+const TEMPORAL_DEADLINE_MS = 3_000;
+/** `git hook run` (repo-hooks preflight) needs 2.36. */
+const GIT_HOOK_RUN = [2, 36] as const;
+
+type Result = Omit<DoctorCheck, "key" | "label" | "required" | "neededFor">;
+const ok = (detail: string): Result => ({ status: "ok", detail, fix: null, fixCommand: null });
+const problem = (
+  status: "warn" | "fail",
+  detail: string,
+  fix: string,
+  fixCommand: string | null = null,
+): Result => ({ status, detail, fix, fixCommand });
+
+interface Check {
+  key: DoctorCheckKey;
+  label: string;
+  required: boolean;
+  neededFor: string | null;
+  run: () => Promise<Result>;
+}
+
+/**
+ * First-run checks: everything a run needs, judged from this machine (the API
+ * and the worker share it). Optional pieces fail as `warn`, never `fail`.
+ */
+@Injectable()
+export class DoctorService {
+  constructor(
+    private readonly config: ConfigService<Env, true>,
+    private readonly database: DatabaseService,
+    private readonly planUsage: PlanUsageService,
+    private readonly repos: ReposService,
+    @Inject(TEMPORAL_CLIENT) private readonly temporal: Client,
+  ) {}
+
+  async report(): Promise<DoctorReport> {
+    // The worker check means nothing without Temporal; it reuses that result.
+    const temporal = this.temporalServer();
+    const checks = await Promise.all(this.checks(temporal).map((c) => this.runCheck(c)));
+    return {
+      ready: checks.every((c) => !c.required || c.status !== "fail"),
+      checks,
+      checkedAt: new Date().toISOString(),
+    };
+  }
+
+  private async runCheck(check: Check): Promise<DoctorCheck> {
+    const { run, ...meta } = check;
+    const timeout = new Promise<Result>((resolve) =>
+      setTimeout(
+        () =>
+          resolve(
+            problem(check.required ? "fail" : "warn", "Check timed out", "Run the check again."),
+          ),
+        // The Claude probe spawns a session and has its own 20 s timeout.
+        check.key === "claude" ? 25_000 : CHECK_TIMEOUT_MS,
+      ).unref(),
+    );
+    const result = await Promise.race([
+      run().catch((error: unknown) =>
+        problem(
+          check.required ? "fail" : "warn",
+          error instanceof Error ? error.message : String(error),
+          "Run the check again.",
+        ),
+      ),
+      timeout,
+    ]);
+    return { ...meta, ...result };
+  }
+
+  private checks(temporal: Promise<Result>): Check[] {
+    return [
+      { key: "claude", label: "Claude", required: true, neededFor: null, run: () => this.claude() },
+      { key: "git", label: "git", required: true, neededFor: null, run: () => git() },
+      {
+        key: "database",
+        label: "Database",
+        required: true,
+        neededFor: null,
+        run: () => this.db(),
+      },
+      {
+        key: "temporal",
+        label: "Temporal",
+        required: true,
+        neededFor: null,
+        run: () => temporal,
+      },
+      {
+        key: "worker",
+        label: "Worker",
+        required: true,
+        neededFor: null,
+        run: () => this.worker(temporal),
+      },
+      {
+        key: "repos",
+        label: "Repos folder",
+        required: false,
+        neededFor: "Needed to pick repos from a list",
+        run: () => this.reposFolder(),
+      },
+      {
+        key: "gh",
+        label: "GitHub CLI",
+        required: false,
+        neededFor: "Needed for pull requests",
+        run: () => gh(),
+      },
+      {
+        key: "chromium",
+        label: "Chromium",
+        required: false,
+        neededFor: "Needed for QA stations",
+        run: () => this.chromium(),
+      },
+      {
+        key: "nvm",
+        label: "nvm",
+        required: false,
+        neededFor: "Needed when repos pin Node in .nvmrc",
+        run: () => this.nvm(),
+      },
+    ];
+  }
+
+  private async claude(): Promise<Result> {
+    if (this.config.get("ANTHROPIC_API_KEY", { infer: true })) {
+      return ok("API key (ANTHROPIC_API_KEY)");
+    }
+    const usage = await this.planUsage.get();
+    if (usage.subscriptionType) return ok(`Logged in · ${capitalize(usage.subscriptionType)} plan`);
+    return problem(
+      "fail",
+      usage.error ? `Not logged in (${usage.error})` : "Not logged in",
+      "Run claude in a terminal and log in with /login, or set ANTHROPIC_API_KEY.",
+      "claude",
+    );
+  }
+
+  private async db(): Promise<Result> {
+    const result = await this.database.db.execute<{ server_version: string }>(
+      sql`show server_version`,
+    );
+    const version = result.rows[0]?.server_version.split(" ")[0];
+    return ok(version ? `Postgres ${version}` : "Connected");
+  }
+
+  private async temporalServer(): Promise<Result> {
+    const address = this.config.get("TEMPORAL_ADDRESS", { infer: true });
+    try {
+      const info = await this.temporal.connection.withDeadline(
+        Date.now() + TEMPORAL_DEADLINE_MS,
+        () => this.temporal.workflowService.getSystemInfo({}),
+      );
+      return ok(`Server ${info.serverVersion || "running"} on ${address}`);
+    } catch {
+      return problem(
+        "fail",
+        `Not reachable on ${address}`,
+        "Start the Temporal dev server.",
+        "pnpm dev:temporal",
+      );
+    }
+  }
+
+  private async worker(temporal: Promise<Result>): Promise<Result> {
+    if ((await temporal).status !== "ok") {
+      return problem("fail", "Unknown while Temporal is down", "Start Temporal first.");
+    }
+    const namespace = this.config.get("TEMPORAL_NAMESPACE", { infer: true });
+    const queue = await this.temporal.connection.withDeadline(
+      Date.now() + TEMPORAL_DEADLINE_MS,
+      () =>
+        this.temporal.workflowService.describeTaskQueue({
+          namespace,
+          taskQueue: { name: TASK_QUEUE },
+          // 1 = TASK_QUEUE_TYPE_WORKFLOW
+          taskQueueType: 1,
+        }),
+    );
+    const pollers = queue.pollers?.length ?? 0;
+    return pollers > 0
+      ? // Temporal remembers pollers for minutes, so a count would include restarted workers.
+        ok("Running")
+      : problem("fail", "Not running", "Start the worker; runs stay queued until it is up.");
+  }
+
+  private async reposFolder(): Promise<Result> {
+    const root = await this.repos.root();
+    if (!existsSync(root)) {
+      return problem(
+        "warn",
+        `${tilde(root)} does not exist`,
+        "Pick your repos folder in Settings.",
+      );
+    }
+    const count = (await this.repos.list()).length;
+    return count > 0
+      ? ok(`${tilde(root)} · ${count} ${count === 1 ? "repo" : "repos"}`)
+      : problem("warn", `No git repos in ${tilde(root)}`, "Pick your repos folder in Settings.");
+  }
+
+  private async chromium(): Promise<Result> {
+    const dir =
+      this.config.get("PLAYWRIGHT_BROWSERS_PATH", { infer: true }) ?? defaultPlaywrightCache();
+    const entries = await readdir(dir).catch(() => [] as string[]);
+    const builds = entries.filter((e) => /^chromium-\d+$/.test(e));
+    return builds.length
+      ? ok(`Playwright Chromium (${builds.length} ${builds.length === 1 ? "build" : "builds"})`)
+      : problem(
+          "warn",
+          "Not installed",
+          "Install Playwright's Chromium (about 150 MB).",
+          "npx playwright install chromium",
+        );
+  }
+
+  private async nvm(): Promise<Result> {
+    const dir = this.config.get("NVM_DIR", { infer: true }) ?? path.join(os.homedir(), ".nvm");
+    return existsSync(path.join(dir, "nvm.sh"))
+      ? ok(tilde(dir))
+      : problem(
+          "warn",
+          "Not installed",
+          "Install nvm (github.com/nvm-sh/nvm); previews then run under the Node a repo pins.",
+        );
+  }
+}
+
+async function git(): Promise<Result> {
+  const out = await exec("git", ["--version"]).then(
+    (r) => r.stdout.trim(),
+    () => null,
+  );
+  if (!out)
+    return problem(
+      "fail",
+      "Not installed",
+      "Install git (Xcode command line tools).",
+      "xcode-select --install",
+    );
+  const match = out.match(/(\d+)\.(\d+)(?:\.(\d+))?/);
+  const version = match?.[0] ?? out;
+  const [major, minor] = [Number(match?.[1] ?? 0), Number(match?.[2] ?? 0)];
+  const recent = major > GIT_HOOK_RUN[0] || (major === GIT_HOOK_RUN[0] && minor >= GIT_HOOK_RUN[1]);
+  return recent
+    ? ok(`git ${version}`)
+    : problem(
+        "warn",
+        `git ${version}`,
+        "Update git to 2.36 or newer; older versions skip the repo-hooks check before delivery.",
+        "brew install git",
+      );
+}
+
+async function gh(): Promise<Result> {
+  const installed = await exec("gh", ["--version"]).then(
+    (r) => r.stdout.split("\n")[0]?.match(/\d+\.\d+\.\d+/)?.[0] ?? "installed",
+    () => null,
+  );
+  if (!installed)
+    return problem("warn", "Not installed", "Install the GitHub CLI.", "brew install gh");
+  const loggedIn = await exec("gh", ["auth", "status"]).then(
+    () => true,
+    () => false,
+  );
+  return loggedIn
+    ? ok(`gh ${installed} · logged in`)
+    : problem("warn", `gh ${installed} · not logged in`, "Log in to GitHub.", "gh auth login");
+}
+
+function defaultPlaywrightCache(): string {
+  const home = os.homedir();
+  if (process.platform === "darwin") return path.join(home, "Library", "Caches", "ms-playwright");
+  if (process.platform === "win32") return path.join(home, "AppData", "Local", "ms-playwright");
+  return path.join(home, ".cache", "ms-playwright");
+}
+
+function tilde(p: string): string {
+  const home = os.homedir();
+  return p === home || p.startsWith(`${home}${path.sep}`) ? `~${p.slice(home.length)}` : p;
+}
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}

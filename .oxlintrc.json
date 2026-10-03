@@ -1,0 +1,22 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "import", "unicorn", "promise", "node"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error"
+  },
+  "rules": {
+    "unicorn/filename-case": ["error", { "case": "kebabCase" }],
+    "typescript/no-extraneous-class": ["error", { "allowWithDecorator": true }],
+    "import/no-unassigned-import": ["error", { "allow": ["reflect-metadata"] }]
+  },
+  "overrides": [
+    {
+      "files": ["**/test/**/*.ts"],
+      "rules": {
+        "typescript/no-unsafe-type-assertion": "off"
+      }
+    }
+  ],
+  "ignorePatterns": ["**/dist/**", "**/node_modules/**", "**/coverage/**"]
+}

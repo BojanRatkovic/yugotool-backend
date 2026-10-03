@@ -1,0 +1,29 @@
+{
+  "name": "@zastava/supervisor",
+  "version": "0.0.0",
+  "private": true,
+  "bin": {
+    "zastava": "./dist/cli.js"
+  },
+  "type": "commonjs",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/cli.js start"
+  },
+  "dependencies": {
+    "pg": "^8.23.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1"
+  },
+  "optionalDependencies": {
+    "@embedded-postgres/darwin-arm64": "18.4.0-beta.17",
+    "@embedded-postgres/darwin-x64": "18.4.0-beta.17"
+  }
+}

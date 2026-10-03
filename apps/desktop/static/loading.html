@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'"
+    />
+    <title>ZASTAVA</title>
+    <style>
+      :root {
+        --background: oklch(0.145 0.004 260);
+        --card: oklch(0.175 0.005 260);
+        --border: oklch(1 0 0 / 8%);
+        --foreground: oklch(0.96 0.003 260);
+        --muted: oklch(0.66 0.01 260);
+        --brand: oklch(0.58 0.21 25);
+        --passed: oklch(0.72 0.15 155);
+        --failed: oklch(0.65 0.2 25);
+        --running: oklch(0.7 0.12 250);
+        color-scheme: dark;
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          --background: oklch(0.985 0.002 260);
+          --card: oklch(1 0 0);
+          --border: oklch(0 0 0 / 9%);
+          --foreground: oklch(0.2 0.006 260);
+          --muted: oklch(0.5 0.01 260);
+          --passed: oklch(0.55 0.15 155);
+          --failed: oklch(0.55 0.2 25);
+          --running: oklch(0.55 0.14 250);
+          color-scheme: light;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        height: 100vh;
+        display: grid;
+        place-items: center;
+        background: var(--background);
+        color: var(--foreground);
+        font:
+          13px/1.5 -apple-system,
+          BlinkMacSystemFont,
+          "Inter",
+          system-ui,
+          sans-serif;
+        -webkit-app-region: drag;
+      }
+      main {
+        width: 360px;
+      }
+      .mark {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+      .mark svg {
+        color: var(--brand);
+      }
+      .word {
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        font-size: 14px;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 6px 0;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 18px 1fr auto;
+        align-items: center;
+        gap: 10px;
+        height: 34px;
+        padding: 0 14px;
+      }
+      .row .state {
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        border: 1.5px solid var(--muted);
+        justify-self: center;
+      }
+      .running .dot,
+      .done .dot {
+        background: var(--passed);
+        border-color: var(--passed);
+      }
+      .starting .dot,
+      .restarting .dot {
+        border-color: var(--running);
+        border-top-color: transparent;
+        width: 10px;
+        height: 10px;
+        animation: spin 0.8s linear infinite;
+      }
+      .failed .dot {
+        background: var(--failed);
+        border-color: var(--failed);
+        border-radius: 2px;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .starting .dot,
+        .restarting .dot {
+          animation: none;
+        }
+      }
+      .hint {
+        color: var(--muted);
+        margin-top: 14px;
+        min-height: 40px;
+      }
+      .error {
+        display: none;
+        margin-top: 14px;
+        padding: 12px 14px;
+        border: 1px solid var(--failed);
+        border-radius: 10px;
+      }
+      .error p {
+        margin: 0 0 10px;
+        word-break: break-word;
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
+        -webkit-app-region: no-drag;
+      }
+      button {
+        font: inherit;
+        padding: 5px 12px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: var(--card);
+        color: var(--foreground);
+        cursor: pointer;
+      }
+      button.primary {
+        background: var(--foreground);
+        color: var(--background);
+        border-color: transparent;
+      }
+      button:focus-visible {
+        outline: 2px solid var(--brand);
+        outline-offset: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="mark">
+        <svg width="20" height="20" viewBox="0 0 16 16" aria-hidden="true">
+          <path fill="currentColor" d="M3 1.5h1.5V15H3zM4.5 2h9l-3 3.5 3 3.5h-9z" />
+        </svg>
+        <span class="word">ZASTAVA</span>
+      </div>
+      <div class="card" id="services" role="status" aria-live="polite"></div>
+      <p class="hint" id="hint">Starting the factory…</p>
+      <div class="error" id="error" role="alert">
+        <p id="error-text"></p>
+        <div class="actions">
+          <button class="primary" id="retry">Try again</button>
+          <button id="logs">Open logs</button>
+        </div>
+      </div>
+    </main>
+    <script>
+      const LABELS = {
+        postgres: "Database",
+        migrations: "Migrations",
+        temporal: "Workflow engine",
+        api: "API",
+        worker: "Worker",
+      };
+      const STATES = {
+        stopped: "Waiting",
+        starting: "Starting…",
+        running: "Ready",
+        done: "Done",
+        restarting: "Restarting…",
+        failed: "Failed",
+      };
+      const order = ["postgres", "migrations", "temporal", "api", "worker"];
+      const services = document.getElementById("services");
+      const render = (status) => {
+        const byName = Object.fromEntries((status?.services ?? []).map((s) => [s.name, s]));
+        services.replaceChildren(
+          ...order.map((name) => {
+            const s = byName[name] ?? { state: "stopped" };
+            const row = document.createElement("div");
+            row.className = `row ${s.state}`;
+            row.innerHTML =
+              '<span class="dot"></span><span class="name"></span><span class="state"></span>';
+            row.querySelector(".name").textContent = LABELS[name];
+            row.querySelector(".state").textContent = STATES[s.state];
+            return row;
+          }),
+        );
+      };
+      render(null);
+      const desktop = window.zastavaDesktop;
+      desktop?.onStatus(render);
+      desktop?.onFailed((failure) => {
+        document.getElementById("hint").textContent = "";
+        document.getElementById("error-text").textContent =
+          `ZASTAVA couldn't start: ${failure.message}`;
+        document.getElementById("error").style.display = "block";
+      });
+      document.getElementById("retry").addEventListener("click", () => {
+        document.getElementById("error").style.display = "none";
+        document.getElementById("hint").textContent = "Starting the factory…";
+        void desktop?.retry();
+      });
+      document.getElementById("logs").addEventListener("click", () => void desktop?.openLogs());
+    </script>
+  </body>
+</html>

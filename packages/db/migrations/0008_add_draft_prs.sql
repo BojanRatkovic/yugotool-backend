@@ -1,0 +1,1 @@
+ALTER TABLE "projects" ADD COLUMN "draft_prs" boolean DEFAULT false NOT NULL;
