@@ -21,6 +21,7 @@ describe("buildReviewPrompt", () => {
     expect(prompt).toContain(".zastava/review-brief.md");
     expect(prompt).toContain("Never modify");
     expect(prompt).toContain("### Lint\nok");
+    expect(prompt).toContain("## Output format");
   });
 });
 

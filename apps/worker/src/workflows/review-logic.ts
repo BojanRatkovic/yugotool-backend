@@ -16,6 +16,13 @@ const RANK = { critical: 0, important: 1, minor: 2 } as const;
 const tail = (text: string, max: number): string =>
   text.length > max ? `…${text.slice(-max)}` : text;
 
+/** How the review text reads in the PR panel and on GitHub, whatever the station's own prompt says. */
+const REVIEW_OUTPUT_FORMAT = [
+  "## Output format",
+  "`summary`: first line, one sentence on what the PR does. Then a blank line and 2–4 short `- ` bullets: what matters most, what you checked, and what you did not verify. Short lines, no wall of text.",
+  "Each finding `body`: markdown for a GitHub comment. Lead with the problem in one or two sentences, then a blank line and the fix. Use `code` for identifiers and short bullets when there are several points.",
+].join("\n\n");
+
 export function buildReviewPrompt(
   run: { title: string; pullRequest: { number: number; url: string } },
   station: AgentStation,
@@ -33,6 +40,7 @@ export function buildReviewPrompt(
     history ? `## Earlier stations\n\n${history}` : "",
     knowledgeSection(knowledge),
     `## Your station: ${station.name} (${station.role})`,
+    REVIEW_OUTPUT_FORMAT,
     "Review the pull request now.",
   ]
     .filter(Boolean)
