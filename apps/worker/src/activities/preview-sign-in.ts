@@ -3,7 +3,7 @@ import { Context } from "@temporalio/activity";
 import { type PreviewSignIn, type ServerEvent, finishSignInSchema } from "@zastava/contracts";
 import { type Database, projects } from "@zastava/db";
 import { eq } from "drizzle-orm";
-import type { Browser, BrowserContext } from "playwright";
+import type { Browser, BrowserContext, Page } from "playwright";
 import {
   existingSession,
   previewSessionFile,
@@ -14,7 +14,7 @@ import {
 import { localRunner } from "../runner/local-runner";
 import { PreviewError, previewUrl, type RunningPreview, startPreview } from "../runner/preview";
 import { launchVisibleBrowser } from "../runner/qa-capture";
-import { hasState, type StorageState } from "../runner/sign-in";
+import { BrowserTrace, hasState, redactUrl, type StorageState } from "../runner/sign-in";
 
 const HEARTBEAT_MS = 10_000;
 const POLL_MS = 1_000;
@@ -90,22 +90,45 @@ export function createPreviewSignInActivities(db: Database, deps: PreviewSignInD
           ...(existing ? { storageState: existing } : {}),
         });
         const url = previewUrl(running.url, preview, preview.readyPath);
+        const trace = new BrowserTrace();
+        traceContext(context, trace);
+        const previewLogs = tail(running.logs());
+        const logs = (): string => `${previewLogs}\n\n── Sign-in window ──\n${trace.text()}`;
         const page = await context.newPage();
         await page.goto(url).catch(() => undefined);
         await page.bringToFront().catch(() => undefined);
-        await save({ status: "waiting", url, logs: tail(running.logs()) });
+        await save({ status: "waiting", url, logs: logs() });
+        let shown = trace.version;
+        const onTick = async (): Promise<void> => {
+          if (trace.version === shown) return;
+          shown = trace.version;
+          await save({ logs: logs() });
+        };
 
-        const outcome = await waitForUser(browser, context, projectId, ctx.cancellationSignal);
-        if (outcome.action === "cancel") return await end({ status: "cancelled" });
+        const outcome = await waitForUser(
+          browser,
+          context,
+          projectId,
+          ctx.cancellationSignal,
+          onTick,
+        );
+        if (outcome.action === "cancel") return await end({ status: "cancelled", logs: logs() });
         if (!outcome.state || !hasState(outcome.state))
           return await end({
             status: "failed",
             error: "The browser held no cookies or storage, so there was nothing to save.",
+            logs: logs(),
           });
         await writeFile(previewSessionFile(projectId), JSON.stringify(outcome.state), {
           mode: 0o600,
         });
-        return await end({ status: "saved" });
+        return await end({
+          status: "saved",
+          logs: logs(),
+          error: trace.loopSuspected()
+            ? "Saved, but the window kept redirecting (see the sign-in log): the app may not accept this session."
+            : null,
+        });
       } catch (error) {
         return await end({
           status: ctx.cancellationSignal.aborted ? "cancelled" : "failed",
@@ -133,6 +156,7 @@ async function waitForUser(
   context: BrowserContext,
   projectId: string,
   cancelled: AbortSignal,
+  onTick: () => Promise<void>,
 ): Promise<{ action: "save" | "cancel"; state: StorageState | null }> {
   let snapshot: StorageState | null = null;
   let disconnected = false;
@@ -150,8 +174,34 @@ async function waitForUser(
     if (requested === "save") return { action: "save", state: snapshot };
     if (disconnected || context.pages().length === 0) return { action: "save", state: snapshot };
     if (Date.now() > deadline) throw new Error("Sign-in timed out after 15 minutes.");
+    await onTick().catch(() => undefined);
     await new Promise((r) => setTimeout(r, POLL_MS));
   }
+}
+
+/** Logs main-frame navigations, failed document/API responses and console errors of every page. */
+function traceContext(context: BrowserContext, trace: BrowserTrace): void {
+  const watch = (page: Page): void => {
+    page.on("framenavigated", (frame) => {
+      if (frame === page.mainFrame()) trace.navigated(frame.url());
+    });
+    page.on("console", (message) => {
+      if (message.type() === "error") trace.add(`console: ${message.text().slice(0, 200)}`);
+    });
+  };
+  context.on("page", watch);
+  context.on("response", (response) => {
+    const type = response.request().resourceType();
+    if (response.status() >= 400 && ["document", "xhr", "fetch"].includes(type))
+      trace.add(`${response.status()} ${response.request().method()} ${redactUrl(response.url())}`);
+  });
+  context.on("requestfailed", (request) => {
+    const type = request.resourceType();
+    if (["document", "xhr", "fetch"].includes(type))
+      trace.add(
+        `failed ${request.method()} ${redactUrl(request.url())} (${request.failure()?.errorText ?? "error"})`,
+      );
+  });
 }
 
 async function finishRequest(projectId: string): Promise<"save" | "cancel" | null> {
