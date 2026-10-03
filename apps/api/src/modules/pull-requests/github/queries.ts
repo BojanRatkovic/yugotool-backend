@@ -472,9 +472,11 @@ export const PR_WRITE_TARGET = /* GraphQL */ `
     repository(owner: $owner, name: $name) {
       pullRequest(number: $number) {
         id
+        headRefOid
         pendingReviews: reviews(first: 1, states: PENDING, author: $viewer) {
           nodes {
             id
+            body
             comments {
               totalCount
             }
@@ -637,6 +639,15 @@ export const PR_REVIEW_SNAPSHOT = /* GraphQL */ `
           }
         }
       }
+    }
+  }
+`;
+
+/** Rewrites my pending review's summary (ZASTAVA findings without a line go there). */
+export const UPDATE_REVIEW_BODY = /* GraphQL */ `
+  mutation UpdateReviewBody($reviewId: ID!, $body: String!) {
+    updatePullRequestReview(input: { pullRequestReviewId: $reviewId, body: $body }) {
+      clientMutationId
     }
   }
 `;

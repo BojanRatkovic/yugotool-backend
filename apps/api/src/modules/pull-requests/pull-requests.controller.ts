@@ -20,6 +20,7 @@ import type {
   ZastavaReviewResult,
 } from "@zastava/contracts";
 import {
+  PostFindingsDto,
   PrCommentInputDto,
   PrDiffDto,
   PrDiffQueryDto,
@@ -58,6 +59,21 @@ export class PullRequestsController {
     @Query() query: ZastavaReviewQueryDto,
   ): Promise<ZastavaReviewResult> {
     return { review: await this.reviews.latest(projectId, number, query.head) };
+  }
+
+  /**
+   * The kept findings (as edited) into my pending review; never submits.
+   * 422 `review_stale` when the PR moved past the reviewed commit.
+   */
+  @Post(":number/zastava-review/post")
+  @HttpCode(200)
+  @ApiOkResponse({ type: ZastavaReviewDto })
+  postZastavaFindings(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+    @Param("number", ParseIntPipe) number: number,
+    @Body() body: PostFindingsDto,
+  ): Promise<ZastavaReview> {
+    return this.reviews.post(projectId, number, body);
   }
 
   /** Starts a ZASTAVA review on the PR's current head; 409 `review_running` while one runs. */

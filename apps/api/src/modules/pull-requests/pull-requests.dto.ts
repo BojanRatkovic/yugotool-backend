@@ -10,6 +10,7 @@ import {
   pullRequestDetailSchema,
   pullRequestListQuerySchema,
   pullRequestListSchema,
+  postFindingsSchema,
   startReviewSchema,
   zastavaReviewQuerySchema,
   zastavaReviewResultSchema,
@@ -32,3 +33,4 @@ export class StartReviewDto extends createZodDto(startReviewSchema) {}
 export class ZastavaReviewDto extends createZodDto(zastavaReviewSchema) {}
 export class ZastavaReviewResultDto extends createZodDto(zastavaReviewResultSchema) {}
 export class ZastavaReviewQueryDto extends createZodDto(zastavaReviewQuerySchema) {}
+export class PostFindingsDto extends createZodDto(postFindingsSchema) {}

@@ -97,3 +97,21 @@ export class PullRequestNotOpenError extends DomainError {
   readonly code = "pull_request_not_open";
   readonly kind = "conflict";
 }
+
+/** There is no finished ZASTAVA review to post from. */
+export class ReviewNotReadyError extends DomainError {
+  readonly code = "review_not_ready";
+  readonly kind = "conflict";
+}
+
+/** The PR moved past the commit the review was written for; re-run it on the new head. */
+export class ReviewStaleError extends DomainError {
+  readonly code = "review_stale";
+  readonly kind = "unprocessable";
+}
+
+/** Posted finding ids the review doesn't have. */
+export class FindingUnknownError extends DomainError {
+  readonly code = "finding_unknown";
+  readonly kind = "unprocessable";
+}

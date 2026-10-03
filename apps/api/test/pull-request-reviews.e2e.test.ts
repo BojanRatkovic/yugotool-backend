@@ -1,6 +1,11 @@
 import type { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
-import type { ProjectRemote, ReviewPullRequest } from "@zastava/contracts";
+import type {
+  ProjectRemote,
+  ReviewFinding,
+  ReviewPullRequest,
+  ReviewVerdict,
+} from "@zastava/contracts";
 import { ZodValidationPipe } from "nestjs-zod";
 import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -18,6 +23,7 @@ import { PullRequestReviewsService } from "../src/modules/pull-requests/pull-req
 import { PullRequestWritesService } from "../src/modules/pull-requests/pull-request-writes.service";
 import { PullRequestsController } from "../src/modules/pull-requests/pull-requests.controller";
 import { PullRequestsService } from "../src/modules/pull-requests/pull-requests.service";
+import { GithubError } from "../src/modules/pull-requests/pull-requests.errors";
 import { FakeGithub } from "./pull-requests-fake-github";
 
 const PROJECT = "85156849-2497-47fa-a2bd-494c776f572b";
@@ -120,14 +126,21 @@ class MemoryReviews {
       return { workOrderId, runId, workflowId: `run-${runId}` };
     },
   );
+  markPosted = vi.fn(async (_db: unknown, workOrderId: string, ids: string[]) => {
+    const row = this.rows.get(workOrderId);
+    if (!row) return;
+    const posted = [...new Set([...row.pullRequest.posted, ...ids])];
+    this.rows.set(workOrderId, { ...row, pullRequest: { ...row.pullRequest, posted } });
+  });
   markFailed = vi.fn(async (_db: unknown, workOrderId: string) => {
     const row = this.rows.get(workOrderId);
     if (row) this.rows.set(workOrderId, { ...row, status: "failed", runStatus: "failed" });
   });
 
-  finish(workOrderId: string) {
+  finish(workOrderId: string, verdict: ReviewVerdict | null = null) {
     const row = this.rows.get(workOrderId);
-    if (row) this.rows.set(workOrderId, { ...row, status: "done", runStatus: "succeeded" });
+    if (row)
+      this.rows.set(workOrderId, { ...row, status: "done", runStatus: "succeeded", verdict });
   }
 }
 
@@ -264,5 +277,134 @@ describe("ZASTAVA review API", () => {
     const [row] = [...reviews.rows.values()];
     expect(row?.runStatus).toBe("failed");
     expect(reviews.markFailed).toHaveBeenCalled();
+  });
+});
+
+const finding = (patch: Partial<ReviewFinding>): ReviewFinding => ({
+  id: "f1",
+  severity: "critical",
+  category: "bug",
+  file: "src/a.ts",
+  side: "RIGHT",
+  startLine: null,
+  line: 12,
+  title: "Null deref",
+  body: "items[0] is undefined when empty.",
+  suggestion: null,
+  confidence: "high",
+  ...patch,
+});
+const VERDICT: ReviewVerdict = {
+  recommendation: "request_changes",
+  summary: "Adds paging.",
+  findings: [
+    finding({}),
+    finding({ id: "f2", severity: "minor", file: null, line: null, title: "No tests" }),
+  ],
+};
+const target = (pending: { id: string; body: string } | null, head = HEAD) => ({
+  repository: {
+    pullRequest: {
+      id: "PR_1",
+      headRefOid: head,
+      pendingReviews: {
+        nodes: pending ? [{ ...pending, comments: { totalCount: 0 } }] : [],
+      },
+    },
+  },
+});
+const POST = `${BASE}/post`;
+const edits = [
+  {
+    id: "f1",
+    title: "Null deref",
+    body: "Guard the empty list.",
+    suggestion: "if (!items[0]) return;",
+  },
+  { id: "f2", title: "No tests", body: "Add a paging test.", suggestion: null },
+];
+
+async function finished() {
+  const ctx = await start();
+  const res = await ctx.http.post(BASE).send({}).expect(201);
+  ctx.reviews.finish(res.body.workOrderId, VERDICT);
+  return { ...ctx, workOrderId: res.body.workOrderId as string };
+}
+
+describe("posting findings", () => {
+  it("is 409 review_not_ready before a review finished", async () => {
+    const { http } = await start();
+    await http.post(BASE).send({}).expect(201);
+    const res = await http
+      .post(POST)
+      .send({ findings: [edits[0]] })
+      .expect(409);
+    expect(res.body.error.code).toBe("review_not_ready");
+  });
+
+  it("adds line findings as comments and the rest to a new pending review's summary", async () => {
+    const { http, github } = await finished();
+    github.answers.PrWriteTarget = target(null);
+    const res = await http.post(POST).send({ findings: edits }).expect(200);
+    expect(res.body.pullRequest.posted.toSorted()).toEqual(["f1", "f2"]);
+    expect(github.operations().filter((o) => o.startsWith("Add"))).toEqual([
+      "AddReview",
+      "AddReviewThread",
+    ]);
+    const review = github.calls.find((c) => c.operation === "AddReview");
+    expect(review?.variables).toMatchObject({ pullRequestId: "PR_1" });
+    expect(review?.variables).not.toHaveProperty("event");
+    expect(String(review?.variables.body)).toContain("**No tests**");
+    const thread = github.calls.find((c) => c.operation === "AddReviewThread");
+    expect(thread?.variables).toMatchObject({ reviewId: "PRR_new", path: "src/a.ts", line: 12 });
+    expect(String(thread?.variables.body)).toBe(
+      "**Null deref**\n\nGuard the empty list.\n\n```suggestion\nif (!items[0]) return;\n```",
+    );
+    expect(github.count("SubmitReview")).toBe(0);
+  });
+
+  it("appends to an existing pending review's summary", async () => {
+    const { http, github } = await finished();
+    github.answers.PrWriteTarget = target({ id: "PRR_mine", body: "My notes." });
+    await http
+      .post(POST)
+      .send({ findings: [edits[1]] })
+      .expect(200);
+    const update = github.calls.find((c) => c.operation === "UpdateReviewBody");
+    expect(update?.variables.reviewId).toBe("PRR_mine");
+    expect(String(update?.variables.body)).toMatch(/^My notes\.\n\n\*\*No tests\*\*/);
+    expect(github.count("AddReview")).toBe(0);
+  });
+
+  it("is 422 review_stale when the PR moved, and writes nothing", async () => {
+    const { http, github, reviews } = await finished();
+    github.answers.PrWriteTarget = target(null, "e".repeat(40));
+    const res = await http.post(POST).send({ findings: edits }).expect(422);
+    expect(res.body.error.code).toBe("review_stale");
+    expect(github.operations().some((o) => o.startsWith("Add"))).toBe(false);
+    expect(reviews.markPosted).not.toHaveBeenCalled();
+  });
+
+  it("remembers what got in when GitHub refuses a comment", async () => {
+    const { http, github, workOrderId, reviews } = await finished();
+    github.answers.PrWriteTarget = target(null);
+    github.answers.AddReviewThread = new GithubError(
+      "Line could not be resolved",
+      null,
+      "UNPROCESSABLE",
+    );
+    const res = await http.post(POST).send({ findings: edits }).expect(422);
+    expect(res.body.error.code).toBe("github_refused");
+    expect(res.body.error.message).toContain("1 of 2 added");
+    expect(reviews.rows.get(workOrderId)?.pullRequest.posted).toEqual(["f2"]);
+  });
+
+  it("is 422 finding_unknown for ids the review doesn't have", async () => {
+    const { http } = await finished();
+    const res = await http
+      .post(POST)
+      .send({ findings: [{ id: "f9", title: "x", body: "", suggestion: null }] })
+      .expect(422);
+    expect(res.body.error.code).toBe("finding_unknown");
   });
 });

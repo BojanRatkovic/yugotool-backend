@@ -1,12 +1,26 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import type { Client } from "@temporalio/client";
-import { type StartReview, TASK_QUEUE, type ZastavaReview } from "@zastava/contracts";
+import {
+  type PostFindings,
+  type StartReview,
+  TASK_QUEUE,
+  type ZastavaReview,
+} from "@zastava/contracts";
 import { DatabaseService } from "../../core/database/database.service";
 import { EventsService } from "../../core/events/events.service";
 import { TEMPORAL_CLIENT } from "../../core/temporal/temporal.module";
 import { ProjectsService } from "../projects/projects.service";
 import { type ReviewRow, PullRequestReviewsRepository } from "./pull-request-reviews.repository";
-import { PullRequestNotOpenError, ReviewAlreadyRunningError } from "./pull-requests.errors";
+import { PullRequestWritesService } from "./pull-request-writes.service";
+import {
+  FindingUnknownError,
+  GithubRefusedError,
+  PullRequestNotOpenError,
+  ReviewAlreadyRunningError,
+  ReviewNotReadyError,
+  ReviewStaleError,
+} from "./pull-requests.errors";
+import { planPendingReview } from "./review-findings";
 import { PullRequestsService } from "./pull-requests.service";
 
 /** Workflow type name registered by the worker. */
@@ -39,6 +53,7 @@ export class PullRequestReviewsService {
     private readonly database: DatabaseService,
     private readonly repository: PullRequestReviewsRepository,
     private readonly pullRequests: PullRequestsService,
+    private readonly writes: PullRequestWritesService,
     private readonly projects: ProjectsService,
     private readonly events: EventsService,
     @Inject(TEMPORAL_CLIENT) private readonly temporal: Client,
@@ -112,6 +127,49 @@ export class PullRequestReviewsService {
     const row = await this.repository.find(db, created.workOrderId);
     if (!row) throw new Error("review work order vanished after insert");
     return toReview(row);
+  }
+
+  /**
+   * The findings the human kept (as edited) go into their pending review on
+   * GitHub; nothing is submitted. What got in is remembered per finding, also
+   * when GitHub refuses one halfway (then 422 with GitHub's message).
+   */
+  async post(projectId: string, number: number, input: PostFindings): Promise<ZastavaReview> {
+    const db = this.database.db;
+    const row = await this.repository.latest(db, projectId, number);
+    if (!row?.verdict || row.runStatus !== "succeeded") {
+      throw new ReviewNotReadyError(`#${number} has no finished ZASTAVA review`);
+    }
+    const { plan, unknown } = planPendingReview(row.verdict.findings, input.findings);
+    if (unknown.length > 0) {
+      throw new FindingUnknownError(`the review has no finding ${unknown.join(", ")}`);
+    }
+    const head = row.pullRequest.headOid;
+    const result = await this.writes.addToPendingReview(
+      projectId,
+      number,
+      { comments: plan.comments, body: plan.body, expectHead: head },
+      (moved) =>
+        new ReviewStaleError(
+          `#${number} moved to ${moved.slice(0, 7)} after the review of ${head.slice(0, 7)}; run the review again`,
+        ),
+    );
+    const posted = [
+      ...(result.bodyAdded ? plan.bodyIds : []),
+      ...result.added.map((i) => plan.commentIds[i]).filter((id) => id !== undefined),
+    ];
+    if (posted.length > 0) {
+      await this.repository.markPosted(db, row.workOrderId, posted);
+      await this.events.publish({ type: "invalidate", collection: "reviews" });
+    }
+    if (result.refused) {
+      throw new GithubRefusedError(
+        `${posted.length} of ${input.findings.length} added; GitHub refused the next one: ${result.refused}`,
+      );
+    }
+    const updated = await this.repository.find(db, row.workOrderId);
+    if (!updated) throw new Error("review work order vanished");
+    return toReview(updated, head);
   }
 
   private async notify(): Promise<void> {

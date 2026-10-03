@@ -172,6 +172,20 @@ export class PullRequestReviewsRepository {
     return { workOrderId: workOrder.id, runId: run.id, workflowId };
   }
 
+  /** Remembers which findings are in the pending review on GitHub (set union). */
+  async markPosted(db: Executor, workOrderId: string, ids: string[]): Promise<void> {
+    const [row] = await db
+      .select({ pullRequest: workOrders.pullRequest })
+      .from(workOrders)
+      .where(eq(workOrders.id, workOrderId));
+    if (!row?.pullRequest) return;
+    const posted = [...new Set([...row.pullRequest.posted, ...ids])];
+    await db
+      .update(workOrders)
+      .set({ pullRequest: { ...row.pullRequest, posted } })
+      .where(eq(workOrders.id, workOrderId));
+  }
+
   async markFailed(db: Executor, workOrderId: string, runId: string): Promise<void> {
     await db
       .update(runs)

@@ -12,6 +12,7 @@ import {
   ADD_REVIEW,
   ADD_REVIEW_THREAD,
   ADD_THREAD_REPLY,
+  UPDATE_REVIEW_BODY,
   DELETE_REVIEW,
   MARK_FILE_VIEWED,
   MARK_READY,
@@ -36,11 +37,16 @@ const targetSchema = z.object({
     pullRequest: z
       .object({
         id: z.string(),
+        headRefOid: z.string().optional(),
         pendingReviews: z
           .object({
             nodes: z.array(
               z
-                .object({ id: z.string(), comments: z.object({ totalCount: z.number().int() }) })
+                .object({
+                  id: z.string(),
+                  body: z.string().optional(),
+                  comments: z.object({ totalCount: z.number().int() }),
+                })
                 .nullable(),
             ),
           })
@@ -59,7 +65,15 @@ const REFUSALS = new Set(["UNPROCESSABLE", "FORBIDDEN", "UNAUTHORIZED", "NOT_FOU
 
 interface Target {
   pullRequestId: string;
-  pendingReview: { id: string; comments: number } | null;
+  headOid: string | null;
+  pendingReview: { id: string; body: string; comments: number } | null;
+}
+
+/** What went into the pending review: comments by input index, and the first refusal. */
+export interface PendingReviewResult {
+  added: number[];
+  bodyAdded: boolean;
+  refused: string | null;
 }
 
 /**
@@ -110,6 +124,70 @@ export class PullRequestWritesService {
         anySchema,
       );
     });
+  }
+
+  /**
+   * Line comments plus an addition to the summary, all into my pending review
+   * (created when there is none). Never submits. Stops at GitHub's first
+   * refusal and says what got in; `expectHead` refuses before writing when the
+   * PR moved past the commit the comments were written for.
+   */
+  async addToPendingReview(
+    projectId: string,
+    number: number,
+    input: { comments: PrLineCommentInput[]; body: string | null; expectHead?: string },
+    onHeadMoved: (head: string) => Error,
+  ): Promise<PendingReviewResult> {
+    const result: PendingReviewResult = { added: [], bodyAdded: false, refused: null };
+    await this.write(projectId, number, async (target) => {
+      if (input.expectHead && target.headOid && target.headOid !== input.expectHead) {
+        throw onHeadMoved(target.headOid);
+      }
+      let reviewId = target.pendingReview?.id ?? null;
+      try {
+        if (input.body && target.pendingReview) {
+          const current = target.pendingReview.body.trim();
+          await this.mutate(
+            UPDATE_REVIEW_BODY,
+            {
+              reviewId: target.pendingReview.id,
+              body: current ? `${current}\n\n${input.body}` : input.body,
+            },
+            anySchema,
+          );
+          result.bodyAdded = true;
+        } else if (input.body) {
+          const data = await this.mutate(
+            ADD_REVIEW,
+            { pullRequestId: target.pullRequestId, body: input.body },
+            addReviewSchema,
+          );
+          reviewId = data.addPullRequestReview.pullRequestReview.id;
+          result.bodyAdded = true;
+        }
+        for (const [index, comment] of input.comments.entries()) {
+          reviewId ??= await this.startReview(target.pullRequestId);
+          await this.mutate(
+            ADD_REVIEW_THREAD,
+            {
+              reviewId,
+              path: comment.path,
+              line: comment.line,
+              side: comment.side,
+              startLine: comment.startLine ?? null,
+              startSide: comment.startLine ? (comment.startSide ?? comment.side) : null,
+              body: comment.body,
+            },
+            anySchema,
+          );
+          result.added.push(index);
+        }
+      } catch (error) {
+        if (!(error instanceof GithubRefusedError)) throw error;
+        result.refused = error.message;
+      }
+    });
+    return result;
   }
 
   /** Submits my pending review, or a new review when there is none. */
@@ -207,7 +285,10 @@ export class PullRequestWritesService {
     const pending = pr.pendingReviews?.nodes.find((n) => n !== null);
     return {
       pullRequestId: pr.id,
-      pendingReview: pending ? { id: pending.id, comments: pending.comments.totalCount } : null,
+      headOid: pr.headRefOid ?? null,
+      pendingReview: pending
+        ? { id: pending.id, body: pending.body ?? "", comments: pending.comments.totalCount }
+        : null,
     };
   }
 
