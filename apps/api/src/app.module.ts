@@ -7,6 +7,7 @@ import { TemporalModule } from "./core/temporal/temporal.module";
 import { DispatcherModule } from "./modules/dispatcher/dispatcher.module";
 import { HealthModule } from "./modules/health/health.module";
 import { KnowledgeModule } from "./modules/knowledge/knowledge.module";
+import { PullRequestsModule } from "./modules/pull-requests/pull-requests.module";
 import { ProjectsModule } from "./modules/projects/projects.module";
 import { ReposModule } from "./modules/repos/repos.module";
 import { RunsModule } from "./modules/runs/runs.module";
@@ -29,6 +30,7 @@ import { WorkOrdersModule } from "./modules/work-orders/work-orders.module";
     SettingsModule,
     DispatcherModule,
     KnowledgeModule,
+    PullRequestsModule,
   ],
 })
 export class AppModule {}
