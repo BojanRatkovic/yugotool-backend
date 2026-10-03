@@ -43,6 +43,11 @@ export const agentStationSchema = z.object({
   canEdit: z.boolean(),
   /** Validator stations return a structured verdict (JSON schema output). */
   structuredVerdict: z.boolean().optional(),
+  /**
+   * Reads the project's knowledge sources (spec 0007). Planning stations only:
+   * a station that edits code never gets it (see updateLineSchema).
+   */
+  useKnowledge: z.boolean().optional(),
   prompt: z.string(),
 });
 
@@ -159,7 +164,13 @@ export const updateLineSchema = z.object({
     .min(1)
     .refine((stations) => new Set(stations.map((s) => s.key)).size === stations.length, {
       message: "station keys must be unique",
-    }),
+    })
+    .refine(
+      (stations) => stations.every((s) => s.kind !== "agent" || !s.useKnowledge || !s.canEdit),
+      {
+        message: "only read-only agent stations can read knowledge",
+      },
+    ),
 });
 export type UpdateLine = z.infer<typeof updateLineSchema>;
 
@@ -172,6 +183,80 @@ export const lineSchema = z.object({
   updatedAt: isoDate,
 });
 export type Line = z.infer<typeof lineSchema>;
+
+// ── Knowledge sources ───────────────────────────────────────────────────────
+
+/**
+ * How a source becomes a read-only folder before a run (spec 0007 §3):
+ * git_local / git_remote = snapshot of tracked files at the branch head;
+ * path = a copy of a file or folder, minus `excludes`.
+ */
+export const knowledgeSourceKindSchema = z.enum(["git_local", "git_remote", "path"]);
+export type KnowledgeSourceKind = z.infer<typeof knowledgeSourceKindSchema>;
+
+/** Excluded by default from `path` sources: secrets that live next to docs. */
+export const DEFAULT_KNOWLEDGE_EXCLUDES = [".env*", "private", "secrets"];
+
+export const knowledgeSourceSchema = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  kind: knowledgeSourceKindSchema,
+  /** Local path (git_local, path) or git URL (git_remote). */
+  location: z.string(),
+  /** Git kinds: the branch to read; null = the repo's current/default branch. */
+  branch: z.string().nullable(),
+  /** Where an agent starts reading, relative to the source; null = auto. */
+  entryFile: z.string().nullable(),
+  /** `path` kind: file/folder names left out of the copy (`*` wildcards). */
+  excludes: z.array(z.string()),
+  lastSyncedSha: z.string().nullable(),
+  lastSyncedAt: isoDate.nullable(),
+  /** The entry file the last sync resolved. */
+  lastEntryFile: z.string().nullable(),
+  lastError: z.string().nullable(),
+  createdAt: isoDate,
+  updatedAt: isoDate,
+});
+export type KnowledgeSource = z.infer<typeof knowledgeSourceSchema>;
+
+const knowledgeSourceFields = {
+  name: z.string().trim().min(1).max(80),
+  kind: knowledgeSourceKindSchema,
+  location: z.string().trim().min(1),
+  branch: z.string().trim().min(1).nullable(),
+  entryFile: z.string().trim().min(1).nullable(),
+  excludes: z.array(z.string().trim().min(1)).max(50),
+};
+
+export const createKnowledgeSourceSchema = z.object({
+  /** Client-generated id makes creation idempotent. */
+  id: z.uuid().optional(),
+  ...knowledgeSourceFields,
+  branch: knowledgeSourceFields.branch.default(null),
+  entryFile: knowledgeSourceFields.entryFile.default(null),
+  excludes: knowledgeSourceFields.excludes.default(DEFAULT_KNOWLEDGE_EXCLUDES),
+});
+export type CreateKnowledgeSource = z.infer<typeof createKnowledgeSourceSchema>;
+
+export const updateKnowledgeSourceSchema = z.object(knowledgeSourceFields).partial();
+export type UpdateKnowledgeSource = z.infer<typeof updateKnowledgeSourceSchema>;
+
+/** The project's sources, in the order agents see them. */
+export const projectKnowledgeSchema = z.object({
+  sourceIds: z.array(z.uuid()).max(20),
+});
+export type ProjectKnowledge = z.infer<typeof projectKnowledgeSchema>;
+
+/** A synced source as a run hands it to a planning station. */
+export interface KnowledgeMount {
+  name: string;
+  /** Read-only snapshot folder. */
+  dir: string;
+  /** Git kinds: the commit read; null for path sources. */
+  sha: string | null;
+  /** Relative to `dir`; null when the source has no obvious start. */
+  entryFile: string | null;
+}
 
 // ── Project ─────────────────────────────────────────────────────────────────
 
@@ -1048,6 +1133,7 @@ export const collectionNameSchema = z.enum([
   "dispatcher",
   "shifts",
   "qa",
+  "knowledge_sources",
 ]);
 export type CollectionName = z.infer<typeof collectionNameSchema>;
 
@@ -1084,6 +1170,8 @@ export const DEFAULT_STATIONS: Station[] = [
     effort: "medium",
     allowedTools: READ_ONLY_TOOLS,
     canEdit: false,
+    // Plans with the project's knowledge sources when it has any (spec 0007).
+    useKnowledge: true,
     prompt:
       "You are the codebase researcher. Map every part of the repository relevant to the work order: files, patterns, conventions, risks. Do not modify anything. End with a concise plan for the builder as a numbered list.",
   },

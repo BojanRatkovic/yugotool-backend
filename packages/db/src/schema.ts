@@ -20,6 +20,7 @@ import {
   pgTable,
   text,
   timestamp,
+  primaryKey,
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
@@ -34,6 +35,13 @@ const updatedAt = () =>
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date());
+
+/** How a knowledge source becomes a read-only folder (contracts `knowledgeSourceKindSchema`). */
+export const knowledgeSourceKind = pgEnum("knowledge_source_kind", [
+  "git_local",
+  "git_remote",
+  "path",
+]);
 
 /** How approved work leaves ZASTAVA (see contracts `deliveryModeSchema`). */
 export const deliveryMode = pgEnum("delivery_mode", ["local", "draft_pr", "pr"]);
@@ -332,3 +340,39 @@ export const settings = pgTable("settings", {
   anthropicApiKey: text("anthropic_api_key"),
   updatedAt: updatedAt(),
 });
+
+/** Team knowledge planning stations may read (spec 0007). Global library. */
+export const knowledgeSources = pgTable("knowledge_sources", {
+  id: id(),
+  name: text("name").notNull(),
+  kind: knowledgeSourceKind("kind").notNull(),
+  location: text("location").notNull(),
+  branch: text("branch"),
+  entryFile: text("entry_file"),
+  excludes: jsonb("excludes").$type<string[]>().notNull().default([]),
+  lastSyncedSha: text("last_synced_sha"),
+  lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+  lastEntryFile: text("last_entry_file"),
+  lastError: text("last_error"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+/** Which sources a project's planning stations read, in order. */
+export const projectKnowledge = pgTable(
+  "project_knowledge",
+  {
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    // Restrict: a source in use is detached from its projects first (409 otherwise).
+    sourceId: uuid("source_id")
+      .notNull()
+      .references(() => knowledgeSources.id, { onDelete: "restrict" }),
+    position: integer("position").notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.projectId, t.sourceId] }),
+    index("project_knowledge_source_id_idx").on(t.sourceId),
+  ],
+);

@@ -8,6 +8,7 @@ import {
   type DeliveryMode,
   type Effort,
   EVENTS_CHANNEL,
+  type KnowledgeMount,
   type RunEventType,
   type RunStatus,
   REPO_HOOKS_STATION_KEY,
@@ -37,6 +38,7 @@ import { runRoots, strayListeners, tcpListeners } from "../runner/orphans";
 import { authRejection, withApiKey } from "../claude-env";
 import { sandboxFor } from "../runner/sandbox";
 import { createCiActivities } from "./ci";
+import { createKnowledgeActivities } from "./knowledge";
 import { createPrBodyComposer } from "./pr-body";
 import { createQaActivities } from "./qa";
 import { createRouteActivities } from "./routes";
@@ -283,6 +285,7 @@ export function createActivities(
     ...createQaActivities(db, { appendEvent, notify }),
     ...createRouteActivities(db, { notify }),
     ...createCiActivities(db, { appendEvent, invalidateBoard, notifyHumans }),
+    ...createKnowledgeActivities(db, { appendEvent, notify }),
 
     async prepareRun(input: { runId: string; workOrderId: string }): Promise<RunContext> {
       const [row] = await db
@@ -484,6 +487,8 @@ export function createActivities(
       effortOverride: Effort | null;
       /** Continue an earlier session of this station (same worktree) instead of starting fresh. */
       resumeSessionId?: string | null;
+      /** Planning stations: the project's knowledge folders, readable but not writable. */
+      knowledge?: KnowledgeMount[];
     }): Promise<AgentStationResult> {
       const model = input.modelOverride ?? input.station.model;
       const effort = input.effortOverride ?? input.station.effort;
@@ -491,7 +496,8 @@ export function createActivities(
       const abortController = new AbortController();
       ctx.cancellationSignal.addEventListener("abort", () => abortController.abort());
 
-      const sandboxed = await withApiKey(await sandboxFor(input.worktreePath));
+      const readRoots = (input.knowledge ?? []).map((k) => k.dir);
+      const sandboxed = await withApiKey(await sandboxFor(input.worktreePath, { readRoots }));
       const session = query({
         prompt: input.prompt,
         options: {
@@ -504,6 +510,8 @@ export function createActivities(
             : {}),
           tools: input.station.allowedTools,
           allowedTools: input.station.allowedTools,
+          // Without it Read outside cwd needs a permission dontAsk never grants (QA does the same).
+          ...(readRoots.length > 0 ? { additionalDirectories: readRoots } : {}),
           permissionMode: "dontAsk",
           ...sandboxed,
           settingSources: ["project"],

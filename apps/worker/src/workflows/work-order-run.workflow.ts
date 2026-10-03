@@ -6,6 +6,7 @@ import {
   REPO_HOOKS_STATION_KEY,
   requestChangesTarget,
   type Handoff,
+  type KnowledgeMount,
   SHIFT_CONTROL_SIGNAL,
   type ShiftControl,
   type ShiftEndReason,
@@ -51,6 +52,12 @@ const work = proxyActivities<Activities>({
   retry: { maximumAttempts: 1 },
 });
 
+/** Syncing knowledge can clone a repo: longer than bookkeeping, and safe to retry. */
+const knowledgeSync = proxyActivities<Activities>({
+  startToCloseTimeout: "20 minutes",
+  retry: { maximumAttempts: 2 },
+});
+
 /** ActivityFailure wraps the real error; surface that, not "Activity task failed". */
 function describeFailure(error: unknown): string {
   if (!(error instanceof Error)) return String(error);
@@ -86,6 +93,13 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
 
   try {
     const run = await bookkeeping.prepareRun(input);
+    // Planning stations read the project's knowledge (spec 0007); builders never do.
+    const readsKnowledge = (station: (typeof run.stations)[number]): boolean =>
+      station.kind === "agent" && station.useKnowledge === true && !station.canEdit;
+    const knowledge: KnowledgeMount[] =
+      run.stations.some(readsKnowledge) && patched("knowledge-sources")
+        ? await knowledgeSync.prepareKnowledge(input)
+        : [];
     const notes: StationNote[] = [];
     /** Set by the approval at the last gate; undefined = the project's settings. */
     let delivery: DeliveryMode | undefined;
@@ -422,10 +436,11 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
         prompt:
           resume && pending
             ? buildFollowUp(pending, station.canEdit)
-            : buildPrompt(run, station, notes),
+            : buildPrompt(run, station, notes, readsKnowledge(station) ? knowledge : []),
         modelOverride: run.modelOverride,
         effortOverride: run.effortOverride,
         resumeSessionId: resume ? sessionId : null,
+        ...(readsKnowledge(station) && knowledge.length > 0 ? { knowledge } : {}),
       });
       if (result.sessionId) sessions.set(index, result.sessionId);
       if (index === followUpTarget) followUp = null;
