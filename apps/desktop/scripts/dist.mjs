@@ -25,6 +25,13 @@ const electronVersion = JSON.parse(
   readFileSync(path.join(desktop, "node_modules", "electron", "package.json"), "utf8"),
 ).version;
 
+// The stage is an npm install (package-lock.json, real folders). electron-builder
+// picks its node_modules collector from npm_config_user_agent when the stage has
+// no packageManager field, so `pnpm dist` would collect with pnpm, find nothing
+// in the stage, and ship an app without api/worker deps. Pin it to npm.
+process.env.npm_config_user_agent = "npm";
+delete process.env.npm_execpath;
+
 for (const arch of values.arch) {
   execFileSync(process.execPath, [path.join(desktop, "scripts", "stage.mjs"), "--arch", arch], {
     stdio: "inherit",
