@@ -17,6 +17,7 @@ import type {
   PullRequestDetail,
   PullRequestList,
   ZastavaReview,
+  ZastavaReviewBriefList,
   ZastavaReviewResult,
 } from "@zastava/contracts";
 import {
@@ -33,6 +34,7 @@ import {
   PullRequestListDto,
   PullRequestListQueryDto,
   StartReviewDto,
+  ZastavaReviewBriefListDto,
   ZastavaReviewDto,
   ZastavaReviewQueryDto,
   ZastavaReviewResultDto,
@@ -95,6 +97,15 @@ export class PullRequestsController {
     @Query() query: PullRequestListQueryDto,
   ): Promise<PullRequestList> {
     return this.service.list(projectId, query.scope, query.teams);
+  }
+
+  /** Every PR's latest ZASTAVA review, for the cards (spec 0009). Before `:number`. */
+  @Get("zastava-reviews")
+  @ApiOkResponse({ type: ZastavaReviewBriefListDto })
+  async zastavaReviews(
+    @Param("projectId", ParseUUIDPipe) projectId: string,
+  ): Promise<ZastavaReviewBriefList> {
+    return { items: await this.reviews.briefs(projectId) };
   }
 
   /** Everything the PR panel shows. */

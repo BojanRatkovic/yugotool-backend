@@ -5,6 +5,7 @@ import {
   type StartReview,
   TASK_QUEUE,
   type ZastavaReview,
+  type ZastavaReviewBrief,
 } from "@zastava/contracts";
 import { DatabaseService } from "../../core/database/database.service";
 import { EventsService } from "../../core/events/events.service";
@@ -58,6 +59,10 @@ export class PullRequestReviewsService {
     private readonly events: EventsService,
     @Inject(TEMPORAL_CLIENT) private readonly temporal: Client,
   ) {}
+
+  briefs(projectId: string): Promise<ZastavaReviewBrief[]> {
+    return this.repository.briefs(this.database.db, projectId);
+  }
 
   /** The newest review of the PR; `head` (the PR's current head) marks it stale. */
   async latest(projectId: string, number: number, head?: string): Promise<ZastavaReview | null> {

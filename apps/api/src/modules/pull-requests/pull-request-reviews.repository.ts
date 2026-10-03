@@ -1,7 +1,12 @@
 import { Injectable } from "@nestjs/common";
-import type { ReviewPullRequest, ReviewVerdict, RunStatus } from "@zastava/contracts";
+import type {
+  ReviewPullRequest,
+  ReviewVerdict,
+  RunStatus,
+  ZastavaReviewBrief,
+} from "@zastava/contracts";
 import { type Executor, runEvents, runs, stationRuns, workOrders } from "@zastava/db";
-import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 
 /** A review work order with what its latest run produced so far. */
 export interface ReviewRow {
@@ -112,6 +117,47 @@ export class PullRequestReviewsRepository {
       startedAt: run.startedAt,
       finishedAt: run.finishedAt,
     };
+  }
+
+  /** Every PR's latest review in the project, with its finding counts. */
+  async briefs(db: Executor, projectId: string): Promise<ZastavaReviewBrief[]> {
+    const latest = await db
+      .selectDistinctOn([sql`(${workOrders.pullRequest}->>'number')::int`], {
+        pullRequest: workOrders.pullRequest,
+        runId: workOrders.currentRunId,
+        runStatus: runs.status,
+      })
+      .from(workOrders)
+      .leftJoin(runs, eq(runs.id, workOrders.currentRunId))
+      .where(and(eq(workOrders.projectId, projectId), eq(workOrders.kind, "review")))
+      .orderBy(sql`(${workOrders.pullRequest}->>'number')::int`, desc(workOrders.createdAt));
+    const runIds = latest.flatMap((r) => (r.runId ? [r.runId] : []));
+    const reviews =
+      runIds.length === 0
+        ? []
+        : await db
+            .selectDistinctOn([stationRuns.runId], {
+              runId: stationRuns.runId,
+              review: stationRuns.review,
+            })
+            .from(stationRuns)
+            .where(and(inArray(stationRuns.runId, runIds), isNotNull(stationRuns.review)))
+            .orderBy(stationRuns.runId, desc(stationRuns.startedAt));
+    const byRun = new Map(reviews.map((r) => [r.runId, r.review]));
+    return latest.flatMap((r) => {
+      if (!r.pullRequest) return [];
+      const review = r.runId ? byRun.get(r.runId) : undefined;
+      const status = r.runStatus ?? "running";
+      return [
+        {
+          number: r.pullRequest.number,
+          status: status === "changes_requested" ? "running" : status,
+          headOid: r.pullRequest.headOid,
+          findings: review ? review.findings.length : null,
+          posted: r.pullRequest.posted.length,
+        },
+      ];
+    });
   }
 
   async isRunning(db: Executor, projectId: string, number: number): Promise<boolean> {

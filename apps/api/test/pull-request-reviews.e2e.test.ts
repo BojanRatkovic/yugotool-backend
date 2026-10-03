@@ -126,6 +126,17 @@ class MemoryReviews {
       return { workOrderId, runId, workflowId: `run-${runId}` };
     },
   );
+  briefs = vi.fn(async (_db: unknown, projectId: string) =>
+    [...this.rows.values()]
+      .filter((r) => r.projectId === projectId)
+      .map((r) => ({
+        number: r.pullRequest.number,
+        status: r.runStatus ?? "running",
+        headOid: r.pullRequest.headOid,
+        findings: r.verdict ? r.verdict.findings.length : null,
+        posted: r.pullRequest.posted.length,
+      })),
+  );
   markPosted = vi.fn(async (_db: unknown, workOrderId: string, ids: string[]) => {
     const row = this.rows.get(workOrderId);
     if (!row) return;
@@ -406,5 +417,17 @@ describe("posting findings", () => {
       .send({ findings: [{ id: "f9", title: "x", body: "", suggestion: null }] })
       .expect(422);
     expect(res.body.error.code).toBe("finding_unknown");
+  });
+});
+
+describe("review briefs", () => {
+  it("lists each PR's latest review for the cards (not routed as a PR number)", async () => {
+    const { http, reviews } = await start();
+    const res = await http.post(BASE).send({}).expect(201);
+    reviews.finish(res.body.workOrderId, VERDICT);
+    const list = await http.get(`/projects/${PROJECT}/pull-requests/zastava-reviews`).expect(200);
+    expect(list.body).toEqual({
+      items: [{ number: 42, status: "succeeded", headOid: HEAD, findings: 2, posted: 0 }],
+    });
   });
 });
