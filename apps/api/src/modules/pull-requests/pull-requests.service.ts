@@ -51,7 +51,7 @@ import { capPatch, onlyPrFiles } from "./pull-requests.diff";
 const REPO_TTL_MS = 5 * 60_000;
 const LIST_TTL_MS = 20_000;
 /** Full fields are refetched when a PR's fingerprint moves, and at least this often. */
-const PR_TTL_MS = 30 * 60_000;
+const PR_TTL_MS = 2 * 60 * 60_000;
 /** An open panel is rebuilt when its fingerprint moves, and at least this often. */
 const DETAIL_TTL_MS = 10 * 60_000;
 /** PRS_BY_ID batch size: its cost grows with the count. */
