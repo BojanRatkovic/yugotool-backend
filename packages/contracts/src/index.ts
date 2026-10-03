@@ -704,6 +704,17 @@ export const reviewPullRequestSchema = z.object({
   baseOid: z.string(),
   /** Head of the previous ZASTAVA review: a re-review focuses on what came after. */
   sinceOid: z.string().nullable(),
+  /** Unresolved threads at start, so the review does not repeat them. */
+  openThreads: z
+    .array(
+      z.object({
+        path: z.string(),
+        line: z.number().int().nullable(),
+        author: z.string(),
+        body: z.string(),
+      }),
+    )
+    .default([]),
   /** Finding ids already added to the pending review on GitHub. */
   posted: z.array(z.string()).default([]),
 });
