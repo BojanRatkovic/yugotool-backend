@@ -5,7 +5,15 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { z } from "zod";
 import type { SupervisorConfig } from "./config";
 import { LogFile } from "./log-file";
-import { createServices, SERVICE_ORDER, type Service, type ServiceName, sleep } from "./services";
+import {
+  createServices,
+  firstFreePort,
+  portFree,
+  SERVICE_ORDER,
+  type Service,
+  type ServiceName,
+  sleep,
+} from "./services";
 
 const serviceStatusSchema = z.object({
   name: z.enum(["postgres", "migrations", "temporal", "api", "worker"]),
@@ -106,6 +114,7 @@ export class Supervisor extends EventEmitter<{ status: [SupervisorStatus] }> {
     this.claimHome();
     this.log("supervisor").line(`starting (pid ${process.pid})`);
     await this.reapOrphans();
+    await this.claimPorts();
     for (const name of SERVICE_ORDER) {
       try {
         await this.startService(name);
@@ -235,6 +244,43 @@ export class Supervisor extends EventEmitter<{ status: [SupervisorStatus] }> {
     }
   }
 
+  /**
+   * Ports must be ours before anything starts. Another server on the API port
+   * (a dev API on 4810) once answered the readiness probe instead of ours, so
+   * the API moves to the next free port; the window follows `appUrl`. Temporal's
+   * ports are fixed for its clients, so a taken one stops the start with who has it.
+   * Postgres is left to its lock file (an orphan of ours may hold its port).
+   */
+  private async claimPorts(): Promise<void> {
+    const { ports } = this.config;
+    for (const [name, port] of [
+      ["temporal", ports.temporal],
+      ["temporal UI", ports.temporalUi],
+      ["temporal HTTP", ports.temporalHttp],
+    ] as const) {
+      if (!(await portFree(port))) {
+        throw new Error(
+          `port ${port} (${name}) is in use by ${holderOf(port)}; stop it and start again`,
+        );
+      }
+    }
+    const wanted = ports.api;
+    if (await portFree(wanted)) return;
+    const taken = [ports.pg, ports.temporal, ports.temporalUi, ports.temporalHttp];
+    const free = await firstFreePort(wanted + 1, wanted + API_PORT_SPAN, taken);
+    if (free === null) {
+      throw new Error(
+        `port ${wanted} (api) and the next ${API_PORT_SPAN} are in use; free one and start again`,
+      );
+    }
+    this.log("supervisor").line(
+      `port ${wanted} is in use by ${holderOf(wanted)}; api uses ${free}`,
+    );
+    ports.api = free;
+    const status = this.status.get("api");
+    if (status) this.status.set("api", { ...status, port: free });
+  }
+
   private log(name: ServiceName | "supervisor"): LogFile {
     let log = this.logs.get(name);
     if (!log) {
@@ -266,6 +312,25 @@ export function pidAlive(pid: number): boolean {
 
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/** How far past its configured port the API may move when that one is taken. */
+const API_PORT_SPAN = 20;
+
+/** "pid 123 (node …/api/dist/main.js)" for whoever listens on `port`, best effort. */
+function holderOf(port: number): string {
+  try {
+    const pid = execFileSync("/usr/sbin/lsof", ["-nP", `-iTCP:${port}`, "-sTCP:LISTEN", "-t"], {
+      encoding: "utf8",
+    })
+      .split("\n")[0]
+      ?.trim();
+    if (!pid) return "another process";
+    const command = commandOf(Number(pid)).trim().slice(0, 120);
+    return `pid ${pid}${command ? ` (${command})` : ""}`;
+  } catch {
+    return "another process";
+  }
 }
 
 function commandOf(pid: number): string {

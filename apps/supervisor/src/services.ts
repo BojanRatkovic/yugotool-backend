@@ -7,7 +7,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { Client } from "pg";
 import { z } from "zod";
-import { Child } from "./child";
+import { Child, type ChildSpec } from "./child";
 import { databaseUrl, PG_DATABASE, PG_PASSWORD, PG_USER, type SupervisorConfig } from "./config";
 import type { LogFile } from "./log-file";
 import { migrate } from "./migrate";
@@ -295,44 +295,53 @@ function nodeEnv(config: SupervisorConfig): NodeJS.ProcessEnv {
   };
 }
 
+function apiEnv(config: SupervisorConfig): NodeJS.ProcessEnv {
+  const port = config.ports.api;
+  return {
+    ...nodeEnv(config),
+    NODE_ENV: "production",
+    PORT: String(port),
+    HOST: "127.0.0.1",
+    WEB_DIST: config.webDist,
+    APP_URL: `http://127.0.0.1:${port}`,
+    CORS_ORIGINS: `http://127.0.0.1:${port},http://localhost:${port}`,
+  };
+}
+
 function api({ config, log, onCrash }: ServiceContext): Service {
   const file = log("api");
-  const child = new Child(
-    {
-      command: config.node,
-      args: [config.apiEntry],
-      cwd: path.dirname(path.dirname(config.apiEntry)),
-      env: {
-        ...nodeEnv(config),
-        NODE_ENV: "production",
-        PORT: String(config.ports.api),
-        HOST: "127.0.0.1",
-        WEB_DIST: config.webDist,
-        APP_URL: `http://127.0.0.1:${config.ports.api}`,
-        CORS_ORIGINS: `http://127.0.0.1:${config.ports.api},http://localhost:${config.ports.api}`,
-      },
-      stopTimeoutMs: 10_000,
-    },
-    file,
-    (code, signal) => onCrash("api", exitReason(code, signal)),
-  );
-  const health = `http://127.0.0.1:${config.ports.api}/api/health`;
+  const spec: ChildSpec = {
+    command: config.node,
+    args: [config.apiEntry],
+    cwd: path.dirname(path.dirname(config.apiEntry)),
+    env: apiEnv(config),
+    stopTimeoutMs: 10_000,
+  };
+  const child = new Child(spec, file, (code, signal) => onCrash("api", exitReason(code, signal)));
+  const health = (): string => `http://127.0.0.1:${config.ports.api}/api/health`;
+  // Ours, not just anything on the port: a dev API on the same port answered
+  // for it once, so the app waited 30 s on the wrong server and gave up.
+  const ours = (): Promise<boolean> => answersAs(health(), child.pid);
   return {
     name: "api",
     oneShot: false,
-    port: config.ports.api,
+    // The supervisor may move the API to a free port before it starts.
+    get port() {
+      return config.ports.api;
+    },
     pid: () => child.pid,
     async start() {
       if (!existsSync(config.apiEntry)) throw new Error(`API not built: ${config.apiEntry}`);
       if (!existsSync(path.join(config.webDist, "index.html"))) {
         throw new Error(`frontend not built: ${config.webDist}`);
       }
+      spec.env = apiEnv(config);
       child.start();
-      await waitFor(() => httpOk(health), 30_000, "api", file);
+      await waitFor(ours, 30_000, "api", file);
       return `http://127.0.0.1:${config.ports.api}`;
     },
     stop: () => child.stop(),
-    healthy: () => httpOk(health),
+    healthy: ours,
   };
 }
 
@@ -415,11 +424,40 @@ function portOpen(port: number): Promise<boolean> {
   });
 }
 
-async function httpOk(url: string): Promise<boolean> {
+/** Whether `url` is our process's health endpoint: it reports the pid we started. */
+export async function answersAs(url: string, pid: number | null): Promise<boolean> {
+  if (pid === null) return false;
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(2_000) });
-    return res.ok;
+    if (!res.ok) return false;
+    const body: unknown = await res.json();
+    return typeof body === "object" && body !== null && Reflect.get(body, "pid") === pid;
   } catch {
     return false;
   }
+}
+
+/** Free = nothing answers on 127.0.0.1 and we can bind it (catches `*:port` listeners too). */
+export async function portFree(port: number): Promise<boolean> {
+  if (await portOpen(port)) return false;
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once("error", () => resolve(false));
+    server.listen({ port, host: "127.0.0.1", exclusive: true }, () => {
+      server.close(() => resolve(true));
+    });
+  });
+}
+
+/** The first free port in [from, to], skipping `taken`; null when all are busy. */
+export async function firstFreePort(
+  from: number,
+  to: number,
+  taken: number[] = [],
+): Promise<number | null> {
+  for (let port = from; port <= to; port++) {
+    if (taken.includes(port)) continue;
+    if (await portFree(port)) return port;
+  }
+  return null;
 }

@@ -1,8 +1,11 @@
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { createServer as createHttpServer } from "node:http";
+import { createServer, type Server } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { pending, readMigrations } from "../src/migrate";
+import { answersAs, firstFreePort, portFree } from "../src/services";
 import { restartDelay } from "../src/supervisor";
 
 describe("restartDelay", () => {
@@ -62,5 +65,46 @@ describe("migrations", () => {
     expect(pending(all, null).map((m) => m.tag)).toEqual(["0000_a", "0001_b"]);
     expect(pending(all, 100).map((m) => m.tag)).toEqual(["0001_b"]);
     expect(pending(all, 200)).toEqual([]);
+  });
+});
+
+const listen = (port: number, host?: string): Promise<Server> =>
+  new Promise((resolve, reject) => {
+    const server = createServer();
+    server.once("error", reject);
+    server.listen({ port, ...(host ? { host } : {}) }, () => resolve(server));
+  });
+const close = (server: Server): Promise<void> => new Promise((r) => server.close(() => r()));
+
+const freeBase = async (): Promise<number> => {
+  const server = await listen(0, "127.0.0.1");
+  const address = server.address();
+  await close(server);
+  if (address === null || typeof address === "string") throw new Error("no port");
+  return address.port;
+};
+
+describe("ports", () => {
+  it("sees a port taken on all interfaces (how the dev API listens) as busy", async () => {
+    const port = await freeBase();
+    const dev = await listen(port);
+    expect(await portFree(port)).toBe(false);
+    expect(await firstFreePort(port, port + 5, [port + 1])).toBe(port + 2);
+    await close(dev);
+    expect(await portFree(port)).toBe(true);
+  });
+
+  it("trusts a health endpoint only when it reports our pid", async () => {
+    const port = await freeBase();
+    const server = createHttpServer((_req, res) => {
+      res.setHeader("content-type", "application/json");
+      res.end(JSON.stringify({ status: "ok", pid: 4242 }));
+    });
+    await new Promise<void>((r) => server.listen(port, "127.0.0.1", () => r()));
+    const url = `http://127.0.0.1:${port}/api/health`;
+    expect(await answersAs(url, 4242)).toBe(true);
+    expect(await answersAs(url, 1)).toBe(false);
+    expect(await answersAs(url, null)).toBe(false);
+    await new Promise<void>((r) => server.close(() => r()));
   });
 });
