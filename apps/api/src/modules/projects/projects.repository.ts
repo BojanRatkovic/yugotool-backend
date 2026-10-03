@@ -8,7 +8,7 @@ import type {
   UpdateProject,
 } from "@zastava/contracts";
 import { type Executor, lines, projects, runs, stationRuns, workOrders } from "@zastava/db";
-import { asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { iso } from "../../common/mappers";
 
 type ProjectRow = typeof projects.$inferSelect;
@@ -35,6 +35,52 @@ export class ProjectsRepository {
   async list(db: Executor): Promise<Project[]> {
     const rows = await db.select().from(projects).orderBy(asc(projects.createdAt));
     return rows.map(toProject);
+  }
+
+  /** Work orders that are queued, on the line or waiting at a gate; locks the project row. */
+  async lockAndCountActive(db: Executor, id: string): Promise<number | null> {
+    const [project] = await db
+      .select({ id: projects.id })
+      .from(projects)
+      .where(eq(projects.id, id))
+      .for("update");
+    if (!project) return null;
+    const [row] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(workOrders)
+      .where(
+        and(
+          eq(workOrders.projectId, id),
+          inArray(workOrders.status, ["queued", "running", "awaiting_approval"]),
+        ),
+      );
+    return row?.count ?? 0;
+  }
+
+  /** Every run of the project with its worktree path (null once cleaned up). */
+  async runWorktrees(db: Executor, id: string): Promise<{ runId: string; worktreePath: string }[]> {
+    const rows = await db
+      .select({ runId: runs.id, worktreePath: runs.worktreePath })
+      .from(runs)
+      .innerJoin(workOrders, eq(workOrders.id, runs.workOrderId))
+      .where(and(eq(workOrders.projectId, id), isNotNull(runs.worktreePath)));
+    return rows.flatMap((r) =>
+      r.worktreePath ? [{ runId: r.runId, worktreePath: r.worktreePath }] : [],
+    );
+  }
+
+  async runIds(db: Executor, id: string): Promise<string[]> {
+    const rows = await db
+      .select({ runId: runs.id })
+      .from(runs)
+      .innerJoin(workOrders, eq(workOrders.id, runs.workOrderId))
+      .where(eq(workOrders.projectId, id));
+    return rows.map((r) => r.runId);
+  }
+
+  /** Lines, work orders, runs, events, shifts and QA rows go with it (FK cascade). */
+  async delete(db: Executor, id: string): Promise<void> {
+    await db.delete(projects).where(eq(projects.id, id));
   }
 
   async find(db: Executor, id: string): Promise<Project | null> {

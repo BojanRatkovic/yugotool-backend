@@ -7,15 +7,19 @@ import {
   type CreateWorkOrder,
   type UpdateWorkOrder,
   type NeedsYouItem,
+  type OpenPullRequest,
+  type OpenPullRequestResult,
   type WorkOrder,
 } from "@zastava/contracts";
 import { runs } from "@zastava/db";
-import type { Client } from "@temporalio/client";
+import { type Client, WorkflowExecutionAlreadyStartedError } from "@temporalio/client";
 import { eq } from "drizzle-orm";
 import { DatabaseService } from "../../core/database/database.service";
 import { EventsService } from "../../core/events/events.service";
 import { TEMPORAL_CLIENT } from "../../core/temporal/temporal.module";
 import {
+  PullRequestFailedError,
+  PullRequestNotPossibleError,
   WorkOrderNotFoundError,
   WorkOrderNotQueuedError,
   WorkOrderNotRunningError,
@@ -44,6 +48,43 @@ export class WorkOrdersService {
     private readonly events: EventsService,
     @Inject(TEMPORAL_CLIENT) private readonly temporal: Client,
   ) {}
+
+  /**
+   * Work delivered locally (done, committed on its branch, no PR yet): push
+   * the branch and open a PR. Waits for the worker; failures come back as
+   * the reason (no origin, not GitHub, gh not logged in…).
+   */
+  async openPullRequest(id: string, input: OpenPullRequest): Promise<OpenPullRequestResult> {
+    const workOrder = await this.repository.find(this.database.db, id);
+    if (!workOrder) throw new WorkOrderNotFoundError(`work order ${id} not found`);
+    if (workOrder.status !== "done" || !workOrder.branch) {
+      throw new PullRequestNotPossibleError(
+        "Only work delivered on a branch can get a pull request.",
+      );
+    }
+    if (workOrder.prUrl) {
+      throw new PullRequestNotPossibleError(
+        `This work order already has a pull request: ${workOrder.prUrl}`,
+      );
+    }
+    let result: { prUrl: string | null; error: string | null };
+    try {
+      result = await this.temporal.workflow.execute("openPullRequest", {
+        taskQueue: TASK_QUEUE,
+        workflowId: `open-pr-${id}`,
+        args: [{ workOrderId: id, draft: input.draft }],
+      });
+    } catch (error) {
+      if (error instanceof WorkflowExecutionAlreadyStartedError) {
+        throw new PullRequestNotPossibleError(
+          "A pull request is already being opened for this work order.",
+        );
+      }
+      throw error;
+    }
+    if (!result.prUrl) throw new PullRequestFailedError(result.error ?? "Pull request failed.");
+    return { prUrl: result.prUrl };
+  }
 
   needsYou(): Promise<NeedsYouItem[]> {
     return this.repository.listAwaitingApproval(this.database.db);

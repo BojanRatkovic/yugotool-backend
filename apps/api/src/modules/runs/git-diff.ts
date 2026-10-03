@@ -45,16 +45,34 @@ export interface DiffLimits {
 }
 
 /**
- * Worktree vs `base`: committed and uncommitted changes, new files included.
+ * What the run's changes are measured from: the merge-base with
+ * `origin/<base>` when the repo has it (worktrees start there), else with the
+ * local base. Diffing against the local branch directly showed every commit
+ * the local base is behind (or ahead) as a change of the run.
+ */
+export async function diffBase(cwd: string, baseBranch: string): Promise<string> {
+  for (const ref of [`origin/${baseBranch}`, baseBranch]) {
+    const mergeBase = await gitCapped(cwd, ["merge-base", "HEAD", ref], 200).then(
+      (out) => out.text.trim(),
+      () => "",
+    );
+    if (mergeBase) return mergeBase;
+  }
+  return baseBranch;
+}
+
+/**
+ * Worktree vs the merge-base with its base: committed and uncommitted changes, new files included.
  * Both the patch and the stat are capped; an over-long stat is cut at a line
  * boundary and closed with the `--shortstat` summary so totals stay visible.
  */
 export async function worktreeDiff(
   cwd: string,
-  base: string,
+  baseBranch: string,
   limits: DiffLimits,
 ): Promise<{ stat: string; patch: string; truncated: boolean }> {
   await gitCapped(cwd, ["add", "--intent-to-add", "."], 10_000);
+  const base = await diffBase(cwd, baseBranch);
   const [stat, patch] = await Promise.all([
     gitCapped(cwd, ["diff", "--stat", base], limits.statChars),
     gitCapped(cwd, ["diff", base], limits.patchChars),

@@ -34,6 +34,9 @@ const updatedAt = () =>
     .defaultNow()
     .$onUpdate(() => new Date());
 
+/** How approved work leaves ZASTAVA (see contracts `deliveryModeSchema`). */
+export const deliveryMode = pgEnum("delivery_mode", ["local", "draft_pr", "pr"]);
+
 export const workOrderStatus = pgEnum("work_order_status", [
   "backlog",
   "queued",
@@ -109,10 +112,8 @@ export const projects = pgTable("projects", {
   baseBranch: text("base_branch").notNull().default("main"),
   /** How to run the app locally for QA stations; null = not set up. */
   preview: jsonb("preview").$type<Preview>(),
-  /** Approved work is committed only: no push, no PR. */
-  localOnly: boolean("local_only").notNull().default(true),
-  /** Pull requests open as drafts. */
-  draftPrs: boolean("draft_prs").notNull().default(false),
+  /** What approving the final gate does by default; each approval can pick another. */
+  deliveryDefault: deliveryMode("delivery_default").notNull().default("local"),
   /** The app's screens for QA's planner; null = not discovered yet. */
   routeMap: jsonb("route_map").$type<RouteMap>(),
   /** Outcome of the last route discovery session. */

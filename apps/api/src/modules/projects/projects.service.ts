@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import type { Client } from "@temporalio/client";
 import { WorkflowExecutionAlreadyStartedError, WorkflowNotFoundError } from "@temporalio/client";
 import {
@@ -9,6 +9,7 @@ import {
   DEFAULT_STATIONS,
   type Line,
   type PreviewDetection,
+  type ProjectRemote,
   type PreviewStatus,
   type PreviewTestResult,
   previewTestResultSchema,
@@ -28,11 +29,14 @@ import {
   PreviewNotConfiguredError,
   PreviewScreenshotMissingError,
   PreviewTestRunningError,
+  ProjectHasActiveWorkError,
   ProjectNotFoundError,
   RepoPathInvalidError,
   RouteDiscoveryRunningError,
 } from "./project.errors";
 import { detectPreview } from "./preview-detect";
+import { removeProjectFiles } from "./project-cleanup";
+import { projectRemote } from "./project-remote";
 import { ProjectsRepository } from "./projects.repository";
 import { readRepoFacts } from "./repo-facts";
 import { baseRef, routeSourceHash } from "./route-hash";
@@ -41,6 +45,7 @@ const discoveryWorkflowId = (projectId: string): string => `discover-routes-${pr
 
 @Injectable()
 export class ProjectsService {
+  private readonly logger = new Logger(ProjectsService.name);
   constructor(
     private readonly database: DatabaseService,
     private readonly repository: ProjectsRepository,
@@ -64,6 +69,47 @@ export class ProjectsService {
     });
     await this.events.publish({ type: "invalidate", collection: "projects" });
     return project;
+  }
+
+  /**
+   * Deletes the project with its line, work orders and run history, then its
+   * worktrees and artifacts on disk. Refused while work is queued, on the line
+   * or at a gate. The repository itself and its branches are never touched.
+   */
+  async delete(projectId: string): Promise<void> {
+    const { project, worktrees, runIds } = await this.database.transaction(async (tx) => {
+      const active = await this.repository.lockAndCountActive(tx, projectId);
+      if (active === null) throw new ProjectNotFoundError(`project ${projectId} not found`);
+      if (active > 0) {
+        throw new ProjectHasActiveWorkError(
+          `${active} work ${active === 1 ? "order is" : "orders are"} queued, running or waiting at a gate. Cancel or finish ${active === 1 ? "it" : "them"} first.`,
+          { active },
+        );
+      }
+      const found = await this.repository.find(tx, projectId);
+      const files = {
+        worktrees: await this.repository.runWorktrees(tx, projectId),
+        runIds: await this.repository.runIds(tx, projectId),
+      };
+      await this.repository.delete(tx, projectId);
+      return { project: found, ...files };
+    });
+    await this.temporal.workflow
+      .getHandle(discoveryWorkflowId(projectId))
+      .terminate("project deleted")
+      .catch(() => undefined);
+    if (project) {
+      const failed = await removeProjectFiles({
+        projectId,
+        repoPath: project.repoPath,
+        worktrees,
+        runIds,
+      });
+      if (failed.length) this.logger.warn(`could not remove: ${failed.join(", ")}`);
+    }
+    for (const collection of ["projects", "work_orders", "runs", "dispatcher"] as const) {
+      await this.events.publish({ type: "invalidate", collection });
+    }
   }
 
   async update(projectId: string, input: UpdateProject): Promise<Project> {
@@ -93,6 +139,12 @@ export class ProjectsService {
       }
       throw error;
     }
+  }
+
+  async remote(projectId: string): Promise<ProjectRemote> {
+    const project = await this.repository.find(this.database.db, projectId);
+    if (!project) throw new ProjectNotFoundError(`project ${projectId} not found`);
+    return projectRemote(project.repoPath);
   }
 
   /** Proposes a preview from the repo's root files on the base branch; saves nothing. */

@@ -353,10 +353,30 @@ export const localRunner = {
         summary: `Committed on ${input.branch} (local only: nothing pushed, no PR).`,
       };
     }
+    return localRunner.openPullRequest({ ...input, dir: input.worktreePath });
+  },
 
+  /**
+   * Pushes `branch` and opens a PR for it with gh. `dir` is the run's worktree
+   * or, once that is gone, the repo (they share refs). A PR that already exists
+   * for the branch counts as opened.
+   */
+  async openPullRequest(input: {
+    dir: string;
+    branch: string;
+    baseBranch: string;
+    title: string;
+    body: string;
+    draft?: boolean;
+  }): Promise<{ prUrl: string | null; summary: string; reason?: string }> {
+    const git = (...args: string[]) => exec("git", ["-C", input.dir, ...args]);
     const { stdout: remotes } = await git("remote");
     if (!remotes.split("\n").includes("origin")) {
-      return { prUrl: null, summary: `Committed on ${input.branch} (no origin remote, no PR).` };
+      return {
+        prUrl: null,
+        summary: `Committed on ${input.branch} (no origin remote, no PR).`,
+        reason: "This repo has no origin remote to push to.",
+      };
     }
     await git("push", "-u", "origin", input.branch);
     // gh only opens PRs on GitHub; any other origin (GitLab, a bare repo) stops at the push.
@@ -365,32 +385,51 @@ export const localRunner = {
       return {
         prUrl: null,
         summary: `Pushed ${input.branch} to origin (${originUrl.trim()}); not a GitHub remote, so no PR.`,
+        reason: `Pushed ${input.branch}, but origin is not on GitHub, so ZASTAVA can't open the pull request.`,
       };
     }
-    const { stdout } = await exec(
-      "gh",
-      [
-        "pr",
-        "create",
-        "--title",
-        input.title,
-        "--body",
-        input.body,
-        "--head",
-        input.branch,
-        "--base",
-        input.baseBranch,
-        ...(input.draft ? ["--draft"] : []),
-      ],
-      { cwd: input.worktreePath },
-    );
-    const prUrl = stdout.trim().split("\n").pop() ?? null;
-    return {
-      prUrl,
-      summary: `${input.draft ? "Draft pull request" : "Pull request"} opened: ${prUrl}`,
-    };
+    const kind = input.draft ? "Draft pull request" : "Pull request";
+    try {
+      const { stdout } = await exec(
+        "gh",
+        [
+          "pr",
+          "create",
+          "--title",
+          input.title,
+          "--body",
+          input.body,
+          "--head",
+          input.branch,
+          "--base",
+          input.baseBranch,
+          ...(input.draft ? ["--draft"] : []),
+        ],
+        { cwd: input.dir },
+      );
+      const prUrl = stdout.trim().split("\n").pop() ?? null;
+      return { prUrl, summary: `${kind} opened: ${prUrl}` };
+    } catch (error) {
+      const existing = existingPrUrl(error);
+      if (!existing) throw error;
+      return {
+        prUrl: existing,
+        summary: `A pull request for ${input.branch} already exists: ${existing}`,
+      };
+    }
   },
 };
+
+/** gh's "a pull request for branch … already exists: <url>" → the url. Pure. */
+export function existingPrUrl(error: unknown): string | null {
+  const text =
+    error && typeof error === "object" && "stderr" in error
+      ? String(error.stderr)
+      : error instanceof Error
+        ? error.message
+        : String(error);
+  return /already exists:?\s*(https:\/\/\S+\/pull\/\d+)/.exec(text)?.[1] ?? null;
+}
 
 const LOCKFILES = new Set([
   "package-lock.json",

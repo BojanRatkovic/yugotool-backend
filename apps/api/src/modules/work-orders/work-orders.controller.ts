@@ -10,12 +10,14 @@ import {
   Query,
 } from "@nestjs/common";
 import { ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
-import type { NeedsYouItem, WorkOrder } from "@zastava/contracts";
+import type { NeedsYouItem, OpenPullRequestResult, WorkOrder } from "@zastava/contracts";
 import {
   CreateWorkOrderDto,
   EnqueueDto,
   ListWorkOrdersQueryDto,
   NeedsYouItemDto,
+  OpenPullRequestDto,
+  OpenPullRequestResultDto,
   UpdateWorkOrderDto,
   WorkOrderDto,
 } from "./work-orders.dto";
@@ -37,6 +39,17 @@ export class WorkOrdersController {
   @ApiOkResponse({ type: [NeedsYouItemDto] })
   needsYou(): Promise<NeedsYouItem[]> {
     return this.service.needsYou();
+  }
+
+  /** Push a locally delivered branch and open a PR (draft or ready). */
+  @Post(":id/pull-request")
+  @HttpCode(200)
+  @ApiOkResponse({ type: OpenPullRequestResultDto })
+  openPullRequest(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() body: OpenPullRequestDto,
+  ): Promise<OpenPullRequestResult> {
+    return this.service.openPullRequest(id, body);
   }
 
   @Post()

@@ -54,3 +54,44 @@ describe("worktreeDiff", () => {
     ).rejects.toThrow(/exited with/);
   });
 });
+
+describe("worktreeDiff base", () => {
+  let upstream: string;
+  let clone: string;
+
+  beforeAll(() => {
+    upstream = mkdtempSync(path.join(tmpdir(), "zastava-upstream-"));
+    git(upstream, "init", "-q", "-b", "main");
+    git(upstream, "config", "user.email", "test@example.com");
+    git(upstream, "config", "user.name", "test");
+    writeFileSync(path.join(upstream, "a.txt"), "a\n");
+    git(upstream, "add", ".");
+    git(upstream, "commit", "-q", "-m", "init");
+    clone = mkdtempSync(path.join(tmpdir(), "zastava-clone-"));
+    execFileSync("git", ["clone", "-q", upstream, clone], { stdio: "pipe" });
+    git(clone, "config", "user.email", "test@example.com");
+    git(clone, "config", "user.name", "test");
+    // origin/main moves on; the clone's local main stays behind (like a stale checkout).
+    for (const name of ["b.txt", "c.txt"]) {
+      writeFileSync(path.join(upstream, name), `${name}\n`);
+      git(upstream, "add", ".");
+      git(upstream, "commit", "-q", "-m", name);
+    }
+    git(clone, "fetch", "-q", "origin");
+    // The run's branch starts from origin/main, as worktrees do.
+    git(clone, "checkout", "-q", "-b", "run", "origin/main");
+    writeFileSync(path.join(clone, "a.txt"), "a changed\n");
+  });
+
+  afterAll(() => {
+    rmSync(upstream, { recursive: true, force: true });
+    rmSync(clone, { recursive: true, force: true });
+  });
+
+  it("shows only the run's changes when the local base is stale", async () => {
+    const diff = await worktreeDiff(clone, "main", { patchChars: 100_000, statChars: 10_000 });
+    expect(diff.stat).toMatch(/a\.txt/);
+    expect(diff.stat).not.toMatch(/b\.txt|c\.txt/);
+    expect(diff.stat).toMatch(/1 file changed/);
+  });
+});

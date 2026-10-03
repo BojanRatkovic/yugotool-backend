@@ -1,9 +1,11 @@
+import { existsSync } from "node:fs";
 import { type ApiKeySource, query } from "@anthropic-ai/claude-agent-sdk";
 import { ApplicationFailure, Context } from "@temporalio/activity";
 import {
   type AgentStation,
   type AuthSource,
   type ChecksStation,
+  type DeliveryMode,
   type Effort,
   EVENTS_CHANNEL,
   type RunEventType,
@@ -685,22 +687,21 @@ export function createActivities(
       branch: string;
       baseBranch: string;
       title: string;
+      /** Chosen at the final gate; omitted = the project's local-only / draft settings. */
+      delivery?: DeliveryMode;
     }): Promise<{ ok: boolean; error: string | null }> {
       let outcome: { ok: boolean; error: string | null } = { ok: true, error: null };
       try {
         const [project] = await db
-          .select({ localOnly: projects.localOnly, draftPrs: projects.draftPrs })
+          .select({ deliveryDefault: projects.deliveryDefault })
           .from(workOrders)
           .innerJoin(projects, eq(projects.id, workOrders.projectId))
           .where(eq(workOrders.id, input.workOrderId));
-        const localOnly = project?.localOnly ?? false;
+        const mode: DeliveryMode = input.delivery ?? project?.deliveryDefault ?? "local";
+        const localOnly = mode === "local";
+        const draft = mode === "draft_pr";
         const body = localOnly ? "" : await composePrBody(input);
-        const result = await localRunner.deliver({
-          ...input,
-          body,
-          localOnly,
-          draft: project?.draftPrs ?? false,
-        });
+        const result = await localRunner.deliver({ ...input, body, localOnly, draft });
         if (result.prUrl) {
           await db
             .update(workOrders)
@@ -722,6 +723,71 @@ export function createActivities(
       }
       await invalidateBoard();
       return outcome;
+    },
+
+    /**
+     * For work delivered locally: push its branch and open a PR (from the
+     * run's worktree, or the repo once that is gone). The result lands on the
+     * work order and in the run's Activity.
+     */
+    async openPullRequest(input: {
+      workOrderId: string;
+      draft: boolean;
+    }): Promise<{ prUrl: string | null; error: string | null }> {
+      const [row] = await db
+        .select({
+          title: workOrders.title,
+          branch: workOrders.branch,
+          runId: workOrders.currentRunId,
+          repoPath: projects.repoPath,
+          baseBranch: projects.baseBranch,
+          worktreePath: runs.worktreePath,
+        })
+        .from(workOrders)
+        .innerJoin(projects, eq(projects.id, workOrders.projectId))
+        .leftJoin(runs, eq(runs.id, workOrders.currentRunId))
+        .where(eq(workOrders.id, input.workOrderId));
+      if (!row?.branch || !row.runId) {
+        return { prUrl: null, error: "This work order has no delivered branch." };
+      }
+      const dir =
+        row.worktreePath && existsSync(row.worktreePath) ? row.worktreePath : row.repoPath;
+      try {
+        const body = await composePrBody({
+          runId: row.runId,
+          workOrderId: input.workOrderId,
+          worktreePath: dir,
+          baseBranch: row.baseBranch,
+        });
+        const result = await localRunner.openPullRequest({
+          dir,
+          branch: row.branch,
+          baseBranch: row.baseBranch,
+          title: row.title,
+          body,
+          draft: input.draft,
+        });
+        if (!result.prUrl) {
+          const reason = result.reason ?? result.summary;
+          await appendEvent(row.runId, null, "error", `Pull request not opened: ${reason}`);
+          return { prUrl: null, error: reason };
+        }
+        await appendEvent(row.runId, null, "system", result.summary);
+        await db
+          .update(workOrders)
+          .set({ prUrl: result.prUrl })
+          .where(eq(workOrders.id, input.workOrderId));
+        return { prUrl: result.prUrl, error: null };
+      } catch (error) {
+        const message = (error instanceof Error ? error.message : String(error)).replace(
+          ANSI_COLOR,
+          "",
+        );
+        await appendEvent(row.runId, null, "error", `Pull request failed: ${message}`);
+        return { prUrl: null, error: `Pull request failed: ${deliveryReason(message)}` };
+      } finally {
+        await invalidateBoard();
+      }
     },
   };
 

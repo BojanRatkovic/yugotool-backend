@@ -2,6 +2,7 @@ import { createReadStream } from "node:fs";
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Header,
   HttpCode,
@@ -15,6 +16,7 @@ import {
 import {
   ApiAcceptedResponse,
   ApiCreatedResponse,
+  ApiNoContentResponse,
   ApiOkResponse,
   ApiProduces,
   ApiTags,
@@ -22,6 +24,7 @@ import {
 import type {
   Line,
   PreviewDetection,
+  ProjectRemote,
   PreviewStatus,
   PreviewTestResult,
   Project,
@@ -32,6 +35,7 @@ import {
   CreateProjectDto,
   LineDto,
   PreviewDetectionDto,
+  ProjectRemoteDto,
   PreviewStatusDto,
   PreviewTestResultDto,
   ProjectDto,
@@ -84,11 +88,25 @@ export class ProjectsController {
     return this.service.update(id, body);
   }
 
+  @Delete(":id")
+  @HttpCode(204)
+  @ApiNoContentResponse()
+  remove(@Param("id", ParseUUIDPipe) id: string): Promise<void> {
+    return this.service.delete(id);
+  }
+
   @Post(":id/preview/test")
   @HttpCode(200)
   @ApiOkResponse({ type: PreviewTestResultDto })
   testPreview(@Param("id", ParseUUIDPipe) id: string): Promise<PreviewTestResult> {
     return this.service.testPreview(id);
+  }
+
+  /** Where approved work can go (origin, GitHub, gh login); checked live. */
+  @Get(":id/remote")
+  @ApiOkResponse({ type: ProjectRemoteDto })
+  remote(@Param("id", ParseUUIDPipe) id: string): Promise<ProjectRemote> {
+    return this.service.remote(id);
   }
 
   @Post(":id/preview/detect")

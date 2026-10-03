@@ -19,3 +19,13 @@ export class WorkOrderNotRunningError extends DomainError {
   readonly code = "work_order_not_running";
   readonly kind = "conflict";
 }
+
+export class PullRequestNotPossibleError extends DomainError {
+  readonly code = "pull_request_not_possible";
+  readonly kind = "conflict";
+}
+
+export class PullRequestFailedError extends DomainError {
+  readonly code = "pull_request_failed";
+  readonly kind = "conflict";
+}

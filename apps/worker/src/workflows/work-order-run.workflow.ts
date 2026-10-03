@@ -1,8 +1,10 @@
 // Deterministic workflow code ONLY — no Node APIs, no I/O, no Date/Math.random.
 import {
   GATE_DECISION_SIGNAL,
+  type DeliveryMode,
   type GateDecision,
   REPO_HOOKS_STATION_KEY,
+  requestChangesTarget,
   type Handoff,
   SHIFT_CONTROL_SIGNAL,
   type ShiftControl,
@@ -84,6 +86,8 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
   try {
     const run = await bookkeeping.prepareRun(input);
     const notes: StationNote[] = [];
+    /** Set by the approval at the last gate; undefined = the project's settings. */
+    let delivery: DeliveryMode | undefined;
     const attempts = new Map<string, number>();
     // The station loop-backs return to: the first editing agent or shift station.
     const buildIndex = run.stations.findIndex(
@@ -101,19 +105,22 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
     let spentUsd = 0;
     let fixLoops = 0;
     let index = 0;
-    /** The builder's Claude session, resumed whenever work comes back to it. */
-    let builderSessionId: string | null = null;
-    /** Why the builder is running again; null on its first pass. */
+    /** Each agent station's last Claude session (by line index), resumed when work comes back to it. */
+    const sessions = new Map<number, string>();
+    /** Why a station is running again; null on a first pass. */
     let followUp: StationNote | null = null;
+    /** The station `followUp` is for: the builder, or where a human sent changes. */
+    let followUpTarget = buildIndex;
     /** The last failing QA report, so the next QA attempt re-checks it first. */
     let lastQaReport: string | null = null;
 
     const pendingFollowUp = (): StationNote | null => followUp;
 
-    const sendBack = (reason: StationNote): void => {
+    const sendBack = (reason: StationNote, target: number = buildIndex): void => {
       notes.push(reason);
       followUp = reason;
-      index = buildIndex;
+      followUpTarget = target;
+      index = target;
     };
 
     /** Automatic loop-back (validator or checks failed); false when out of loops. */
@@ -158,7 +165,14 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
         decisions.delete(station.key);
         if (!decision) continue;
         const approved = decision.decision === "approve";
-        if (decision.decision === "request_changes" && buildIndex >= 0) {
+        // Older runs replay the old rule (always the builder).
+        const changesTarget =
+          decision.decision !== "request_changes"
+            ? -1
+            : patched("request-changes-nearest-agent")
+              ? requestChangesTarget(run.stations, index)
+              : buildIndex;
+        if (decision.decision === "request_changes" && changesTarget >= 0) {
           await bookkeeping.finishStation({
             runId: input.runId,
             stationRunId,
@@ -167,7 +181,10 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
             output: `Changes requested: ${decision.comment}`,
           });
           // Human-requested changes are not capped: the reviewer decides when to stop.
-          sendBack({ station: `${station.name} (changes requested)`, text: decision.comment });
+          sendBack(
+            { station: `${station.name} (changes requested)`, text: decision.comment },
+            changesTarget,
+          );
           continue;
         }
         await bookkeeping.finishStation({
@@ -188,6 +205,7 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
         if (decision.comment) {
           notes.push({ station: station.name, text: `Human reviewer: ${decision.comment}` });
         }
+        if (decision.delivery) delivery = decision.delivery;
         index += 1;
         continue;
       }
@@ -393,21 +411,23 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
       const stationRunId = await begin("running");
       // Mutated inside closures above, so TS cannot narrow it here; annotate explicitly.
       const pending: StationNote | null = followUp;
-      const resume: boolean = index === buildIndex && pending !== null && builderSessionId !== null;
+      const sessionId = sessions.get(index) ?? null;
+      const resume: boolean = index === followUpTarget && pending !== null && sessionId !== null;
       const result: AgentStationResult = await work.runAgentStation({
         runId: input.runId,
         stationRunId,
         station,
         worktreePath: run.worktreePath,
-        prompt: resume && pending ? buildFollowUp(pending) : buildPrompt(run, station, notes),
+        prompt:
+          resume && pending
+            ? buildFollowUp(pending, station.canEdit)
+            : buildPrompt(run, station, notes),
         modelOverride: run.modelOverride,
         effortOverride: run.effortOverride,
-        resumeSessionId: resume ? builderSessionId : null,
+        resumeSessionId: resume ? sessionId : null,
       });
-      if (index === buildIndex) {
-        builderSessionId = result.sessionId ?? builderSessionId;
-        followUp = null;
-      }
+      if (result.sessionId) sessions.set(index, result.sessionId);
+      if (index === followUpTarget) followUp = null;
       spentUsd += result.costUsd ?? 0;
       await bookkeeping.finishStation({
         runId: input.runId,
@@ -447,6 +467,7 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
       branch: run.branch,
       baseBranch: run.baseBranch,
       title: run.title,
+      ...(delivery ? { delivery } : {}),
     });
     if (!delivered.ok) {
       await finish("failed", delivered.error ?? "Delivery failed");

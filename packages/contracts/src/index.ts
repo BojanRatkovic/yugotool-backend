@@ -202,16 +202,21 @@ export const previewSchema = z.object({
 });
 export type Preview = z.infer<typeof previewSchema>;
 
+/**
+ * How approved work leaves ZASTAVA: a commit on its branch only, or pushed
+ * with a draft / ready pull request.
+ */
+export const deliveryModeSchema = z.enum(["local", "draft_pr", "pr"]);
+export type DeliveryMode = z.infer<typeof deliveryModeSchema>;
+
 export const projectSchema = z.object({
   id: z.uuid(),
   name: z.string(),
   repoPath: z.string(),
   baseBranch: z.string(),
   preview: previewSchema.nullable(),
-  /** Approved work is committed on its branch only: no push, no PR. */
-  localOnly: z.boolean(),
-  /** Pull requests open as drafts (ignored when local only). */
-  draftPrs: z.boolean(),
+  /** What approving the final gate does unless that approval picks another mode. */
+  deliveryDefault: deliveryModeSchema,
   createdAt: isoDate,
   updatedAt: isoDate,
 });
@@ -222,8 +227,7 @@ export const updateProjectSchema = z
     name: z.string().trim().min(1).max(120),
     baseBranch: z.string().trim().min(1),
     preview: previewSchema.nullable(),
-    localOnly: z.boolean(),
-    draftPrs: z.boolean(),
+    deliveryDefault: deliveryModeSchema,
   })
   .partial();
 export type UpdateProject = z.infer<typeof updateProjectSchema>;
@@ -255,6 +259,21 @@ export const previewDetectionSchema = z.object({
   notes: z.array(z.string()),
 });
 export type PreviewDetection = z.infer<typeof previewDetectionSchema>;
+
+/** Where approved work can go: checked live from the repo and gh. */
+export const projectRemoteSchema = z.object({
+  /** `origin` URL; null when the repo has none. */
+  origin: z.string().nullable(),
+  /** origin is on GitHub (gh can open pull requests there). */
+  github: z.boolean(),
+  /** gh is installed and logged in. */
+  ghLoggedIn: z.boolean(),
+  /** Draft / ready PR delivery can work. */
+  prPossible: z.boolean(),
+  /** Why not, in one sentence; null when possible. */
+  reason: z.string().nullable(),
+});
+export type ProjectRemote = z.infer<typeof projectRemoteSchema>;
 
 /** The project's last preview test (persisted on disk by the worker), if any. */
 export const previewStatusSchema = z.object({ last: previewTestResultSchema.nullable() });
@@ -516,6 +535,13 @@ export type UpdateWorkOrder = z.infer<typeof updateWorkOrderSchema>;
 
 export const listWorkOrdersQuerySchema = z.object({ projectId: z.uuid() });
 
+/** Push the branch of work delivered locally and open a pull request for it. */
+export const openPullRequestSchema = z.object({ draft: z.boolean().default(false) });
+export type OpenPullRequest = z.infer<typeof openPullRequestSchema>;
+
+export const openPullRequestResultSchema = z.object({ prUrl: z.string() });
+export type OpenPullRequestResult = z.infer<typeof openPullRequestResultSchema>;
+
 /** A work order waiting at a gate, across projects (desktop tray, badge). */
 export const needsYouItemSchema = z.object({
   workOrderId: z.uuid(),
@@ -656,6 +682,11 @@ export const gateDecisionSchema = z
     /** request_changes sends the work back to the builder, resuming its Claude session. */
     decision: z.enum(["approve", "reject", "request_changes"]),
     comment: z.string().max(5_000).default(""),
+    /**
+     * Approve at the last gate only: overrides the project's delivery settings
+     * (local only, draft PRs) for this run. Omitted = the project's settings.
+     */
+    delivery: deliveryModeSchema.optional(),
   })
   .refine((d) => d.decision !== "request_changes" || d.comment.trim().length > 0, {
     message: "a comment is required when requesting changes",
@@ -1051,6 +1082,21 @@ export const DEFAULT_STATIONS: Station[] = [
  * when a run has station runs with this key.
  */
 export const REPO_HOOKS_STATION_KEY = "repo_hooks";
+
+/**
+ * Where "Request changes" at a gate sends the work: the closest earlier
+ * station that edits code (agent with canEdit, or shift); when none comes
+ * before the gate (a plan gate after research), the closest earlier agent,
+ * which revises its output. -1: nothing to send back to (the gate rejects).
+ */
+export function requestChangesTarget(stations: Station[], gateIndex: number): number {
+  const before = stations.slice(0, Math.max(0, gateIndex));
+  const editor = before.findLastIndex(
+    (s) => (s.kind === "agent" && s.canEdit) || s.kind === "shift",
+  );
+  if (editor >= 0) return editor;
+  return before.findLastIndex((s) => s.kind === "agent");
+}
 
 /**
  * The line with a QA station (from the template) right after the last station

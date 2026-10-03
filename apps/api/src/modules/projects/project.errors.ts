@@ -29,3 +29,8 @@ export class RouteDiscoveryRunningError extends DomainError {
   readonly code = "route_discovery_running";
   readonly kind = "conflict";
 }
+
+export class ProjectHasActiveWorkError extends DomainError {
+  readonly code = "project_has_active_work";
+  readonly kind = "conflict";
+}

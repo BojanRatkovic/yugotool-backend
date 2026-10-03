@@ -71,6 +71,20 @@
       "when": 1791026371849,
       "tag": "0009_first_run_defaults",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791031392579,
+      "tag": "0010_add_delivery_default",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791031392970,
+      "tag": "0011_drop_local_only_draft_prs",
+      "breakpoints": true
     }
   ]
 }

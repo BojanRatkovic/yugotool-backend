@@ -45,11 +45,16 @@ export function buildPrompt(
     .join("\n\n");
 }
 
-/** Prompt for a resumed builder session: it already holds the plan, so send only what changed. */
-export function buildFollowUp(reason: StationNote): string {
+/**
+ * Prompt for a resumed session: it already holds its earlier work, so send
+ * only what changed. A read-only station (research) revises its output.
+ */
+export function buildFollowUp(reason: StationNote, canEdit = true): string {
   return [
     "The work came back to you.",
     `### ${reason.station}\n${reason.text.slice(0, MAX_NOTE_CHARS)}`,
-    "Address this now in the same worktree, then summarize what you changed.",
+    canEdit
+      ? "Address this now in the same worktree, then summarize what you changed."
+      : "Revise your work to address this. Do not modify any files. End with the complete revised result (for a plan: the full revised plan as a numbered list), not only the differences.",
   ].join("\n\n");
 }
