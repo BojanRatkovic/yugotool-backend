@@ -30,13 +30,13 @@ const review: ReviewVerdict = {
 };
 const lint: Station = { key: "lint", kind: "checks", name: "Lint", command: "pnpm lint" };
 
-function context(stations: Station[]): ReviewRunContext {
+function context(stations: Station[], previousFindings = 0): ReviewRunContext {
   return {
     stations,
     worktreePath: "/tmp/wt",
     title: "Review #7: Add paging",
     description: "",
-    pullRequest: { number: 7, url: "https://x/pull/7" },
+    pullRequest: { number: 7, url: "https://x/pull/7", previousFindings },
     baseBranch: "main",
     modelOverride: null,
     effortOverride: null,
@@ -46,6 +46,7 @@ function context(stations: Station[]): ReviewRunContext {
 
 function activities(opts: {
   stations: Station[];
+  previousFindings?: number;
   checksPass?: boolean;
   agent?: () => Promise<AgentStationResult>;
 }) {
@@ -60,7 +61,7 @@ function activities(opts: {
     calls,
     completed,
     mocks: {
-      prepareReview: track("prepareReview", () => context(opts.stations)),
+      prepareReview: track("prepareReview", () => context(opts.stations, opts.previousFindings)),
       prepareKnowledge: track("prepareKnowledge", () => []),
       beginStation: track(
         "beginStation",
@@ -151,6 +152,24 @@ describe("reviewRun", () => {
     expect(completed?.extra).toHaveLength(1);
     expect(completed?.extra[0]?.title).toContain("pnpm lint");
     expect(acts.mocks.finishRun.mock.calls[0]?.[0]).toMatchObject({ status: "succeeded" });
+  }, 120_000);
+
+  it("asks a re-review for previous statuses, in the same order", async () => {
+    const acts = activities({ stations: REVIEW_LINE_STATIONS, previousFindings: 2 });
+    await run(acts);
+    expect(acts.calls).toEqual([
+      "prepareReview",
+      "prepareKnowledge",
+      "beginStation",
+      "runAgentStation",
+      "finishStation",
+      "completeReview",
+      "finishRun",
+      "removeReviewWorkspace",
+    ]);
+    expect(JSON.stringify(acts.mocks.runAgentStation.mock.calls[0])).toContain(
+      "## Previous findings",
+    );
   }, 120_000);
 
   it("fails without completing when the reviewer returns no review", async () => {

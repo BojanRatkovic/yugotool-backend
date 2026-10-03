@@ -12,6 +12,8 @@ export const REVIEW_BRIEF_PATH = ".zastava/review-brief.md";
 const MAX_FILES = 300;
 /** Long thread comments are cut; the point is "this was said", not the full text. */
 const MAX_THREAD_CHARS = 400;
+/** A previous finding's body in the brief: enough to recognise it. */
+const MAX_PREVIOUS_BODY_CHARS = 1_200;
 
 /** The PR's head commit could not be fetched (force-pushed away, or no such PR). */
 export class ReviewHeadMissingError extends Error {}
@@ -73,7 +75,14 @@ export interface ReviewBriefInput {
   body: string;
   pr: Pick<
     ReviewPullRequest,
-    "number" | "url" | "headRefName" | "baseRefName" | "headOid" | "sinceOid" | "openThreads"
+    | "number"
+    | "url"
+    | "headRefName"
+    | "baseRefName"
+    | "headOid"
+    | "sinceOid"
+    | "openThreads"
+    | "previousFindings"
   >;
   /** Merge-base of base and head: what the PR diff starts from. */
   mergeBaseOid: string;
@@ -94,6 +103,30 @@ const oneLine = (text: string): string => {
   const flat = text.replace(/\s+/g, " ").trim();
   return flat.length > MAX_THREAD_CHARS ? `${flat.slice(0, MAX_THREAD_CHARS)}…` : flat;
 };
+
+const trimmed = (text: string): string => {
+  const flat = text.trim();
+  return flat.length > MAX_PREVIOUS_BODY_CHARS
+    ? `${flat.slice(0, MAX_PREVIOUS_BODY_CHARS)}…`
+    : flat;
+};
+
+function previousFinding(f: ReviewPullRequest["previousFindings"][number]): string {
+  const place = f.file ? ` · \`${f.file}${f.line ? `:${f.line}` : ""}\`` : "";
+  const state = !f.posted
+    ? "Not posted."
+    : f.threadId === null
+      ? "Posted in the review summary."
+      : f.threadResolved
+        ? "Posted; the thread is resolved on GitHub."
+        : "Posted; the thread is still open on GitHub.";
+  return [
+    `### ${f.id} · ${f.severity}${place}`,
+    `**${oneLine(f.title)}**`,
+    trimmed(f.body),
+    `_${state}_`,
+  ].join("\n\n");
+}
 
 /** The markdown brief the review station reads first. Pure. */
 export function buildReviewBrief(input: ReviewBriefInput): string {
@@ -117,6 +150,14 @@ export function buildReviewBrief(input: ReviewBriefInput): string {
     );
   }
   sections.push("## Description", input.body.trim() || "_No description._");
+  if (pr.previousFindings.length > 0) {
+    const at = (pr.sinceOid ?? pr.headOid).slice(0, 7);
+    sections.push(
+      "## Previous findings (check each one)",
+      `ZASTAVA's last review (at \`${at}\`) raised these. Give each one a status in \`previous\`; lines are at \`${at}\` and may have moved.`,
+      pr.previousFindings.map(previousFinding).join("\n\n"),
+    );
+  }
   sections.push(
     "## Open threads (already raised; do not repeat)",
     pr.openThreads.length === 0

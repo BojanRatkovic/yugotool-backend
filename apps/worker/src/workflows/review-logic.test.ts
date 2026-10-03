@@ -1,6 +1,17 @@
-import { REVIEW_LINE_STATIONS, type AgentStation, type ReviewVerdict } from "@zastava/contracts";
+import {
+  REVIEW_LINE_STATIONS,
+  type AgentStation,
+  type PreviousFinding,
+  type ReviewVerdict,
+} from "@zastava/contracts";
 import { describe, expect, it } from "vitest";
-import { buildReviewPrompt, checksFinding, mergeFindings, qaFinding } from "./review-logic";
+import {
+  buildReviewPrompt,
+  checksFinding,
+  mergeFindings,
+  qaFinding,
+  reconcilePrevious,
+} from "./review-logic";
 
 function reviewerStation(): AgentStation {
   const station = REVIEW_LINE_STATIONS[0];
@@ -27,6 +38,85 @@ describe("buildReviewPrompt", () => {
     expect(prompt).toContain("Never modify");
     expect(prompt).toContain("### Lint\nok");
     expect(prompt).toContain("## Output format");
+    expect(prompt).not.toContain("## Previous findings");
+  });
+
+  it("asks for a status per previous finding on a re-review", () => {
+    const prompt = buildReviewPrompt(
+      {
+        title: "Add paging",
+        pullRequest: { number: 7, url: "https://x/pull/7", previousFindings: 2 },
+      },
+      reviewer,
+      [],
+    );
+    expect(prompt).toContain("## Previous findings");
+    expect(prompt).toContain("`fixed`, `partly` or `open`");
+    expect(prompt).toContain("Never repeat a previous finding in `findings`");
+  });
+});
+
+const prev = (id: string, severity: "critical" | "minor"): PreviousFinding => ({
+  id,
+  severity,
+  category: "bug",
+  file: "src/a.ts",
+  line: 1,
+  title: "t",
+  body: "b",
+  posted: true,
+  threadId: null,
+  threadResolved: null,
+});
+
+describe("reconcilePrevious", () => {
+  const previous = [prev("f1", "critical"), prev("f2", "minor")];
+
+  it("drops unknown ids and repeats", () => {
+    const out = reconcilePrevious(
+      {
+        ...clean,
+        previous: [
+          { id: "f1", status: "fixed", note: "src/a.ts:3" },
+          { id: "f1", status: "open", note: "again" },
+          { id: "f9", status: "open", note: "made up" },
+        ],
+      },
+      previous,
+    );
+    expect(out.previous).toEqual([{ id: "f1", status: "fixed", note: "src/a.ts:3" }]);
+    expect(out.recommendation).toBe("approve");
+  });
+
+  it("asks for changes while a previous critical finding is not fixed", () => {
+    for (const status of ["open", "partly"] as const) {
+      const out = reconcilePrevious(
+        { ...clean, previous: [{ id: "f1", status, note: "still there" }] },
+        previous,
+      );
+      expect(out.recommendation).toBe("request_changes");
+    }
+  });
+
+  it("keeps the recommendation when only a minor one is open", () => {
+    const out = reconcilePrevious(
+      { ...clean, recommendation: "comment", previous: [{ id: "f2", status: "open", note: "n" }] },
+      previous,
+    );
+    expect(out.recommendation).toBe("comment");
+  });
+
+  it("asks for changes for a new critical finding", () => {
+    const critical = checksFinding(
+      { key: "lint", kind: "checks", name: "Lint", command: "pnpm lint" },
+      "x",
+      1,
+    );
+    const out = reconcilePrevious(
+      { ...clean, findings: [{ ...critical, severity: "critical" }] },
+      [],
+    );
+    expect(out.recommendation).toBe("request_changes");
   });
 });
 

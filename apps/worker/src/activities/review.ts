@@ -1,5 +1,11 @@
 import { ApplicationFailure } from "@temporalio/activity";
-import type { Effort, ReviewFinding, ReviewVerdict, Station } from "@zastava/contracts";
+import {
+  type Effort,
+  type ReviewFinding,
+  type ReviewVerdict,
+  type Station,
+  reviewPullRequestSchema,
+} from "@zastava/contracts";
 import { type Database, lines, projects, runs, stationRuns, workOrders } from "@zastava/db";
 import { and, eq } from "drizzle-orm";
 import { localRunner } from "../runner/local-runner";
@@ -13,7 +19,7 @@ import {
   writeReviewBrief,
 } from "../runner/review-workspace";
 import { anchorFindings, parseHunks } from "../runner/diff-anchors";
-import { mergeFindings } from "../workflows/review-logic";
+import { mergeFindings, reconcilePrevious } from "../workflows/review-logic";
 import type { ShiftDeps } from "./shifts";
 
 type ReviewDeps = Pick<ShiftDeps, "appendEvent" | "invalidateBoard" | "notify" | "notifyHumans">;
@@ -24,7 +30,8 @@ export interface ReviewRunContext {
   worktreePath: string;
   title: string;
   description: string;
-  pullRequest: { number: number; url: string };
+  /** `previousFindings`: how many the reviewer must give a status (spec 0010). */
+  pullRequest: { number: number; url: string; previousFindings?: number };
   /** The PR's base branch (QA compares against it). */
   baseBranch: string;
   modelOverride: string | null;
@@ -50,10 +57,11 @@ export function createReviewActivities(db: Database, deps: ReviewDeps) {
           `review work order ${input.workOrderId} or its review line not found`,
         );
       }
-      const pr = row.workOrder.pullRequest;
-      if (!pr) {
+      if (!row.workOrder.pullRequest) {
         throw ApplicationFailure.nonRetryable("This work order has no pull request to review");
       }
+      // Fills the fields newer than the row (spec 0010).
+      const pr = reviewPullRequestSchema.parse(row.workOrder.pullRequest);
       const repoPath = row.project.repoPath;
       try {
         await fetchPullRequest(repoPath, pr);
@@ -94,7 +102,11 @@ export function createReviewActivities(db: Database, deps: ReviewDeps) {
         worktreePath,
         title: row.workOrder.title,
         description: row.workOrder.description,
-        pullRequest: { number: pr.number, url: pr.url },
+        pullRequest: {
+          number: pr.number,
+          url: pr.url,
+          previousFindings: pr.previousFindings.length,
+        },
         baseBranch: pr.baseRefName,
         modelOverride: row.workOrder.modelOverride,
         effortOverride: row.workOrder.effortOverride,
@@ -123,7 +135,8 @@ export function createReviewActivities(db: Database, deps: ReviewDeps) {
         .innerJoin(workOrders, eq(workOrders.id, runs.workOrderId))
         .where(eq(stationRuns.id, input.stationRunId));
       if (!row?.review) throw ApplicationFailure.nonRetryable("The reviewer returned no review");
-      const merged = mergeFindings(row.review, input.extra);
+      const previous = row.pullRequest?.previousFindings ?? [];
+      const merged = reconcilePrevious(mergeFindings(row.review, input.extra), previous);
       // GitHub refuses line comments outside the PR diff's hunks.
       let review = merged;
       if (row.worktreePath && row.pullRequest) {

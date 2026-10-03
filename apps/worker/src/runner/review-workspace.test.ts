@@ -85,6 +85,7 @@ describe("buildReviewBrief", () => {
       { path: "src/a.ts", line: 3, author: "ana", body: "Why\nnot a map?" },
       { path: "src/b.ts", line: null, author: "bo", body: "x".repeat(500) },
     ],
+    previousFindings: [],
   };
 
   it("has the diff range, files, description and open threads", () => {
@@ -116,6 +117,68 @@ describe("buildReviewBrief", () => {
     expect(brief).toContain("## Re-review");
     expect(brief).toContain(`git diff ${"s".repeat(40)}...${"h".repeat(40)}`);
     expect(brief).toContain("_No description._");
+  });
+
+  it("lists previous findings to check, before the open threads", () => {
+    const previous = {
+      severity: "critical" as const,
+      category: "bug",
+      file: "src/a.ts",
+      line: 12,
+      title: "Null deref",
+      body: "Guard the empty list.",
+    };
+    const brief = buildReviewBrief({
+      title: "Add paging",
+      body: "",
+      pr: {
+        ...pr,
+        sinceOid: "s".repeat(40),
+        previousFindings: [
+          { ...previous, id: "f1", posted: true, threadId: "T1", threadResolved: false },
+          {
+            ...previous,
+            id: "f2",
+            file: null,
+            line: null,
+            posted: true,
+            threadId: null,
+            threadResolved: null,
+          },
+          {
+            ...previous,
+            id: "f3",
+            body: "y".repeat(2_000),
+            posted: false,
+            threadId: null,
+            threadResolved: null,
+          },
+        ],
+      },
+      mergeBaseOid: "m".repeat(40),
+      files: ["M src/a.ts"],
+      sinceFiles: ["M src/a.ts"],
+    });
+    expect(brief).toContain("## Previous findings (check each one)");
+    expect(brief).toContain("### f1 · critical · `src/a.ts:12`");
+    expect(brief).toContain("_Posted; the thread is still open on GitHub._");
+    expect(brief).toContain("_Posted in the review summary._");
+    expect(brief).toContain("_Not posted._");
+    expect(brief).toContain("lines are at `sssssss`");
+    expect(brief).toContain(`${"y".repeat(1_200)}…`);
+    expect(brief.indexOf("## Previous findings")).toBeLessThan(brief.indexOf("## Open threads"));
+  });
+
+  it("has no previous findings section on a first review", () => {
+    const brief = buildReviewBrief({
+      title: "t",
+      body: "",
+      pr,
+      mergeBaseOid: "m".repeat(40),
+      files: [],
+      sinceFiles: null,
+    });
+    expect(brief).not.toContain("## Previous findings");
   });
 
   it("is written under .zastava in the worktree", async () => {

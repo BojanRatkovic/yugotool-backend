@@ -3,6 +3,7 @@ import type {
   AgentStation,
   ChecksStation,
   KnowledgeMount,
+  PreviousFinding,
   ReviewFinding,
   ReviewVerdict,
 } from "@zastava/contracts";
@@ -23,8 +24,17 @@ const REVIEW_OUTPUT_FORMAT = [
   "Each finding `body`: markdown for a GitHub comment. Lead with the problem in one or two sentences, then a blank line and the fix. Use `code` for identifiers and short bullets when there are several points.",
 ].join("\n\n");
 
+/** A re-review answers "did they fix what I asked for?" first (spec 0010). */
+const RE_REVIEW_RULES = [
+  "## Previous findings",
+  "The brief lists the previous review's findings. Give every one an entry in `previous`: its `id`, `status` (`fixed`, `partly` or `open`) and `note`, one line of evidence such as `file:line` or a commit.",
+  "Judge each on the head commit, not the old one: lines may have moved, and a finding is fixed when the problem is gone, whatever the fix looks like.",
+  "Never repeat a previous finding in `findings`: `findings` holds new problems only.",
+  "The `summary` says what changed since the last review and what is still open.",
+].join("\n\n");
+
 export function buildReviewPrompt(
-  run: { title: string; pullRequest: { number: number; url: string } },
+  run: { title: string; pullRequest: { number: number; url: string; previousFindings?: number } },
   station: AgentStation,
   notes: StationNote[],
   knowledge: KnowledgeMount[] = [],
@@ -41,6 +51,7 @@ export function buildReviewPrompt(
     knowledgeSection(knowledge),
     `## Your station: ${station.name} (${station.role})`,
     REVIEW_OUTPUT_FORMAT,
+    (run.pullRequest.previousFindings ?? 0) > 0 ? RE_REVIEW_RULES : "",
     "Review the pull request now.",
   ]
     .filter(Boolean)
@@ -103,4 +114,30 @@ export function mergeFindings(verdict: ReviewVerdict, extra: ReviewFinding[]): R
       ? "comment"
       : verdict.recommendation;
   return { ...verdict, recommendation, findings };
+}
+
+/**
+ * Keeps one status per previous finding the re-review knows (unknown ids and
+ * repeats are dropped; a missing one shows as "not checked"). A critical
+ * finding that is not fixed, previous or new, means request changes.
+ */
+export function reconcilePrevious(
+  verdict: ReviewVerdict,
+  previousFindings: PreviousFinding[],
+): ReviewVerdict {
+  const severity = new Map(previousFindings.map((f) => [f.id, f.severity]));
+  const seen = new Set<string>();
+  const previous = verdict.previous.filter((p) => {
+    if (!severity.has(p.id) || seen.has(p.id)) return false;
+    seen.add(p.id);
+    return true;
+  });
+  const criticalOpen =
+    verdict.findings.some((f) => f.severity === "critical") ||
+    previous.some((p) => p.status !== "fixed" && severity.get(p.id) === "critical");
+  return {
+    ...verdict,
+    previous,
+    recommendation: criticalOpen ? "request_changes" : verdict.recommendation,
+  };
 }
