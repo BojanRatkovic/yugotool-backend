@@ -16,6 +16,7 @@ import {
   type ServerEvent,
   type StationRunStatus,
   type Station,
+  REVIEW_VERDICT_JSON_SCHEMA,
   VERDICT_JSON_SCHEMA,
   type Verdict,
   verdictSchema,
@@ -552,7 +553,15 @@ export function createActivities(
           ...(effort ? { effort } : {}),
           ...(input.station.maxBudgetUsd ? { maxBudgetUsd: input.station.maxBudgetUsd } : {}),
           ...(input.station.structuredVerdict
-            ? { outputFormat: { type: "json_schema" as const, schema: VERDICT_JSON_SCHEMA } }
+            ? {
+                outputFormat: {
+                  type: "json_schema" as const,
+                  schema:
+                    input.station.structuredVerdict === "review"
+                      ? REVIEW_VERDICT_JSON_SCHEMA
+                      : VERDICT_JSON_SCHEMA,
+                },
+              }
             : {}),
           tools: input.station.allowedTools,
           allowedTools: input.station.allowedTools,

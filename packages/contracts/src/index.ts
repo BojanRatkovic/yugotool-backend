@@ -41,8 +41,11 @@ export const agentStationSchema = z.object({
   maxBudgetUsd: z.number().positive().optional(),
   allowedTools: z.array(z.string()),
   canEdit: z.boolean(),
-  /** Validator stations return a structured verdict (JSON schema output). */
-  structuredVerdict: z.boolean().optional(),
+  /**
+   * Validator stations return a structured verdict (JSON schema output):
+   * true = pass/fail `verdictSchema`, "review" = PR review findings (spec 0009).
+   */
+  structuredVerdict: z.union([z.boolean(), z.literal("review")]).optional(),
   /**
    * Reads the project's knowledge sources (spec 0007). Planning stations only:
    * a station that edits code never gets it (see updateLineSchema).
@@ -1418,6 +1421,110 @@ export type PrViewedInput = z.infer<typeof prViewedInputSchema>;
 export const prMergeInputSchema = z.object({ method: prMergeMethodSchema });
 export type PrMergeInput = z.infer<typeof prMergeInputSchema>;
 
+// ── PR review (spec 0009) ───────────────────────────────────────────────────
+
+/** `build` runs down the project's line; `review` reviews a pull request. */
+export const workOrderKindSchema = z.enum(["build", "review"]);
+export type WorkOrderKind = z.infer<typeof workOrderKindSchema>;
+
+/** A project has one line per kind. */
+export const lineKindSchema = z.enum(["build", "review"]);
+export type LineKind = z.infer<typeof lineKindSchema>;
+
+/** The PR a review work order looks at, frozen when the review starts. */
+export const reviewPullRequestSchema = z.object({
+  number: z.number().int().min(1),
+  url: z.string(),
+  headRefName: z.string(),
+  headOid: z.string(),
+  baseRefName: z.string(),
+  baseOid: z.string(),
+  /** Head of the previous ZASTAVA review: a re-review focuses on what came after. */
+  sinceOid: z.string().nullable(),
+  /** Finding ids already added to the pending review on GitHub. */
+  posted: z.array(z.string()).default([]),
+});
+export type ReviewPullRequest = z.infer<typeof reviewPullRequestSchema>;
+
+export const reviewFindingSchema = z.object({
+  /** Stable within the verdict, e.g. "f1". */
+  id: z.string(),
+  severity: z.enum(["critical", "important", "minor"]),
+  category: z.enum(["bug", "security", "performance", "tests", "design", "convention"]),
+  file: z.string().nullable(),
+  side: z.enum(["RIGHT", "LEFT"]),
+  /** First line of a multi-line range; null for a single line. */
+  startLine: z.number().int().min(1).nullable(),
+  /** Line in the PR diff (new file for RIGHT); null = about the file or the PR as a whole. */
+  line: z.number().int().min(1).nullable(),
+  /** One line; becomes the comment's first line. */
+  title: z.string(),
+  /** Why it is wrong, markdown. */
+  body: z.string(),
+  /** Replacement for startLine..line, posted as a ```suggestion block. */
+  suggestion: z.string().nullable(),
+  confidence: z.enum(["high", "medium"]),
+});
+export type ReviewFinding = z.infer<typeof reviewFindingSchema>;
+
+/** What a review station returns (also its JSON schema). */
+export const reviewVerdictSchema = z.object({
+  recommendation: z.enum(["approve", "comment", "request_changes"]),
+  /** 2–5 sentences: what the PR does and what matters. */
+  summary: z.string(),
+  /** Most severe first. */
+  findings: z.array(reviewFindingSchema).max(30),
+});
+export type ReviewVerdict = z.infer<typeof reviewVerdictSchema>;
+
+const { $schema: _reviewDialect, ...reviewVerdictJsonSchema } = z.toJSONSchema(
+  reviewVerdictSchema,
+  { target: "draft-7" },
+);
+export const REVIEW_VERDICT_JSON_SCHEMA: Record<string, unknown> = reviewVerdictJsonSchema;
+
+/** Starts a ZASTAVA review of the PR's current head. */
+export const startReviewSchema = z.object({
+  /** Client-generated work order id makes the start idempotent. */
+  id: z.uuid().optional(),
+});
+export type StartReview = z.infer<typeof startReviewSchema>;
+
+/** The latest ZASTAVA review of a PR. */
+export const zastavaReviewSchema = z.object({
+  workOrderId: z.uuid(),
+  runId: z.uuid().nullable(),
+  status: runStatusSchema,
+  costUsd: z.number(),
+  pullRequest: reviewPullRequestSchema,
+  /** The PR head moved since the review ran. */
+  stale: z.boolean(),
+  verdict: reviewVerdictSchema.nullable(),
+  error: z.string().nullable(),
+  startedAt: isoDate,
+  finishedAt: isoDate.nullable(),
+});
+export type ZastavaReview = z.infer<typeof zastavaReviewSchema>;
+
+export const zastavaReviewResultSchema = z.object({ review: zastavaReviewSchema.nullable() });
+export type ZastavaReviewResult = z.infer<typeof zastavaReviewResultSchema>;
+
+/** Findings the human kept, as edited; they go to the pending review. */
+export const postFindingsSchema = z.object({
+  findings: z
+    .array(
+      z.object({
+        id: z.string(),
+        title: z.string().trim().min(1).max(300),
+        body: z.string().max(20_000),
+        suggestion: z.string().max(20_000).nullable(),
+      }),
+    )
+    .min(1)
+    .max(30),
+});
+export type PostFindings = z.infer<typeof postFindingsSchema>;
+
 // ── Queue & dispatcher ──────────────────────────────────────────────────────
 
 export const enqueueSchema = z.object({ mode: queueModeSchema.default("asap") });
@@ -1628,3 +1735,39 @@ export const QA_STATION_TEMPLATE: Extract<Station, { kind: "qa" }> = {
   interactive: true,
   planner: true,
 };
+
+// ── Review line (spec 0009) ─────────────────────────────────────────────────
+
+/** A review line only reads: no station edits code, works in shifts or waits at a gate. */
+export const updateReviewLineSchema = updateLineSchema.refine(
+  ({ stations }) =>
+    stations.every(
+      (s) => s.kind !== "gate" && s.kind !== "shift" && (s.kind !== "agent" || !s.canEdit),
+    ),
+  { message: "a review line has no gates, shifts or stations that edit code", path: ["stations"] },
+);
+
+/** The review line every project starts with: one read-only reviewer. */
+export const REVIEW_LINE_STATIONS: Station[] = [
+  {
+    key: "review",
+    kind: "agent",
+    name: "Review",
+    role: "pull-request-reviewer",
+    model: "claude-sonnet-5-5",
+    effort: "high",
+    maxBudgetUsd: 3,
+    allowedTools: [...READ_ONLY_TOOLS, "Bash"],
+    canEdit: false,
+    structuredVerdict: "review",
+    useKnowledge: true,
+    prompt: [
+      "You are a senior reviewer on this team, reviewing someone's pull request. The working tree is the PR's head commit; the brief at .zastava/review-brief.md has the PR, the base and head commits, the changed files and the open threads.",
+      "Read the diff (git diff <base>...<head>) and as much surrounding code as you need to be sure. Never modify files.",
+      "Report only real problems a careful teammate would block or fix before merge: bugs, broken edge cases, security, data loss, races, missing or wrong tests for changed behaviour, and clear violations of this repo's own conventions (CLAUDE.md, knowledge). No style nits a linter or formatter catches, no praise, no restating what the code does, nothing already said in an open thread.",
+      "Every finding points at a line the PR added or changed: file, line (new file, side RIGHT; side LEFT only for removed lines), startLine for a range. Title is one line. Body says why it is wrong and what to do. Give a suggestion (the exact replacement lines for startLine..line) only when the fix is local and certain.",
+      "Only emit findings you are at least fairly sure about (confidence high or medium). Fewer, sharper findings beat many weak ones; an empty findings array is the right answer for a clean PR. Order findings most severe first; ids f1, f2, ….",
+      "recommendation: request_changes if any critical finding, comment if only important/minor ones, approve if none. summary: 2–5 sentences on what the PR does and what matters most.",
+    ].join("\n\n"),
+  },
+];
