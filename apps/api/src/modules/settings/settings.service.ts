@@ -86,8 +86,13 @@ export class SettingsService {
     );
   }
 
-  async broadcast(notice: { title: string; body: string; url: string }): Promise<void> {
-    await broadcast(await this.get(), notice, this.desktopSink());
+  /** Every enabled channel; one failing never blocks the others (see `error`). */
+  async broadcast(notice: {
+    title: string;
+    body: string;
+    url: string;
+  }): Promise<{ channel: Channel; error: string | null }[]> {
+    return broadcast(await this.get(), notice, this.desktopSink());
   }
 
   /** Inside the desktop app, notices travel as events and the app shows them natively. */

@@ -1,5 +1,6 @@
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from "@nestjs/common";
 import type { DispatcherState, PlanUsage, Settings } from "@zastava/contracts";
+import { enqueueNotification } from "@zastava/notify";
 import { DatabaseService } from "../../core/database/database.service";
 import { EventsService } from "../../core/events/events.service";
 import { SettingsService } from "../settings/settings.service";
@@ -58,7 +59,9 @@ export class DispatcherService implements OnModuleInit, OnModuleDestroy {
         next.status !== this.state?.status ||
         next.reason !== this.state.reason ||
         next.running !== this.state.running;
+      const paused = next.status === "paused_usage" && this.state?.status !== "paused_usage";
       this.state = next;
+      if (paused) await this.notifyPaused(next);
       if (changed) await this.events.publish({ type: "invalidate", collection: "dispatcher" });
       return next;
     } catch (error) {
@@ -67,6 +70,15 @@ export class DispatcherService implements OnModuleInit, OnModuleDestroy {
     } finally {
       this.ticking = false;
     }
+  }
+
+  /** Once per pause: the dedupe key is the reset time, so a restart does not repeat it. */
+  private async notifyPaused(state: DispatcherState): Promise<void> {
+    await enqueueNotification(
+      this.database.db,
+      { kind: "dispatcher_paused", payload: { reason: state.reason, resumesAt: state.resumesAt } },
+      `dispatcher_paused:${state.resumesAt ?? state.checkedAt.slice(0, 13)}`,
+    );
   }
 
   private async evaluate(now: Date): Promise<DispatcherState> {
