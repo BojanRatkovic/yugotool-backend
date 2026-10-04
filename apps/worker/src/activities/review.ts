@@ -159,13 +159,10 @@ export function createReviewActivities(db: Database, deps: ReviewDeps) {
       await db.update(stationRuns).set({ review }).where(eq(stationRuns.id, input.stationRunId));
       await deps.notify({ type: "invalidate", collection: "reviews" });
       const count = review.findings.length;
-      await deps.notifyHumans(input.workOrderId, (title) => ({
-        title: `Review ready: ${title}`,
-        body:
-          count === 0
-            ? "No findings."
-            : `${count} finding${count === 1 ? "" : "s"}; pick the ones to post.`,
-      }));
+      await deps.notifyHumans(
+        { kind: "review_ready", payload: { workOrderId: input.workOrderId, findings: count } },
+        `review_ready:${input.stationRunId}`,
+      );
       return review;
     },
 

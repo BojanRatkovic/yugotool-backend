@@ -23,6 +23,7 @@ import {
   type Verdict,
   verdictSchema,
   type WorkOrderStatus,
+  type NotificationJob,
 } from "@zastava/contracts";
 import {
   type Database,
@@ -30,12 +31,11 @@ import {
   projects,
   runEvents,
   runs,
-  settings,
   shifts,
   stationRuns,
   workOrders,
 } from "@zastava/db";
-import { broadcast, type DesktopSink, truncateNotice } from "@zastava/notify";
+import { enqueueNotification } from "@zastava/notify";
 import { and, eq, sql } from "drizzle-orm";
 import { runArtifactsDir } from "../runner/artifacts";
 import { localRunner } from "../runner/local-runner";
@@ -123,22 +123,10 @@ function toAuthSource(source: ApiKeySource): AuthSource {
 const describeListeners = (list: { port: string; pid: number }[]): string =>
   list.map((l) => `:${l.port} (pid ${l.pid})`).join(", ");
 
-function stationName(line: Station[], key: string): string {
-  return line.find((s) => s.key === key)?.name ?? key;
-}
-
-export function createActivities(
-  db: Database,
-  options: { desktopNotices: "osascript" | "app" } = { desktopNotices: "osascript" },
-) {
+export function createActivities(db: Database) {
   async function notify(event: ServerEvent): Promise<void> {
     await db.execute(sql`SELECT pg_notify(${EVENTS_CHANNEL}, ${JSON.stringify(event)})`);
   }
-
-  const desktopSink: DesktopSink | undefined =
-    options.desktopNotices === "app"
-      ? (notice) => notify({ type: "notice", ...truncateNotice(notice) })
-      : undefined;
 
   async function invalidateBoard(): Promise<void> {
     await notify({ type: "invalidate", collection: "work_orders" });
@@ -159,44 +147,11 @@ export function createActivities(
   }
 
   /**
-   * Best effort: a notification failure is logged as a run event, never thrown,
-   * so it cannot fail (and re-run) the bookkeeping activity it rides on.
+   * Queues a notification (spec 0011); the API's job processor renders, stores
+   * and fans it out. Idempotent on `dedupeKey`, so a retried activity queues once.
    */
-  async function notifyHumans(
-    workOrderId: string,
-    compose: (
-      title: string,
-      line: Station[],
-      prUrl: string | null,
-    ) => { title: string; body: string },
-  ): Promise<void> {
-    const [row] = await db
-      .select({ workOrder: workOrders, line: lines })
-      .from(workOrders)
-      .innerJoin(lines, and(eq(lines.projectId, workOrders.projectId), eq(lines.kind, "build")))
-      .where(eq(workOrders.id, workOrderId));
-    if (!row) return;
-    await db.insert(settings).values({ id: "default" }).onConflictDoNothing();
-    const [config] = await db.select().from(settings).where(eq(settings.id, "default"));
-    if (!config) return;
-    const { workOrder } = row;
-    const message = compose(workOrder.title, row.line.stations, workOrder.prUrl);
-    // A review opens its pull request; everything else the work order on the board.
-    const appPath = workOrder.pullRequest
-      ? `/projects/${workOrder.projectId}/pulls/assigned?pr=${workOrder.pullRequest.number}`
-      : `/projects/${workOrder.projectId}?view=board&wo=${workOrder.id}`;
-    const url = `${config.appUrl}${appPath}`;
-    const results = await broadcast(config, { ...message, url }, desktopSink);
-    for (const failed of results.filter((r) => r.error)) {
-      if (workOrder.currentRunId) {
-        await appendEvent(
-          workOrder.currentRunId,
-          null,
-          "error",
-          `Notification via ${failed.channel} failed: ${failed.error}`,
-        );
-      }
-    }
+  async function notifyHumans(job: NotificationJob, dedupeKey: string): Promise<void> {
+    await enqueueNotification(db, job, dedupeKey);
   }
 
   const composePrBody = createPrBodyComposer(db);
@@ -308,7 +263,7 @@ export function createActivities(
     ...createRouteActivities(db, { notify }),
     ...createPreviewSignInActivities(db, { notify }),
     ...createCiActivities(db, { appendEvent, invalidateBoard, notifyHumans }),
-    ...createKnowledgeActivities(db, { appendEvent, notify }),
+    ...createKnowledgeActivities(db, { appendEvent, notify, notifyHumans }),
     ...createReviewActivities(db, { appendEvent, invalidateBoard, notify, notifyHumans }),
 
     async prepareRun(input: { runId: string; workOrderId: string }): Promise<RunContext> {
@@ -398,10 +353,13 @@ export function createActivities(
         .where(eq(workOrders.id, input.workOrderId));
       await invalidateBoard();
       if (input.status === "awaiting_approval") {
-        await notifyHumans(input.workOrderId, (title, line) => ({
-          title: `Needs you: ${title}`,
-          body: `${stationName(line, input.stationKey)} is waiting for your decision.`,
-        }));
+        await notifyHumans(
+          {
+            kind: "gate_waiting",
+            payload: { workOrderId: input.workOrderId, stationKey: input.stationKey },
+          },
+          `gate_waiting:${stationRun.id}`,
+        );
       }
       return stationRun.id;
     },
@@ -527,16 +485,19 @@ export function createActivities(
         );
       await invalidateBoard();
       if (input.status === "failed") {
-        await notifyHumans(input.workOrderId, (title) => ({
-          title: `Run failed: ${title}`,
-          body: input.reason ?? "The run stopped with an error.",
-        }));
+        await notifyHumans(
+          {
+            kind: "run_failed",
+            payload: { workOrderId: input.workOrderId, reason: input.reason ?? null },
+          },
+          `run_finished:${input.runId}`,
+        );
       } else if (input.status === "succeeded" && !(await isReview(input.workOrderId))) {
         // A finished review notifies from completeReview, with its findings.
-        await notifyHumans(input.workOrderId, (title, _line, prUrl) => ({
-          title: `Done: ${title}`,
-          body: prUrl ? `Pull request: ${prUrl}` : "Committed on its branch.",
-        }));
+        await notifyHumans(
+          { kind: "run_succeeded", payload: { workOrderId: input.workOrderId } },
+          `run_finished:${input.runId}`,
+        );
       }
     },
 

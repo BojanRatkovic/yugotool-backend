@@ -9,7 +9,7 @@ import {
   type ServerEvent,
   type ShiftEndReason,
   type ShiftStation,
-  type Station,
+  type NotificationJob,
 } from "@zastava/contracts";
 import { type Database, runs, shifts, stationRuns, workOrders } from "@zastava/db";
 import { eq, sql } from "drizzle-orm";
@@ -45,14 +45,8 @@ export interface ShiftDeps {
   ): Promise<void>;
   notify(event: ServerEvent): Promise<void>;
   invalidateBoard(): Promise<void>;
-  notifyHumans(
-    workOrderId: string,
-    compose: (
-      title: string,
-      line: Station[],
-      prUrl: string | null,
-    ) => { title: string; body: string },
-  ): Promise<void>;
+  /** Queues a notification (spec 0011); idempotent on `dedupeKey`. */
+  notifyHumans(job: NotificationJob, dedupeKey: string): Promise<void>;
 }
 
 export interface ShiftResult {
@@ -660,10 +654,13 @@ export function createShiftActivities(db: Database, deps: ShiftDeps) {
       );
       await invalidateShifts();
       await deps.invalidateBoard();
-      await deps.notifyHumans(input.workOrderId, (title) => ({
-        title: `Handoff ready for review: ${title}`,
-        body: `Shift ${input.number} handed off. Review it before shift ${input.number + 1} starts.`,
-      }));
+      await deps.notifyHumans(
+        {
+          kind: "shift_handoff_ready",
+          payload: { workOrderId: input.workOrderId, number: input.number },
+        },
+        `shift_handoff_ready:${input.shiftId}`,
+      );
     },
 
     async resolveShiftReview(input: {
@@ -704,10 +701,13 @@ export function createShiftActivities(db: Database, deps: ShiftDeps) {
         .where(eq(shifts.id, input.shiftId));
       await invalidateShifts();
       if (input.endReason === "stuck") {
-        await deps.notifyHumans(input.workOrderId, (title) => ({
-          title: `Stuck after shift ${input.number}: ${title}`,
-          body: "Two shifts in a row changed no code. Check the handoff and the goal before restarting.",
-        }));
+        await deps.notifyHumans(
+          {
+            kind: "shift_stuck",
+            payload: { workOrderId: input.workOrderId, number: input.number },
+          },
+          `shift_stuck:${input.shiftId}`,
+        );
       }
     },
   };

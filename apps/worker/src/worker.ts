@@ -12,8 +12,6 @@ const envSchema = z.object({
   TEMPORAL_ADDRESS: z.string().default("localhost:7233"),
   TEMPORAL_NAMESPACE: z.string().default("default"),
   DATABASE_URL: z.string().default("postgres://localhost:5432/zastava"),
-  /** "app": desktop notices go to the desktop app (as events) instead of osascript. */
-  DESKTOP_NOTICES: z.enum(["osascript", "app"]).default("osascript"),
 });
 
 const PREBUILT_BUNDLE = path.join(__dirname, "workflow-bundle.js");
@@ -37,7 +35,7 @@ async function main(): Promise<void> {
       ...(existsSync(PREBUILT_BUNDLE)
         ? { workflowBundle: { codePath: PREBUILT_BUNDLE } }
         : { workflowsPath: require.resolve("./workflows") }),
-      activities: createActivities(dbClient.db, { desktopNotices: env.DESKTOP_NOTICES }),
+      activities: createActivities(dbClient.db),
       // Activities learn about a cancel only when a heartbeat reaches the
       // server; the default throttle (up to 60 s) let agents keep editing
       // after "Cancel run". Sessions heartbeat per message, so this is cheap.

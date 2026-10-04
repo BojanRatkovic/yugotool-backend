@@ -4,7 +4,7 @@ import { asc, eq } from "drizzle-orm";
 import { syncKnowledgeSource } from "../runner/knowledge";
 import type { ShiftDeps } from "./shifts";
 
-type KnowledgeDeps = Pick<ShiftDeps, "appendEvent" | "notify">;
+type KnowledgeDeps = Pick<ShiftDeps, "appendEvent" | "notify" | "notifyHumans">;
 
 type SourceRow = typeof knowledgeSources.$inferSelect;
 
@@ -87,6 +87,18 @@ export function createKnowledgeActivities(db: Database, deps: KnowledgeDeps) {
             null,
             "system",
             `Knowledge source "${source.name}" skipped: it failed to sync (${message.split("\n")[0]}).`,
+          );
+          await deps.notifyHumans(
+            {
+              kind: "knowledge_sync_failed",
+              payload: {
+                workOrderId: input.workOrderId,
+                sourceId: source.id,
+                name: source.name,
+                error: message.slice(0, 1_000),
+              },
+            },
+            `knowledge_sync_failed:${input.runId}:${source.id}`,
           );
         }
       }

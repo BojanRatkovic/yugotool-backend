@@ -111,11 +111,24 @@ export function createCiActivities(db: Database, deps: CiDeps) {
         if (final && changed) await logResult(workOrder.runId, stationRunId, ci);
       }
       await deps.invalidateBoard();
+      const dedupeKey = `ci:${input.workOrderId}:${ci.headSha}:${ci.state}`;
       if (final && changed && ci.state === "failed") {
-        await deps.notifyHumans(input.workOrderId, (title) => ({
-          title: `CI failed: ${title}`,
-          body: `${ci.summary}. ${failing(ci.checks)[0]?.link ?? ""}`.trim(),
-        }));
+        await deps.notifyHumans(
+          {
+            kind: "ci_failed",
+            payload: {
+              workOrderId: input.workOrderId,
+              summary: ci.summary,
+              link: failing(ci.checks)[0]?.link ?? null,
+            },
+          },
+          dedupeKey,
+        );
+      } else if (final && changed && ci.state === "passed") {
+        await deps.notifyHumans(
+          { kind: "ci_passed", payload: { workOrderId: input.workOrderId, summary: ci.summary } },
+          dedupeKey,
+        );
       }
     },
   };
