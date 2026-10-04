@@ -157,7 +157,15 @@ export class NotificationJobsProcessor implements OnModuleInit, OnModuleDestroy 
         url: `${appUrl}${notification.path}`,
       });
       for (const failed of results.filter((r) => r.error)) {
-        this.logger.warn(`notification via ${failed.channel} failed: ${failed.error}`);
+        const message = `Notification via ${failed.channel} failed: ${failed.error}`;
+        this.logger.warn(message);
+        if (!notification.workOrderId) continue;
+        const logged = await this.repository.appendRunError(
+          this.database.db,
+          notification.workOrderId,
+          message,
+        );
+        if (logged) await this.events.publish({ type: "run_event", ...logged });
       }
     } catch (error) {
       this.logger.error(

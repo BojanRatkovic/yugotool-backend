@@ -5,7 +5,14 @@ import {
   notificationJobSchema,
   notificationKindSchema,
 } from "@zastava/contracts";
-import { type Executor, lines, notificationJobs, notifications, workOrders } from "@zastava/db";
+import {
+  type Executor,
+  lines,
+  notificationJobs,
+  notifications,
+  runEvents,
+  workOrders,
+} from "@zastava/db";
 import { and, desc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
 import { iso } from "../../common/mappers";
 import type { RenderedNotification, WorkOrderContext } from "./notification-definitions";
@@ -120,6 +127,27 @@ export class NotificationsRepository {
       pullRequestNumber: row.pullRequest?.number ?? null,
       stations: row.stations ?? [],
     };
+  }
+
+  /**
+   * Logs a failed external send on the work order's current run, where the
+   * user looks when a ping never came. Null when there is no run to log on.
+   */
+  async appendRunError(
+    db: Executor,
+    workOrderId: string,
+    message: string,
+  ): Promise<{ runId: string; seq: number } | null> {
+    const [order] = await db
+      .select({ runId: workOrders.currentRunId })
+      .from(workOrders)
+      .where(eq(workOrders.id, workOrderId));
+    if (!order?.runId) return null;
+    const [row] = await db
+      .insert(runEvents)
+      .values({ runId: order.runId, type: "error", message: message.slice(0, 4_000) })
+      .returning({ runId: runEvents.runId, seq: runEvents.seq });
+    return row ?? null;
   }
 
   // ── Notifications ─────────────────────────────────────────────────────────

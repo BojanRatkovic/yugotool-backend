@@ -140,15 +140,23 @@ function processorWith(claimed: ClaimedJob | null) {
     insert: vi.fn(() => Promise.resolve(notification)),
     completeJob: vi.fn(() => Promise.resolve()),
     failJob: vi.fn(() => Promise.resolve()),
+    appendRunError: vi.fn(() => Promise.resolve({ runId: "run-1", seq: 7 })),
   };
   // A transaction whose savepoints run inline; enough to exercise the flow.
   const tx = { transaction: (work: (sp: unknown) => Promise<unknown>) => work(tx) };
-  const database = { transaction: (work: (t: unknown) => Promise<unknown>) => work(tx) };
+  const database = {
+    db: {},
+    transaction: (work: (t: unknown) => Promise<unknown>) => work(tx),
+  };
   const published: ServerEvent[] = [];
   const events = { publish: vi.fn((e: ServerEvent) => Promise.resolve(void published.push(e))) };
   const settings = {
     get: vi.fn(() => Promise.resolve({ appUrl: "http://localhost:4800" })),
-    broadcast: vi.fn(() => Promise.resolve([{ channel: "slack", error: null }])),
+    broadcast: vi.fn(() =>
+      Promise.resolve<{ channel: string; error: string | null }[]>([
+        { channel: "slack", error: null },
+      ]),
+    ),
   };
   const processor = new NotificationJobsProcessor(
     {} as never,
@@ -189,6 +197,18 @@ describe("NotificationJobsProcessor", () => {
       body: notification.body,
       url: `http://localhost:4800${notification.path}`,
     });
+  });
+
+  it("logs a failed channel on the work order's run", async () => {
+    const { processor, repository, published, settings } = processorWith(job());
+    settings.broadcast.mockResolvedValueOnce([{ channel: "slack", error: "HTTP 404" }]);
+    await processor.processNext();
+    expect(repository.appendRunError).toHaveBeenCalledWith(
+      {},
+      WO,
+      "Notification via slack failed: HTTP 404",
+    );
+    expect(published).toContainEqual({ type: "run_event", runId: "run-1", seq: 7 });
   });
 
   it("does not fan out a bell-only kind", async () => {
