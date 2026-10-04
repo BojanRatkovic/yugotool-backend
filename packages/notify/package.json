@@ -12,7 +12,9 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@zastava/contracts": "workspace:*"
+    "@zastava/contracts": "workspace:*",
+    "@zastava/db": "workspace:*",
+    "drizzle-orm": "^0.45.2"
   },
   "devDependencies": {
     "@types/node": "^24.19.1"

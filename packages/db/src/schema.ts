@@ -1,6 +1,7 @@
 import type {
   CiStatus,
   Handoff,
+  NotificationJob,
   Preview,
   QaStep,
   RouteDiscovery,
@@ -14,6 +15,7 @@ import { sql } from "drizzle-orm";
 import {
   bigserial,
   boolean,
+  check,
   doublePrecision,
   index,
   integer,
@@ -386,5 +388,62 @@ export const projectKnowledge = pgTable(
   (t) => [
     primaryKey({ columns: [t.projectId, t.sourceId] }),
     index("project_knowledge_source_id_idx").on(t.sourceId),
+  ],
+);
+
+/**
+ * Notification outbox (spec 0011). Producers (worker, API) only insert here;
+ * the API's job processor renders each job into a `notifications` row.
+ */
+export const notificationJobs = pgTable(
+  "notification_jobs",
+  {
+    id: id(),
+    /** A `NotificationKind`; text, not an enum, so a new kind needs no enum migration. */
+    kind: text("kind").notNull(),
+    payload: jsonb("payload").$type<NotificationJob["payload"]>().notNull(),
+    /** Idempotency: a retried activity enqueues the same job once. */
+    dedupeKey: text("dedupe_key").notNull(),
+    status: text("status").$type<"pending" | "done" | "failed">().notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    runAfter: timestamp("run_after", { withTimezone: true }).notNull().defaultNow(),
+    lastError: text("last_error"),
+    createdAt: createdAt(),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("notification_jobs_dedupe_key_idx").on(t.dedupeKey),
+    // The processor's claim query: due pending jobs, oldest first.
+    index("notification_jobs_pending_idx")
+      .on(t.runAfter)
+      .where(sql`${t.status} = 'pending'`),
+    check("notification_jobs_status_check", sql`${t.status} IN ('pending', 'done', 'failed')`),
+  ],
+);
+
+/** What the bell shows (spec 0011). One per job. */
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: id(),
+    /** Null once the sweep has deleted the (done) job; the notification outlives it. */
+    jobId: uuid("job_id").references(() => notificationJobs.id, { onDelete: "set null" }),
+    kind: text("kind").notNull(),
+    projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }),
+    workOrderId: uuid("work_order_id").references(() => workOrders.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    path: text("path").notNull(),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("notifications_job_id_idx").on(t.jobId),
+    index("notifications_project_id_idx").on(t.projectId),
+    index("notifications_work_order_id_idx").on(t.workOrderId),
+    index("notifications_created_at_idx").on(t.createdAt.desc(), t.id.desc()),
+    index("notifications_unread_idx")
+      .on(t.createdAt)
+      .where(sql`${t.readAt} IS NULL`),
   ],
 );

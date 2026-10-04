@@ -8,6 +8,8 @@ export const GATE_DECISION_SIGNAL = "gateDecision";
 export const SHIFT_CONTROL_SIGNAL = "shiftControl";
 /** Postgres NOTIFY channel the worker publishes to and the API fans out over SSE. */
 export const EVENTS_CHANNEL = "zastava_events";
+/** Postgres NOTIFY channel that wakes the API's notification job processor (spec 0011). */
+export const NOTIFICATION_JOBS_CHANNEL = "zastava_notification_jobs";
 
 const isoDate = z.iso.datetime({ offset: true });
 
@@ -1648,6 +1650,127 @@ export const notificationTestSchema = z.object({
   channel: z.enum(["desktop", "slack", "telegram"]),
 });
 
+// ── Notifications (spec 0011) ───────────────────────────────────────────────
+
+/**
+ * Every kind of notification. Adding one: a payload below plus a renderer in
+ * the API's notification registry (a `Record`, so a missing one fails typecheck).
+ */
+export const notificationKindSchema = z.enum([
+  "gate_waiting",
+  "run_failed",
+  "run_succeeded",
+  "review_ready",
+  "ci_failed",
+  "ci_passed",
+  "shift_handoff_ready",
+  "shift_stuck",
+  "knowledge_sync_failed",
+  "dispatcher_paused",
+]);
+export type NotificationKind = z.infer<typeof notificationKindSchema>;
+
+/** What a producer enqueues: the kind and just enough to render it later. */
+export const notificationJobSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("gate_waiting"),
+    payload: z.object({ workOrderId: z.uuid(), stationKey: z.string() }),
+  }),
+  z.object({
+    kind: z.literal("run_failed"),
+    payload: z.object({ workOrderId: z.uuid(), reason: z.string().nullable() }),
+  }),
+  z.object({
+    kind: z.literal("run_succeeded"),
+    payload: z.object({ workOrderId: z.uuid() }),
+  }),
+  z.object({
+    kind: z.literal("review_ready"),
+    payload: z.object({ workOrderId: z.uuid(), findings: z.number().int().nonnegative() }),
+  }),
+  z.object({
+    kind: z.literal("ci_failed"),
+    payload: z.object({
+      workOrderId: z.uuid(),
+      summary: z.string(),
+      link: z.string().nullable(),
+    }),
+  }),
+  z.object({
+    kind: z.literal("ci_passed"),
+    payload: z.object({ workOrderId: z.uuid(), summary: z.string() }),
+  }),
+  z.object({
+    kind: z.literal("shift_handoff_ready"),
+    payload: z.object({ workOrderId: z.uuid(), number: z.number().int().positive() }),
+  }),
+  z.object({
+    kind: z.literal("shift_stuck"),
+    payload: z.object({ workOrderId: z.uuid(), number: z.number().int().positive() }),
+  }),
+  z.object({
+    kind: z.literal("knowledge_sync_failed"),
+    payload: z.object({
+      /** The run that went on without it. */
+      workOrderId: z.uuid(),
+      sourceId: z.uuid(),
+      name: z.string(),
+      error: z.string(),
+    }),
+  }),
+  z.object({
+    kind: z.literal("dispatcher_paused"),
+    payload: z.object({ reason: z.string(), resumesAt: isoDate.nullable() }),
+  }),
+]);
+export type NotificationJob = z.infer<typeof notificationJobSchema>;
+export type NotificationPayload<K extends NotificationKind> = Extract<
+  NotificationJob,
+  { kind: K }
+>["payload"];
+
+export const notificationSchema = z.object({
+  id: z.uuid(),
+  kind: notificationKindSchema,
+  title: z.string().max(200),
+  body: z.string().max(2_000),
+  /** In-app path to open, e.g. `/projects/<id>?view=board&wo=<id>`. */
+  path: z.string().max(1_000),
+  projectId: z.uuid().nullable(),
+  workOrderId: z.uuid().nullable(),
+  readAt: isoDate.nullable(),
+  createdAt: isoDate,
+});
+export type Notification = z.infer<typeof notificationSchema>;
+
+export const notificationListQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+  /** Cursor from the previous page's `nextCursor` (the last item's id). */
+  before: z.uuid().optional(),
+});
+export type NotificationListQuery = z.infer<typeof notificationListQuerySchema>;
+
+export const notificationPageSchema = z.object({
+  items: z.array(notificationSchema),
+  unreadCount: z.number().int().nonnegative(),
+  nextCursor: z.string().nullable(),
+});
+export type NotificationPage = z.infer<typeof notificationPageSchema>;
+
+/** `{ ids }` marks those read, `{ all: true }` every unread one. An object (not a union) so it can be a DTO. */
+export const markNotificationsReadSchema = z
+  .object({
+    ids: z.array(z.uuid()).min(1).max(100).optional(),
+    all: z.literal(true).optional(),
+  })
+  .refine((v) => (v.ids === undefined) !== (v.all === undefined), {
+    message: "Send either ids or all: true",
+  });
+export type MarkNotificationsRead = z.infer<typeof markNotificationsReadSchema>;
+
+export const unreadCountSchema = z.object({ unreadCount: z.number().int().nonnegative() });
+export type UnreadCount = z.infer<typeof unreadCountSchema>;
+
 // ── Realtime ────────────────────────────────────────────────────────────────
 
 export const collectionNameSchema = z.enum([
@@ -1661,6 +1784,8 @@ export const collectionNameSchema = z.enum([
   "knowledge_sources",
   /** ZASTAVA reviews of pull requests (spec 0009). */
   "reviews",
+  /** The bell (spec 0011): read state changed. New ones arrive as `notification`. */
+  "notifications",
 ]);
 export type CollectionName = z.infer<typeof collectionNameSchema>;
 
@@ -1678,6 +1803,8 @@ export const serverEventSchema = z.discriminatedUnion("type", [
     body: z.string().max(2_000),
     url: z.string().max(1_000),
   }),
+  /** A new notification for the bell (spec 0011); the client prepends it and toasts. */
+  z.object({ type: z.literal("notification"), notification: notificationSchema }),
 ]);
 export type ServerEvent = z.infer<typeof serverEventSchema>;
 
