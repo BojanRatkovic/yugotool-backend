@@ -6,23 +6,12 @@ import type { Env } from "../../core/config/env.schema";
 import { DatabaseService } from "../../core/database/database.service";
 import { EventsService } from "../../core/events/events.service";
 import { SettingsService } from "../settings/settings.service";
-import {
-  backoffSeconds,
-  clamp,
-  isExternal,
-  MAX_ATTEMPTS,
-  renderJob,
-} from "./notification-definitions";
+import { backoffSeconds, clamp, MAX_ATTEMPTS, renderJob } from "./notification-definitions";
 import { NotificationsRepository } from "./notifications.repository";
 
 /** Fallback when a NOTIFY is missed (listener down, job delayed by backoff). */
 const TICK_MS = 10_000;
 const SWEEP_EVERY_MS = 24 * 60 * 60 * 1_000;
-
-interface Processed {
-  notification: Notification | null;
-  external: boolean;
-}
 
 /**
  * Turns queued notification jobs into notifications (spec 0011): render →
@@ -107,10 +96,10 @@ export class NotificationJobsProcessor implements OnModuleInit, OnModuleDestroy 
   async processNext(): Promise<boolean> {
     const processed = await this.database.transaction(async (tx) => {
       const claimed = await this.repository.claimNextJob(tx);
-      if (!claimed) return null;
+      if (!claimed) return undefined;
       if (!claimed.job) {
         await this.repository.failJob(tx, claimed.id, claimed.parseError ?? "unparseable", null);
-        return { notification: null, external: false };
+        return null;
       }
       const { job } = claimed;
       try {
@@ -125,7 +114,7 @@ export class NotificationJobsProcessor implements OnModuleInit, OnModuleDestroy 
           await this.repository.completeJob(sp, claimed.id);
           return stored;
         });
-        return { notification, external: isExternal(job) } satisfies Processed;
+        return notification;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         const attempts = claimed.attempts + 1;
@@ -134,11 +123,11 @@ export class NotificationJobsProcessor implements OnModuleInit, OnModuleDestroy 
           `notification job ${claimed.id} (${job.kind}) failed, attempt ${attempts}: ${message}`,
         );
         await this.repository.failJob(tx, claimed.id, message, retry);
-        return { notification: null, external: false };
+        return null;
       }
     });
-    if (!processed) return false;
-    if (processed.notification) await this.deliver(processed.notification, processed.external);
+    if (processed === undefined) return false;
+    if (processed) await this.deliver(processed);
     return true;
   }
 
@@ -146,11 +135,11 @@ export class NotificationJobsProcessor implements OnModuleInit, OnModuleDestroy 
    * After commit, best effort: the bell already has it. Never retried — a
    * second Slack message is worse than a missed one.
    */
-  private async deliver(notification: Notification, external: boolean): Promise<void> {
+  private async deliver(notification: Notification): Promise<void> {
     try {
       await this.events.publish({ type: "notification", notification });
-      if (!external) return;
-      const { appUrl } = await this.settings.get();
+      const { appUrl, notificationExternal } = await this.settings.get();
+      if (!notificationExternal[notification.kind]) return;
       const results = await this.settings.broadcast({
         title: notification.title,
         body: notification.body,

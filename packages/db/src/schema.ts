@@ -2,6 +2,7 @@ import type {
   CiStatus,
   Handoff,
   NotificationJob,
+  NotificationKind,
   Preview,
   QaStep,
   RouteDiscovery,
@@ -352,6 +353,11 @@ export const settings = pgTable("settings", {
   reposRoot: text("repos_root"),
   /** Anthropic API key saved in Settings; wins over ANTHROPIC_API_KEY. Never returned by the API. */
   anthropicApiKey: text("anthropic_api_key"),
+  /** Overrides of NOTIFICATION_EXTERNAL_DEFAULTS, kind → also send outside the app. */
+  notificationExternal: jsonb("notification_external")
+    .$type<Partial<Record<NotificationKind, boolean>>>()
+    .notNull()
+    .default({}),
   updatedAt: updatedAt(),
 });
 

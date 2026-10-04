@@ -1,6 +1,11 @@
 import type { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
-import type { Notification, NotificationJob, ServerEvent } from "@zastava/contracts";
+import {
+  NOTIFICATION_EXTERNAL_DEFAULTS,
+  type Notification,
+  type NotificationJob,
+  type ServerEvent,
+} from "@zastava/contracts";
 import { ZodValidationPipe } from "nestjs-zod";
 import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -8,7 +13,6 @@ import { GlobalExceptionFilter } from "../src/common/filters/global-exception.fi
 import {
   backoffSeconds,
   clamp,
-  isExternal,
   NOTIFICATION_DEFINITIONS,
   renderJob,
   type RenderDeps,
@@ -95,15 +99,6 @@ describe("notification definitions", () => {
     }
   });
 
-  it("keeps chatty kinds in the bell only", () => {
-    expect(isExternal({ kind: "ci_passed", payload: { workOrderId: WO, summary: "" } })).toBe(
-      false,
-    );
-    expect(isExternal({ kind: "run_failed", payload: { workOrderId: WO, reason: null } })).toBe(
-      true,
-    );
-  });
-
   it("clamps to the contract's limits", () => {
     const long = clamp({
       title: "t".repeat(500),
@@ -133,11 +128,11 @@ const notification: Notification = {
   createdAt: "2026-10-04T10:00:00.000Z",
 };
 
-function processorWith(claimed: ClaimedJob | null) {
+function processorWith(claimed: ClaimedJob | null, stored: Notification = notification) {
   const repository = {
     claimNextJob: vi.fn(() => Promise.resolve(claimed)),
     workOrderContext: vi.fn(() => Promise.resolve(workOrder)),
-    insert: vi.fn(() => Promise.resolve(notification)),
+    insert: vi.fn(() => Promise.resolve(stored)),
     completeJob: vi.fn(() => Promise.resolve()),
     failJob: vi.fn(() => Promise.resolve()),
     appendRunError: vi.fn(() => Promise.resolve({ runId: "run-1", seq: 7 })),
@@ -151,7 +146,12 @@ function processorWith(claimed: ClaimedJob | null) {
   const published: ServerEvent[] = [];
   const events = { publish: vi.fn((e: ServerEvent) => Promise.resolve(void published.push(e))) };
   const settings = {
-    get: vi.fn(() => Promise.resolve({ appUrl: "http://localhost:4800" })),
+    get: vi.fn(() =>
+      Promise.resolve({
+        appUrl: "http://localhost:4800",
+        notificationExternal: { ...NOTIFICATION_EXTERNAL_DEFAULTS, review_ready: false },
+      }),
+    ),
     broadcast: vi.fn(() =>
       Promise.resolve<{ channel: string; error: string | null }[]>([
         { channel: "slack", error: null },
@@ -212,12 +212,21 @@ describe("NotificationJobsProcessor", () => {
   });
 
   it("does not fan out a bell-only kind", async () => {
-    const { processor, settings, published } = processorWith({
-      ...job(),
-      job: { kind: "ci_passed", payload: { workOrderId: WO, summary: "ok" } },
-    });
+    const { processor, settings, published } = processorWith(
+      { ...job(), job: { kind: "ci_passed", payload: { workOrderId: WO, summary: "ok" } } },
+      { ...notification, kind: "ci_passed" },
+    );
     await processor.processNext();
     expect(published).toHaveLength(1);
+    expect(settings.broadcast).not.toHaveBeenCalled();
+  });
+
+  it("honours a kind turned off in Settings", async () => {
+    const { processor, settings } = processorWith(
+      { ...job(), job: { kind: "review_ready", payload: { workOrderId: WO, findings: 0 } } },
+      { ...notification, kind: "review_ready" },
+    );
+    await processor.processNext();
     expect(settings.broadcast).not.toHaveBeenCalled();
   });
 

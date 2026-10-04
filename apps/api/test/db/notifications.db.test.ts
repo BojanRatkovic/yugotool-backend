@@ -3,6 +3,7 @@ import { enqueueNotification } from "@zastava/notify";
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { NotificationsRepository } from "../../src/modules/notifications/notifications.repository";
+import { SettingsService } from "../../src/modules/settings/settings.service";
 import { testDatabaseUrl } from "./test-database";
 
 const PROJECT = "85156849-2497-47fa-a2bd-494c776f572b";
@@ -198,5 +199,25 @@ describe("notifications on Postgres", () => {
     const context = await repository.workOrderContext(client.db, WO);
     expect(context).toMatchObject({ id: WO, projectId: PROJECT, title: "Add dark mode" });
     expect(await repository.workOrderContext(client.db, PROJECT)).toBeNull();
+  });
+});
+
+describe("notification channel settings on Postgres", () => {
+  it("fills defaults and merges a patch into the stored overrides", async () => {
+    const service = new SettingsService(
+      { get: () => undefined } as never,
+      { db: client.db } as never,
+      { publish: () => Promise.resolve() } as never,
+    );
+    const before = await service.get();
+    expect(before.notificationExternal).toMatchObject({ run_failed: true, ci_passed: false });
+    await service.update({ notificationExternal: { ci_passed: true } });
+    await service.update({ notificationExternal: { run_failed: false } });
+    const after = await service.get();
+    expect(after.notificationExternal).toMatchObject({
+      ci_passed: true,
+      run_failed: false,
+      gate_waiting: true,
+    });
   });
 });

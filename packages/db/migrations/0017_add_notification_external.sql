@@ -1,0 +1,1 @@
+ALTER TABLE "settings" ADD COLUMN "notification_external" jsonb DEFAULT '{}'::jsonb NOT NULL;

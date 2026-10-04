@@ -1597,6 +1597,43 @@ export type PostFindings = z.infer<typeof postFindingsSchema>;
 export const enqueueSchema = z.object({ mode: queueModeSchema.default("asap") });
 export type Enqueue = z.infer<typeof enqueueSchema>;
 
+// ── Notification kinds (spec 0011) ──────────────────────────────────────────
+
+/**
+ * Every kind of notification. Adding one: a payload in `notificationJobSchema`, a
+ * default below and a renderer in the API's registry (a `Record`, so a missing one fails typecheck).
+ */
+export const notificationKindSchema = z.enum([
+  "gate_waiting",
+  "run_failed",
+  "run_succeeded",
+  "review_ready",
+  "ci_failed",
+  "ci_passed",
+  "shift_handoff_ready",
+  "shift_stuck",
+  "knowledge_sync_failed",
+  "dispatcher_paused",
+]);
+export type NotificationKind = z.infer<typeof notificationKindSchema>;
+
+/**
+ * Default for "also send outside the app" (desktop, Slack, Telegram) per kind;
+ * Settings → Notifications overrides it. The chatty ones stay in the bell.
+ */
+export const NOTIFICATION_EXTERNAL_DEFAULTS: Record<NotificationKind, boolean> = {
+  gate_waiting: true,
+  run_failed: true,
+  run_succeeded: true,
+  review_ready: true,
+  ci_failed: true,
+  ci_passed: false,
+  shift_handoff_ready: true,
+  shift_stuck: true,
+  knowledge_sync_failed: false,
+  dispatcher_paused: false,
+};
+
 const clockTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "HH:MM");
 
 export const settingsSchema = z.object({
@@ -1619,6 +1656,8 @@ export const settingsSchema = z.object({
   anthropicApiKeyHint: z.string().nullable(),
   /** "env" = ANTHROPIC_API_KEY of the environment (not removable here); "settings" = saved in Settings. */
   anthropicApiKeySource: z.enum(["settings", "env"]).nullable(),
+  /** Per kind: also send outside the app (spec 0011). Every kind, defaults filled in. */
+  notificationExternal: z.record(notificationKindSchema, z.boolean()),
   updatedAt: isoDate,
 });
 export type Settings = z.infer<typeof settingsSchema>;
@@ -1629,6 +1668,8 @@ export const updateSettingsSchema = settingsSchema
   .extend({
     /** Write-only: a key saves it (checked with Anthropic first), null removes the saved key. */
     anthropicApiKey: z.string().trim().min(1).nullable().optional(),
+    /** Only the kinds sent change; the rest keep their setting. */
+    notificationExternal: z.partialRecord(notificationKindSchema, z.boolean()).optional(),
   });
 export type UpdateSettings = z.infer<typeof updateSettingsSchema>;
 
@@ -1651,24 +1692,6 @@ export const notificationTestSchema = z.object({
 });
 
 // ── Notifications (spec 0011) ───────────────────────────────────────────────
-
-/**
- * Every kind of notification. Adding one: a payload below plus a renderer in
- * the API's notification registry (a `Record`, so a missing one fails typecheck).
- */
-export const notificationKindSchema = z.enum([
-  "gate_waiting",
-  "run_failed",
-  "run_succeeded",
-  "review_ready",
-  "ci_failed",
-  "ci_passed",
-  "shift_handoff_ready",
-  "shift_stuck",
-  "knowledge_sync_failed",
-  "dispatcher_paused",
-]);
-export type NotificationKind = z.infer<typeof notificationKindSchema>;
 
 /** What a producer enqueues: the kind and just enough to render it later. */
 export const notificationJobSchema = z.discriminatedUnion("kind", [

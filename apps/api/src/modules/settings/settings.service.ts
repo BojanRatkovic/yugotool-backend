@@ -3,10 +3,14 @@ import os from "node:os";
 import path from "node:path";
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import type { Settings, UpdateSettings } from "@zastava/contracts";
+import {
+  NOTIFICATION_EXTERNAL_DEFAULTS,
+  type Settings,
+  type UpdateSettings,
+} from "@zastava/contracts";
 import { settings } from "@zastava/db";
 import { broadcast, type Channel, type DesktopSink, send, truncateNotice } from "@zastava/notify";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { DomainError } from "../../common/errors/domain.error";
 import { iso } from "../../common/mappers";
 import type { Env } from "../../core/config/env.schema";
@@ -49,6 +53,7 @@ export class SettingsService {
       ...rest,
       anthropicApiKeyHint: key ? maskApiKey(key) : null,
       anthropicApiKeySource: saved ? "settings" : envKey ? "env" : null,
+      notificationExternal: { ...NOTIFICATION_EXTERNAL_DEFAULTS, ...row.notificationExternal },
       updatedAt: iso(row.updatedAt),
     };
   }
@@ -66,7 +71,19 @@ export class SettingsService {
     await this.get();
     if (patch.reposRoot) patch = { ...patch, reposRoot: await existingFolder(patch.reposRoot) };
     if (patch.anthropicApiKey) await checkApiKey(patch.anthropicApiKey);
-    await this.database.db.update(settings).set(patch).where(eq(settings.id, ROW_ID));
+    const { notificationExternal, ...rest } = patch;
+    await this.database.db
+      .update(settings)
+      .set({
+        ...rest,
+        // Merge into the stored overrides: a patch names only the kinds it changes.
+        ...(notificationExternal
+          ? {
+              notificationExternal: sql`${settings.notificationExternal} || ${JSON.stringify(notificationExternal)}::jsonb`,
+            }
+          : {}),
+      })
+      .where(eq(settings.id, ROW_ID));
     await this.events.publish({ type: "invalidate", collection: "settings" });
     await this.events.publish({ type: "invalidate", collection: "dispatcher" });
     return this.get();
