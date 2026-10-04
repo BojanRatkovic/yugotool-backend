@@ -120,4 +120,4 @@ async function postJson(url: string, body: unknown): Promise<void> {
     throw new Error(`HTTP ${response.status}${text ? `: ${text.slice(0, 200)}` : ""}`);
   }
 }
-export { enqueueNotification } from "./enqueue";
+export { enqueueNotification, hasNotificationJobs } from "./enqueue";

@@ -1614,6 +1614,8 @@ export const notificationKindSchema = z.enum([
   "shift_stuck",
   "knowledge_sync_failed",
   "dispatcher_paused",
+  /** Someone asked you to review a pull request (polled from GitHub). */
+  "pr_review_requested",
 ]);
 export type NotificationKind = z.infer<typeof notificationKindSchema>;
 
@@ -1632,6 +1634,7 @@ export const NOTIFICATION_EXTERNAL_DEFAULTS: Record<NotificationKind, boolean> =
   shift_stuck: true,
   knowledge_sync_failed: false,
   dispatcher_paused: false,
+  pr_review_requested: true,
 };
 
 const clockTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "HH:MM");
@@ -1744,6 +1747,17 @@ export const notificationJobSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("dispatcher_paused"),
     payload: z.object({ reason: z.string(), resumesAt: isoDate.nullable() }),
+  }),
+  z.object({
+    kind: z.literal("pr_review_requested"),
+    payload: z.object({
+      projectId: z.uuid(),
+      number: z.number().int().positive(),
+      title: z.string(),
+      author: z.string(),
+      /** "owner/name". */
+      repo: z.string(),
+    }),
   }),
 ]);
 export type NotificationJob = z.infer<typeof notificationJobSchema>;

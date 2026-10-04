@@ -1,5 +1,5 @@
 import { createDbClient, type DbClient, notificationJobs, notifications } from "@zastava/db";
-import { enqueueNotification } from "@zastava/notify";
+import { enqueueNotification, hasNotificationJobs } from "@zastava/notify";
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { NotificationsRepository } from "../../src/modules/notifications/notifications.repository";
@@ -60,6 +60,19 @@ describe("notification jobs on Postgres", () => {
     const rows = await client.db.select().from(notificationJobs);
     expect(rows).toHaveLength(1);
     expect(rows[0]?.payload).toEqual({ workOrderId: WO, stationKey: "s1" });
+  });
+
+  it("records a silent job as done, and finds keys by prefix", async () => {
+    expect(await hasNotificationJobs(client.db, "pr_review_requested:p1:")).toBe(false);
+    await enqueueNotification(client.db, gate(1), "pr_review_requested:p1:5:first", {
+      silent: true,
+    });
+    expect(await hasNotificationJobs(client.db, "pr_review_requested:p1:")).toBe(true);
+    // `_` is a LIKE wildcard; it must match literally.
+    expect(await hasNotificationJobs(client.db, "pr_review_requested:p1_")).toBe(false);
+    const [row] = await client.db.select().from(notificationJobs);
+    expect(row?.status).toBe("done");
+    expect(await client.db.transaction((tx) => repository.claimNextJob(tx))).toBeNull();
   });
 
   it("rejects a payload that does not match its kind", async () => {

@@ -10,6 +10,7 @@ import {
   lines,
   notificationJobs,
   notifications,
+  projects,
   runEvents,
   workOrders,
 } from "@zastava/db";
@@ -148,6 +149,11 @@ export class NotificationsRepository {
       .values({ runId: order.runId, type: "error", message: message.slice(0, 4_000) })
       .returning({ runId: runEvents.runId, seq: runEvents.seq });
     return row ?? null;
+  }
+
+  async projectExists(db: Executor, id: string): Promise<boolean> {
+    const [row] = await db.select({ id: projects.id }).from(projects).where(eq(projects.id, id));
+    return row !== undefined;
   }
 
   // ── Notifications ─────────────────────────────────────────────────────────

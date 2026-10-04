@@ -23,6 +23,7 @@ export interface RenderedNotification {
 export interface RenderDeps {
   /** Null when the work order is gone (deleted since the job was queued). */
   workOrder(id: string): Promise<WorkOrderContext | null>;
+  projectExists(id: string): Promise<boolean>;
 }
 
 interface Definition<P> {
@@ -121,6 +122,18 @@ export const NOTIFICATION_DEFINITIONS: Registry = {
         projectId: null,
         workOrderId: null,
       }),
+  },
+  pr_review_requested: {
+    async render(p, deps) {
+      if (!(await deps.projectExists(p.projectId))) return null;
+      return {
+        title: `Review requested: #${p.number} ${p.title}`,
+        body: `${p.author} asked for your review in ${p.repo}.`,
+        path: `/projects/${p.projectId}/pulls/assigned?pr=${p.number}`,
+        projectId: p.projectId,
+        workOrderId: null,
+      };
+    },
   },
 };
 

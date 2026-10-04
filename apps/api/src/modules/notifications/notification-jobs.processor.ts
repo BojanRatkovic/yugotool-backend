@@ -107,6 +107,7 @@ export class NotificationJobsProcessor implements OnModuleInit, OnModuleDestroy 
         const notification = await tx.transaction(async (sp) => {
           const rendered = await renderJob(job, {
             workOrder: (id) => this.repository.workOrderContext(sp, id),
+            projectExists: (id) => this.repository.projectExists(sp, id),
           });
           const stored = rendered
             ? await this.repository.insert(sp, claimed.id, job.kind, clamp(rendered))

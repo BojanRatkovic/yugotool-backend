@@ -38,8 +38,9 @@ const workOrder: WorkOrderContext = {
   stations: [{ key: "plan_gate", kind: "gate", name: "Approve plan", prompt: "" }],
 };
 
-const deps = (found: WorkOrderContext | null = workOrder): RenderDeps => ({
+const deps = (found: WorkOrderContext | null = workOrder, projectExists = true): RenderDeps => ({
   workOrder: () => Promise.resolve(found),
+  projectExists: () => Promise.resolve(projectExists),
 });
 
 describe("notification definitions", () => {
@@ -66,6 +67,27 @@ describe("notification definitions", () => {
     expect(rendered?.body).toBe("1 finding; pick the ones to post.");
   });
 
+  it("links a review request to the PR on the assigned board", async () => {
+    const job = {
+      kind: "pr_review_requested",
+      payload: {
+        projectId: PROJECT,
+        number: 7,
+        title: "Fix login",
+        author: "ana",
+        repo: "acme/app",
+      },
+    } as const;
+    expect(await renderJob(job, deps())).toEqual({
+      title: "Review requested: #7 Fix login",
+      body: "ana asked for your review in acme/app.",
+      path: `/projects/${PROJECT}/pulls/assigned?pr=7`,
+      projectId: PROJECT,
+      workOrderId: null,
+    });
+    expect(await renderJob(job, deps(workOrder, false))).toBeNull();
+  });
+
   it("renders nothing when the work order is gone", async () => {
     const rendered = await renderJob(
       { kind: "run_failed", payload: { workOrderId: WO, reason: null } },
@@ -89,6 +111,10 @@ describe("notification definitions", () => {
         payload: { workOrderId: WO, sourceId: WO, name: "Handbook", error: "git: 128\nmore" },
       },
       { kind: "dispatcher_paused", payload: { reason: "5-hour usage 90%", resumesAt: null } },
+      {
+        kind: "pr_review_requested",
+        payload: { projectId: PROJECT, number: 7, title: "Fix login", author: "ana", repo: "a/b" },
+      },
     ];
     expect(jobs.map((j) => j.kind).toSorted()).toEqual(
       Object.keys(NOTIFICATION_DEFINITIONS).toSorted(),
