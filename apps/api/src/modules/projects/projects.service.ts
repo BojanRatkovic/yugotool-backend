@@ -63,7 +63,7 @@ export class ProjectsService {
   async create(input: CreateProject): Promise<Project> {
     const repoPath = path.resolve(input.repoPath);
     if (!existsSync(path.join(repoPath, ".git"))) {
-      throw new RepoPathInvalidError(`${repoPath} is not a git repository`);
+      throw new RepoPathInvalidError(`${repoPath} is not a Git repository`);
     }
     // A hub's own repo holds its knowledge, not the code: runs must branch off one of its repos.
     if (isHubRoot(repoPath)) {

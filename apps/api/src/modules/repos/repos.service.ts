@@ -40,7 +40,7 @@ export class ReposService {
 
   async branches(repoPath: string): Promise<string[]> {
     if (!(await isGitRepo(repoPath)))
-      throw new RepoPathInvalidError(`${repoPath} is not a git repository`);
+      throw new RepoPathInvalidError(`${repoPath} is not a Git repository`);
     const { stdout } = await exec("git", ["-C", repoPath, "branch", "--format=%(refname:short)"]);
     return stdout.split("\n").filter(Boolean);
   }

@@ -24,7 +24,7 @@ export function locationProblem(kind: KnowledgeSourceKind, location: string): st
   const resolved = expandHome(location);
   if (!existsSync(resolved)) return `${resolved} does not exist on this machine.`;
   if (kind === "git_local" && !existsSync(path.join(resolved, ".git"))) {
-    return `${resolved} is not a git repository. Use "Folder or file" for plain folders.`;
+    return `${resolved} is not a Git repository. Use "Folder or file" for plain folders.`;
   }
   return null;
 }
