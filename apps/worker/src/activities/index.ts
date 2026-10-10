@@ -16,8 +16,11 @@ import {
   type ServerEvent,
   type StationRunStatus,
   type Station,
+  RESEARCH_PLAN_JSON_SCHEMA,
+  researchPlanSchema,
   REVIEW_VERDICT_JSON_SCHEMA,
   type ReviewVerdict,
+  type StationResearch,
   reviewVerdictSchema,
   VERDICT_JSON_SCHEMA,
   type Verdict,
@@ -42,7 +45,20 @@ import { localRunner } from "../runner/local-runner";
 import { runRoots, strayListeners, tcpListeners } from "../runner/orphans";
 import { authRejection, withApiKey } from "../claude-env";
 import { sandboxFor } from "../runner/sandbox";
-import { hubOfRepo, hubPlugin, hubSession, linkIgnoredFiles } from "../runner/work-hub";
+import {
+  describeSync,
+  hubResearchPrompt,
+  researchOutput,
+  resolveResearch,
+  syncHubRepos,
+} from "../runner/hub-research";
+import {
+  hubOfRepo,
+  hubPlugin,
+  hubRepoNames,
+  hubSession,
+  linkIgnoredFiles,
+} from "../runner/work-hub";
 import { createCiActivities } from "./ci";
 import { createKnowledgeActivities } from "./knowledge";
 import { createPrBodyComposer } from "./pr-body";
@@ -85,6 +101,25 @@ export interface RunContext {
   modelOverride: string | null;
   effortOverride: Effort | null;
   maxBudgetUsd: number | null;
+  /**
+   * Hub projects (spec 0014): until the repo is chosen, `worktreePath` is the
+   * hub and `branch`/`baseBranch` are empty. Absent on runs started before.
+   */
+  kind?: "repo" | "hub";
+  hubPath?: string | null;
+  /** The hub's repos, by name. */
+  repos?: string[];
+  /** The work order's preset repo; null = Research picks. */
+  repo?: string | null;
+}
+
+/** A read-only station running in a hub project's hub (spec 0014). */
+export interface HubResearchInput {
+  hub: string;
+  repos: string[];
+  presetRepo: string | null;
+  /** This station returns the plan (structured: plan, repo, split). */
+  plans: boolean;
 }
 
 export interface AgentStationResult {
@@ -95,6 +130,8 @@ export interface AgentStationResult {
   verdict: Verdict | null;
   /** Review stations (structuredVerdict "review", spec 0009). */
   review: ReviewVerdict | null;
+  /** The planning station of a hub run (spec 0014). */
+  research?: StationResearch | null;
 }
 
 export interface ChecksResult {
@@ -320,6 +357,41 @@ export function createActivities(
         .innerJoin(lines, and(eq(lines.projectId, projects.id), eq(lines.kind, "build")))
         .where(eq(workOrders.id, input.workOrderId));
       if (!row) throw new Error(`work order ${input.workOrderId} not found`);
+
+      // A hub project (spec 0014): Research runs in the hub; the worktree comes
+      // once the repo is chosen (prepareRepoWorkspace).
+      if (row.project.kind === "hub") {
+        const hub = row.project.repoPath;
+        const repos = hubRepoNames(hub);
+        const repoSettings = row.project.repoSettings ?? {};
+        await appendEvent(
+          input.runId,
+          null,
+          "system",
+          `Work hub ${hub}: planning runs in the hub, read-only${row.workOrder.repo ? ` · repo ${row.workOrder.repo}` : " · Research picks the repo"}`,
+        );
+        const synced = await syncHubRepos(
+          hub,
+          repos.map((name) => ({ name, baseBranch: repoSettings[name]?.baseBranch ?? "main" })),
+        );
+        if (synced.length) await appendEvent(input.runId, null, "system", describeSync(synced));
+        await invalidateBoard();
+        return {
+          stations: row.line.stations,
+          worktreePath: hub,
+          branch: "",
+          baseBranch: "",
+          title: row.workOrder.title,
+          description: row.workOrder.description,
+          modelOverride: row.workOrder.modelOverride,
+          effortOverride: row.workOrder.effortOverride,
+          maxBudgetUsd: row.workOrder.maxBudgetUsd,
+          kind: "hub",
+          hubPath: hub,
+          repos,
+          repo: row.workOrder.repo,
+        };
+      }
 
       const hub = hubOfRepo(row.project.repoPath);
       const workspace = await localRunner.prepareWorkspace({
@@ -575,6 +647,8 @@ export function createActivities(
       resumeSessionId?: string | null;
       /** Planning stations: the project's knowledge folders, readable but not writable. */
       knowledge?: KnowledgeMount[];
+      /** A read-only station of a hub run, in the hub itself (`worktreePath` = the hub). */
+      hubResearch?: HubResearchInput;
     }): Promise<AgentStationResult> {
       const model = input.modelOverride ?? input.station.model;
       const effort = input.effortOverride ?? input.station.effort;
@@ -582,10 +656,23 @@ export function createActivities(
       const abortController = new AbortController();
       ctx.cancellationSignal.addEventListener("abort", () => abortController.abort());
 
-      const hub = await hubSession(input.worktreePath);
+      const research = input.hubResearch ?? null;
+      // In the hub the project settings load its own skills; a hub worktree gets them as a plugin.
+      const hub = research
+        ? { readRoots: [], plugins: [], tools: ["Skill"], prompt: hubResearchPrompt(research) }
+        : await hubSession(input.worktreePath);
       const readRoots = [...(input.knowledge ?? []).map((k) => k.dir), ...(hub?.readRoots ?? [])];
       const tools = [...input.station.allowedTools, ...(hub?.tools ?? [])];
-      const sandboxed = await withApiKey(await sandboxFor(input.worktreePath, { readRoots }));
+      const sandboxed = await withApiKey(
+        await sandboxFor(input.worktreePath, { readRoots, readOnly: research !== null }),
+      );
+      const outputSchema = research?.plans
+        ? RESEARCH_PLAN_JSON_SCHEMA
+        : input.station.structuredVerdict === "review"
+          ? REVIEW_VERDICT_JSON_SCHEMA
+          : input.station.structuredVerdict
+            ? VERDICT_JSON_SCHEMA
+            : null;
       const session = query({
         prompt: input.prompt,
         options: {
@@ -593,16 +680,8 @@ export function createActivities(
           model,
           ...(effort ? { effort } : {}),
           ...(input.station.maxBudgetUsd ? { maxBudgetUsd: input.station.maxBudgetUsd } : {}),
-          ...(input.station.structuredVerdict
-            ? {
-                outputFormat: {
-                  type: "json_schema" as const,
-                  schema:
-                    input.station.structuredVerdict === "review"
-                      ? REVIEW_VERDICT_JSON_SCHEMA
-                      : VERDICT_JSON_SCHEMA,
-                },
-              }
+          ...(outputSchema
+            ? { outputFormat: { type: "json_schema" as const, schema: outputSchema } }
             : {}),
           tools,
           allowedTools: tools,
@@ -629,6 +708,7 @@ export function createActivities(
       let costUsd = 0;
       let verdict: Verdict | null = null;
       let review: ReviewVerdict | null = null;
+      let plan: StationResearch | null = null;
       /** Context size = everything the model read on its latest top-level turn. */
       let contextTokens = 0;
       for await (const message of session) {
@@ -682,7 +762,16 @@ export function createActivities(
           costUsd = message.total_cost_usd;
           output =
             message.subtype === "success" ? message.result : `Station ended: ${message.subtype}`;
-          if (message.subtype === "success" && message.structured_output !== undefined) {
+          if (research?.plans && message.subtype === "success") {
+            // No structured answer: the plan is the text, the repo the first one it names.
+            const parsed = researchPlanSchema.safeParse(message.structured_output);
+            plan = resolveResearch(
+              parsed.success ? parsed.data : { plan: message.result, repo: "" },
+              research.repos,
+              research.presetRepo,
+            );
+            output = researchOutput(plan);
+          } else if (message.subtype === "success" && message.structured_output !== undefined) {
             if (input.station.structuredVerdict === "review") {
               const parsed = reviewVerdictSchema.safeParse(message.structured_output);
               review = parsed.success ? parsed.data : null;
@@ -701,6 +790,7 @@ export function createActivities(
               costUsd: message.total_cost_usd,
               verdict,
               review,
+              ...(research?.plans ? { research: plan } : {}),
               inputTokens: message.usage.input_tokens,
               outputTokens: message.usage.output_tokens,
               cacheReadTokens: message.usage.cache_read_input_tokens,
@@ -724,7 +814,7 @@ export function createActivities(
         const stat = await localRunner.diffStat(input.worktreePath);
         if (stat) await appendEvent(input.runId, input.stationRunId, "system", `Changes:\n${stat}`);
       }
-      return { sessionId, output, isError, costUsd, verdict, review };
+      return { sessionId, output, isError, costUsd, verdict, review, research: plan };
     },
 
     /** Runs the station's shell command in the worktree; non-zero exit = failed. */
@@ -928,7 +1018,11 @@ export function createActivities(
   return {
     ...activities,
     runAgentStation: (input: Parameters<typeof activities.runAgentStation>[0]) =>
-      sweepAfter(input, () => uncommitAfter(input, () => activities.runAgentStation(input))),
+      // In the hub itself nothing is ours to sweep or uncommit: the hub, its
+      // repos and their servers are the person's (spec 0014).
+      input.hubResearch
+        ? activities.runAgentStation(input)
+        : sweepAfter(input, () => uncommitAfter(input, () => activities.runAgentStation(input))),
     runShift: (input: Parameters<typeof activities.runShift>[0]) =>
       sweepAfter(input, () => activities.runShift(input)),
   };

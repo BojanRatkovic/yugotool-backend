@@ -36,6 +36,7 @@ import {
   type ShiftTally,
 } from "./shift-logic";
 import { startCiWatch } from "./watch-ci.workflow";
+import { hubPlanIndex, runsInHub } from "./hub-logic";
 
 export const gateDecisionSignal =
   defineSignal<[GateDecision & { stationKey: string }]>(GATE_DECISION_SIGNAL);
@@ -148,6 +149,9 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
     let lastQaReport: string | null = null;
 
     const pendingFollowUp = (): StationNote | null => followUp;
+    // A hub project (spec 0014): planning runs in the hub; runs started before replay as repo runs.
+    const hub = run.kind === "hub" && run.hubPath && patched("hub-projects") ? run.hubPath : null;
+    const planIndex = hub ? hubPlanIndex(run.stations) : -1;
 
     const sendBack = (reason: StationNote, target: number = buildIndex): void => {
       notes.push(reason);
@@ -485,15 +489,31 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
       const pending: StationNote | null = followUp;
       const sessionId = sessions.get(index) ?? null;
       const resume: boolean = index === followUpTarget && pending !== null && sessionId !== null;
+      const inHub = hub !== null && runsInHub(run.stations, index);
       const result: AgentStationResult = await work.runAgentStation({
         runId: input.runId,
         stationRunId,
         station,
-        worktreePath: run.worktreePath,
+        worktreePath: inHub ? hub : run.worktreePath,
         prompt:
           resume && pending
             ? buildFollowUp(pending, station.canEdit)
-            : buildPrompt(run, station, notes, readsKnowledge(station) ? knowledge : []),
+            : buildPrompt(
+                inHub ? { ...run, hub } : run,
+                station,
+                notes,
+                readsKnowledge(station) ? knowledge : [],
+              ),
+        ...(inHub
+          ? {
+              hubResearch: {
+                hub,
+                repos: run.repos ?? [],
+                presetRepo: run.repo ?? null,
+                plans: index === planIndex,
+              },
+            }
+          : {}),
         modelOverride: run.modelOverride,
         effortOverride: run.effortOverride,
         resumeSessionId: resume ? sessionId : null,

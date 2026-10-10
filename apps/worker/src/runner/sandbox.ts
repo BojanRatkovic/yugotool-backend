@@ -32,21 +32,30 @@ const ALLOWED_DOMAINS = [
  */
 export async function sandboxFor(
   worktreePath: string,
-  options: { readRoots?: string[] } = {},
+  /** `readOnly`: nothing but the temp dir is writable (Research in a hub, spec 0014). */
+  options: { readRoots?: string[]; readOnly?: boolean } = {},
 ): Promise<Pick<Options, "sandbox" | "env" | "hooks">> {
-  const { stdout } = await exec("git", [
-    "-C",
-    worktreePath,
-    "rev-parse",
-    "--path-format=absolute",
-    "--git-common-dir",
-  ]);
+  const writable = options.readOnly
+    ? [os.tmpdir()]
+    : [
+        worktreePath,
+        (
+          await exec("git", [
+            "-C",
+            worktreePath,
+            "rev-parse",
+            "--path-format=absolute",
+            "--git-common-dir",
+          ])
+        ).stdout.trim(),
+        os.tmpdir(),
+      ];
   const sandbox: NonNullable<Options["sandbox"]> = {
     enabled: true,
     failIfUnavailable: true,
     autoAllowBashIfSandboxed: true,
     allowUnsandboxedCommands: false,
-    filesystem: { allowWrite: [worktreePath, stdout.trim(), os.tmpdir()] },
+    filesystem: { allowWrite: writable },
     network: { allowedDomains: ALLOWED_DOMAINS, allowLocalBinding: true },
   };
   // Package-manager caches default to the home dir, which the sandbox cannot write.
@@ -59,6 +68,7 @@ export async function sandboxFor(
       input.tool_input,
       worktreePath,
       options.readRoots,
+      options.readOnly,
     );
     return reason
       ? {

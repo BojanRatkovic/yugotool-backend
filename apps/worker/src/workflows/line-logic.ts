@@ -45,7 +45,8 @@ export function knowledgeSection(mounts: KnowledgeMount[]): string {
 }
 
 export function buildPrompt(
-  run: { title: string; description: string; branch: string },
+  /** `hub`: a hub run's station in the hub itself, before any worktree (spec 0014). */
+  run: { title: string; description: string; branch: string; hub?: string },
   station: AgentStation,
   notes: StationNote[],
   knowledge: KnowledgeMount[] = [],
@@ -56,8 +57,12 @@ export function buildPrompt(
   return [
     `# Work order: ${run.title}`,
     run.description || "(no description)",
-    `You are working in a git worktree on branch \`${run.branch}\`.`,
-    "`.zastava/` (goal, tasks.json, progress) is ZASTAVA's working memory: it is excluded from git and from the diff by design, so never report it as missing or part of the change.",
+    run.hub
+      ? `You are in the work hub at \`${run.hub}\`, read-only: no worktree exists yet.`
+      : `You are working in a git worktree on branch \`${run.branch}\`.`,
+    run.hub
+      ? ""
+      : "`.zastava/` (goal, tasks.json, progress) is ZASTAVA's working memory: it is excluded from git and from the diff by design, so never report it as missing or part of the change.",
     history ? `## Previous stations\n\n${history}` : "",
     knowledgeSection(knowledge),
     `## Your station: ${station.name} (${station.role})`,

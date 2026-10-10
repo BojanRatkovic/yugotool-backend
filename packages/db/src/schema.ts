@@ -5,7 +5,7 @@ import type {
   ProjectKind,
   QaStep,
   RepoSettings,
-  ResearchPlan,
+  StationResearch,
   RouteDiscovery,
   RouteMap,
   Station,
@@ -246,7 +246,7 @@ export const stationRuns = pgTable(
     /** Review stations (structuredVerdict "review"): the PR review verdict. */
     review: jsonb("review").$type<ReviewVerdict>(),
     /** Research in a hub project: chosen repo and optional split. */
-    research: jsonb("research").$type<ResearchPlan>(),
+    research: jsonb("research").$type<StationResearch>(),
     error: text("error"),
     costUsd: doublePrecision("cost_usd").notNull().default(0),
     inputTokens: integer("input_tokens").notNull().default(0),

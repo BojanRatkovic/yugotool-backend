@@ -26,9 +26,14 @@ export function pathViolation(
   input: unknown,
   worktree: string,
   readRoots: string[] = [],
+  /** No writes anywhere (Research in a hub, spec 0014). */
+  readOnly = false,
 ): string | null {
   const spec = PATH_FIELDS[tool];
   if (!spec || typeof input !== "object" || input === null) return null;
+  if (spec.write && readOnly) {
+    return `${tool} is not allowed here: this station is read-only and must not modify anything.`;
+  }
   const raw: unknown = Reflect.get(input, spec.field);
   if (typeof raw !== "string" || raw === "") return null;
   const target = path.resolve(worktree, raw);

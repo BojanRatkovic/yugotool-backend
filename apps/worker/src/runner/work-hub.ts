@@ -2,7 +2,7 @@
 // whose CLAUDE.md/AGENTS.md, knowledge and skills teach agents that code.
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { lstat, mkdir, readdir, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -24,6 +24,19 @@ export function isHubRoot(dir: string): boolean {
 export function hubOfRepo(repoPath: string): string | null {
   const hub = hubCandidateOf(path.resolve(repoPath));
   return hub && isHubRoot(hub) ? hub : null;
+}
+
+/** The git checkouts in a hub's `repos/`, by name (mirrors the API's `hubRepos`). */
+export function hubRepoNames(hub: string): string[] {
+  const reposDir = path.join(hub, "repos");
+  try {
+    return readdirSync(reposDir, { withFileTypes: true })
+      .filter((e) => e.isDirectory() && existsSync(path.join(reposDir, e.name, ".git")))
+      .map((e) => e.name)
+      .toSorted((a, b) => a.localeCompare(b));
+  } catch {
+    return [];
+  }
 }
 
 /** The hub a run's worktree sits in (`<hub>/worktrees/<name>`), else null. */
