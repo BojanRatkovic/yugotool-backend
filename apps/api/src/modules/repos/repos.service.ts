@@ -7,6 +7,7 @@ import { ConfigService } from "@nestjs/config";
 import type { Repo } from "@zastava/contracts";
 import type { Env } from "../../core/config/env.schema";
 import { RepoPathInvalidError } from "../projects/project.errors";
+import { hubRepos, isHubRoot } from "../projects/work-hub";
 import { SettingsService } from "../settings/settings.service";
 
 const exec = promisify(execFile);
@@ -45,8 +46,26 @@ export class ReposService {
   }
 
   private async scan(dir: string, depth: number, out: Repo[]): Promise<void> {
+    // A work hub stands for its repos (`work/frontend`), never for itself (spec 0012).
+    if (isHubRoot(dir)) {
+      const hubName = path.basename(dir);
+      for (const repo of hubRepos(dir)) {
+        out.push({
+          name: `${hubName}/${repo.name}`,
+          path: repo.path,
+          currentBranch: await currentBranch(repo.path),
+          hubPath: dir,
+        });
+      }
+      return;
+    }
     if (await isGitRepo(dir)) {
-      out.push({ name: path.basename(dir), path: dir, currentBranch: await currentBranch(dir) });
+      out.push({
+        name: path.basename(dir),
+        path: dir,
+        currentBranch: await currentBranch(dir),
+        hubPath: null,
+      });
       return;
     }
     if (depth >= MAX_DEPTH) return;

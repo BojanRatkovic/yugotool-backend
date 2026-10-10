@@ -28,7 +28,13 @@ import {
   type StationNote,
   validatorPassed,
 } from "./line-logic";
-import { handoffFromFeedback, isStuck, type ShiftTally } from "./shift-logic";
+import {
+  asShiftStation,
+  canResumeShift,
+  handoffFromFeedback,
+  isStuck,
+  type ShiftTally,
+} from "./shift-logic";
 import { startCiWatch } from "./watch-ci.workflow";
 
 export const gateDecisionSignal =
@@ -130,6 +136,10 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
     let index = 0;
     /** Each agent station's last Claude session (by line index), resumed when work comes back to it. */
     const sessions = new Map<number, string>();
+    /** Each editing station's last shift (by line index): resumed when work comes back and it has room. */
+    const lastShifts = new Map<number, ShiftResult>();
+    // Editing agent stations work in shifts (spec 0012); runs started before replay the old path.
+    const buildsInShifts = patched("build-in-shifts");
     /** Why a station is running again; null on a first pass. */
     let followUp: StationNote | null = null;
     /** The station `followUp` is for: the builder, or where a human sent changes. */
@@ -257,32 +267,54 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
         continue;
       }
 
-      if (station.kind === "shift") {
+      const shiftStation =
+        station.kind === "shift"
+          ? station
+          : station.kind === "agent" && station.canEdit && buildsInShifts
+            ? asShiftStation(station)
+            : null;
+      if (shiftStation) {
+        const autoShifts = station.kind === "agent";
+        if (autoShifts && run.maxBudgetUsd !== null && spentUsd >= run.maxBudgetUsd) {
+          await finish(
+            "failed",
+            `Budget exhausted: $${spentUsd.toFixed(2)} of $${run.maxBudgetUsd.toFixed(2)} spent before ${station.name}`,
+          );
+          return;
+        }
         const stationRunId = await begin("running");
         const ids = { runId: input.runId, workOrderId: input.workOrderId, stationRunId };
-        await bookkeeping.prepareShiftStation({
+        const pending = index === followUpTarget ? pendingFollowUp() : null;
+        const startSha = await bookkeeping.prepareShiftStation({
           runId: input.runId,
           stationRunId,
           worktreePath: run.worktreePath,
-          station,
+          station: shiftStation,
           title: run.title,
           description: run.description,
+          ...(station.kind === "agent" ? { brief: buildPrompt(run, station, notes) } : {}),
         });
-        const pending = pendingFollowUp();
-        followUp = null;
-        let handoff: Handoff | null = pending
-          ? handoffFromFeedback(pending.station, pending.text)
-          : null;
+        if (index === followUpTarget) followUp = null;
+        const previous = lastShifts.get(index);
+        // Work back at a builder whose last session finished with room left: continue it.
+        let resume: { sessionId: string; prompt: string } | null =
+          autoShifts && pending && canResumeShift(previous, shiftStation.handoffAtPct)
+            ? { sessionId: previous.sessionId, prompt: buildFollowUp(pending, true) }
+            : null;
+        let handoff: Handoff | null =
+          pending && !resume ? handoffFromFeedback(pending.station, pending.text) : null;
         stopAfterShift = false;
         const history: ShiftTally[] = [];
         let stationSpent = 0;
         let last: ShiftResult | null = null;
         let endReason: ShiftEndReason = "max_shifts";
 
-        for (let n = 1; n <= station.maxShifts; n++) {
+        for (let n = 1; n <= shiftStation.maxShifts; n++) {
           const runLeft = run.maxBudgetUsd === null ? null : run.maxBudgetUsd - spentUsd;
           const stationLeft =
-            station.maxBudgetUsd === undefined ? null : station.maxBudgetUsd - stationSpent;
+            shiftStation.maxBudgetUsd === undefined
+              ? null
+              : shiftStation.maxBudgetUsd - stationSpent;
           const left =
             runLeft === null
               ? stationLeft
@@ -293,7 +325,7 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
             endReason = "budget";
             break;
           }
-          if (last && station.reviewHandoff) {
+          if (last && shiftStation.reviewHandoff) {
             shiftReview = null;
             await bookkeeping.awaitShiftReview({
               ...ids,
@@ -319,15 +351,18 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
           const result: ShiftResult = await work.runShift({
             runId: input.runId,
             stationRunId,
-            station,
+            station: shiftStation,
             worktreePath: run.worktreePath,
             number: shiftNumber,
             previousHandoff: handoff,
             modelOverride: run.modelOverride,
             effortOverride: run.effortOverride,
             maxBudgetUsd: left,
+            ...(resume ? { resume } : {}),
           });
+          resume = null;
           last = result;
+          if (autoShifts) lastShifts.set(index, result);
           spentUsd += result.costUsd;
           stationSpent += result.costUsd;
           handoff = result.handoff;
@@ -354,6 +389,15 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
             endReason,
           });
         }
+        // Builders leave one uncommitted change behind, as before shifts (spec 0012).
+        if (autoShifts && startSha) {
+          await bookkeeping.foldCheckpoints({
+            runId: input.runId,
+            stationRunId,
+            worktreePath: run.worktreePath,
+            sha: startSha,
+          });
+        }
         const summary = last?.output ?? "";
         // A human stop or a met goal hands the work to the rest of the line.
         const passed = endReason === "done" || endReason === "manual";
@@ -369,7 +413,7 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
               ? `Stuck after shift ${shiftNumber}: two shifts in a row changed no code`
               : endReason === "budget"
                 ? `Budget exhausted in ${station.name} after shift ${shiftNumber}`
-                : `${station.name} reached ${station.maxShifts} shifts without meeting its goal`;
+                : `${station.name} reached ${shiftStation.maxShifts} shifts without ${autoShifts ? "finishing" : "meeting its goal"}`;
           await finish("failed", why);
           return;
         }
@@ -423,6 +467,11 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
         continue;
       }
 
+      // Shift stations were handled above; this narrows for TS.
+      if (station.kind !== "agent") {
+        index += 1;
+        continue;
+      }
       if (run.maxBudgetUsd !== null && spentUsd >= run.maxBudgetUsd) {
         await finish(
           "failed",

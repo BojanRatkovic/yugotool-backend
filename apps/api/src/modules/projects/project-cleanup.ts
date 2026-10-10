@@ -3,12 +3,13 @@ import { rm } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { previewTestDir, runArtifactsDir, WORKTREES_ROOT } from "../../core/artifacts/artifacts";
+import { hubOfRepo } from "./work-hub";
 
 const exec = promisify(execFile);
 
 /**
  * Removes what a deleted project left on disk: its runs' worktrees (only under
- * ~/.zastava/worktrees, unregistered from the repo), run artifacts and the
+ * ~/.zastava/worktrees or its work hub's worktrees/, unregistered from the repo), run artifacts and the
  * preview test. Branches in the repo are kept. Best effort: returns what failed.
  */
 export async function removeProjectFiles(input: {
@@ -18,10 +19,13 @@ export async function removeProjectFiles(input: {
   runIds: string[];
 }): Promise<string[]> {
   const failed: string[] = [];
-  const root = path.resolve(WORKTREES_ROOT);
+  const hub = hubOfRepo(input.repoPath);
+  const roots = [WORKTREES_ROOT, ...(hub ? [path.join(hub, "worktrees")] : [])].map((r) =>
+    path.resolve(r),
+  );
   for (const { worktreePath } of input.worktrees) {
     const target = path.resolve(worktreePath);
-    if (!target.startsWith(`${root}${path.sep}`)) continue;
+    if (!roots.some((root) => target.startsWith(`${root}${path.sep}`))) continue;
     await exec("git", ["-C", input.repoPath, "worktree", "remove", "--force", target]).catch(
       () => undefined,
     );

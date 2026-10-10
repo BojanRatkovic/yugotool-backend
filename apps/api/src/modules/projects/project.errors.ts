@@ -10,6 +10,12 @@ export class RepoPathInvalidError extends DomainError {
   readonly kind = "validation";
 }
 
+/** The path is a work hub, not a code repo: pick one of its repos (spec 0012). */
+export class RepoPathIsHubError extends DomainError {
+  readonly code = "repo_path_is_hub";
+  readonly kind = "validation";
+}
+
 export class PreviewNotConfiguredError extends DomainError {
   readonly code = "preview_not_configured";
   readonly kind = "conflict";

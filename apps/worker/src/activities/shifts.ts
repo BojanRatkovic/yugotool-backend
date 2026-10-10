@@ -17,6 +17,7 @@ import { localRunner } from "../runner/local-runner";
 import { withApiKey } from "../claude-env";
 import { sandboxFor } from "../runner/sandbox";
 import { shiftMemory } from "../runner/shift-memory";
+import { hubSession } from "../runner/work-hub";
 import {
   buildHandoffPrompt,
   buildShiftPrompt,
@@ -67,6 +68,8 @@ export interface ShiftResult {
   tasksTotal: number;
   /** "Stop after this shift" was pressed while it ran. */
   stopAfter: boolean;
+  /** Context used when the shift ended, percent of the window. */
+  contextPct: number;
 }
 
 /** A push-based prompt stream: keeps the session open so it can be interrupted. */
@@ -220,6 +223,7 @@ export function createShiftActivities(db: Database, deps: ShiftDeps) {
       tasksDone: tasks.done,
       tasksTotal: tasks.total,
       stopAfter: row?.stopAfter ?? false,
+      contextPct: pct,
     };
   }
 
@@ -231,17 +235,51 @@ export function createShiftActivities(db: Database, deps: ShiftDeps) {
       station: ShiftStation;
       title: string;
       description: string;
-    }): Promise<void> {
+      /** Editing agent stations (spec 0012): their brief becomes the goal. */
+      brief?: string;
+    }): Promise<string> {
       await shiftMemory.prepare(
         input.worktreePath,
-        renderGoal({ title: input.title, description: input.description, station: input.station }),
+        renderGoal({
+          title: input.title,
+          description: input.description,
+          station: input.station,
+          ...(input.brief ? { brief: input.brief } : {}),
+        }),
       );
-      await deps.appendEvent(
-        input.runId,
-        input.stationRunId,
-        "system",
-        `Shift station ready: handoff at ${input.station.handoffAtPct}% context, up to ${input.station.maxShifts} shifts${input.station.doneCommand ? `, done when \`${input.station.doneCommand}\` passes` : ""}`,
-      );
+      // A builder's shifts are routine: one line only when the work needs more than one.
+      if (!input.brief) {
+        await deps.appendEvent(
+          input.runId,
+          input.stationRunId,
+          "system",
+          `Shift station ready: handoff at ${input.station.handoffAtPct}% context, up to ${input.station.maxShifts} shifts${input.station.doneCommand ? `, done when \`${input.station.doneCommand}\` passes` : ""}`,
+        );
+      }
+      // Where this pass started: its checkpoints are folded back from here (foldCheckpoints).
+      return localRunner.headSha(input.worktreePath);
+    },
+
+    /**
+     * An editing station's checkpoint commits become working-tree changes
+     * again when it ends, so validators and delivery see one uncommitted
+     * change, as they did before builders worked in shifts.
+     */
+    async foldCheckpoints(input: {
+      runId: string;
+      stationRunId: string;
+      worktreePath: string;
+      sha: string;
+    }): Promise<void> {
+      const undone = await localRunner.uncommitSince(input.worktreePath, input.sha);
+      if (undone > 1) {
+        await deps.appendEvent(
+          input.runId,
+          input.stationRunId,
+          "system",
+          `Folded ${undone} shift checkpoints back into the working tree; delivery commits them once.`,
+        );
+      }
     },
 
     /**
@@ -260,6 +298,8 @@ export function createShiftActivities(db: Database, deps: ShiftDeps) {
       effortOverride: Effort | null;
       /** Remaining station/run budget for this session, if capped. */
       maxBudgetUsd: number | null;
+      /** Work came back: continue this session with `prompt` instead of a fresh shift. */
+      resume?: { sessionId: string; prompt: string } | null;
     }): Promise<ShiftResult> {
       const { station } = input;
       const model = input.modelOverride ?? station.model;
@@ -288,29 +328,36 @@ export function createShiftActivities(db: Database, deps: ShiftDeps) {
 
       const memory = await shiftMemory.read(input.worktreePath);
       const startSha = await localRunner.headSha(input.worktreePath);
-      const prompt = buildShiftPrompt({
-        number: input.number,
-        station,
-        goal: memory.goal ?? "",
-        previousHandoff: input.previousHandoff,
-        recentProgress: lastProgressEntries(memory.progress ?? ""),
-        gitLog: await localRunner.recentLog(input.worktreePath),
-      });
+      const prompt =
+        input.resume?.prompt ??
+        buildShiftPrompt({
+          number: input.number,
+          station,
+          goal: memory.goal ?? "",
+          previousHandoff: input.previousHandoff,
+          recentProgress: lastProgressEntries(memory.progress ?? ""),
+          gitLog: await localRunner.recentLog(input.worktreePath),
+        });
 
-      const sandboxed = await withApiKey(await sandboxFor(input.worktreePath));
+      const hub = await hubSession(input.worktreePath);
+      const readRoots = hub?.readRoots ?? [];
+      const tools = [...station.allowedTools, ...(hub?.tools ?? [])];
+      const sandboxed = await withApiKey(await sandboxFor(input.worktreePath, { readRoots }));
       const baseOptions = {
         cwd: input.worktreePath,
         model,
         ...(effort ? { effort } : {}),
-        tools: station.allowedTools,
-        allowedTools: station.allowedTools,
+        tools,
+        allowedTools: tools,
+        ...(readRoots.length > 0 ? { additionalDirectories: readRoots } : {}),
+        ...(hub?.plugins.length ? { plugins: hub.plugins } : {}),
         permissionMode: "dontAsk" as const,
         ...sandboxed,
         settingSources: ["project" as const],
         systemPrompt: {
           type: "preset" as const,
           preset: "claude_code" as const,
-          append: station.prompt,
+          append: hub ? `${station.prompt}\n\n${hub.prompt}` : station.prompt,
         },
         abortController,
       };
@@ -366,6 +413,7 @@ export function createShiftActivities(db: Database, deps: ShiftDeps) {
         options: {
           ...baseOptions,
           ...(input.maxBudgetUsd !== null ? { maxBudgetUsd: input.maxBudgetUsd } : {}),
+          ...(input.resume ? { resume: input.resume.sessionId } : {}),
           maxTurns: MAX_SHIFT_TURNS,
         },
       });
@@ -418,7 +466,7 @@ export function createShiftActivities(db: Database, deps: ShiftDeps) {
               input.runId,
               input.stationRunId,
               "system",
-              `Shift ${input.number} session ${message.session_id} · ${message.model}${effort ? ` · effort ${effort}` : ""}`,
+              `Shift ${input.number} ${input.resume ? "resumed session" : "session"} ${message.session_id} · ${message.model}${effort ? ` · effort ${effort}` : ""}`,
             );
             readContextWindow().catch(() => undefined);
           } else if (message.type === "assistant" && message.parent_tool_use_id === null) {

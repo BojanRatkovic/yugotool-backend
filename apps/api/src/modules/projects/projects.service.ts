@@ -33,8 +33,10 @@ import {
   ProjectHasActiveWorkError,
   ProjectNotFoundError,
   RepoPathInvalidError,
+  RepoPathIsHubError,
   RouteDiscoveryRunningError,
 } from "./project.errors";
+import { hubRepos, isHubRoot } from "./work-hub";
 import { detectPreview } from "./preview-detect";
 import { removeProjectFiles } from "./project-cleanup";
 import { projectRemote } from "./project-remote";
@@ -62,6 +64,14 @@ export class ProjectsService {
     const repoPath = path.resolve(input.repoPath);
     if (!existsSync(path.join(repoPath, ".git"))) {
       throw new RepoPathInvalidError(`${repoPath} is not a git repository`);
+    }
+    // A hub's own repo holds its knowledge, not the code: runs must branch off one of its repos.
+    if (isHubRoot(repoPath)) {
+      const repos = hubRepos(repoPath);
+      throw new RepoPathIsHubError(
+        `${repoPath} is a work hub; pick one of its repos${repos.length ? ` (${repos.map((r) => r.name).join(", ")})` : ""}`,
+        { repos },
+      );
     }
     const project = await this.database.transaction(async (tx) => {
       const result = await this.repository.insert(tx, { ...input, repoPath });

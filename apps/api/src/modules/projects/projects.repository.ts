@@ -11,6 +11,7 @@ import type {
 import { type Executor, lines, projects, runs, stationRuns, workOrders } from "@zastava/db";
 import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { iso } from "../../common/mappers";
+import { hubOfRepo } from "./work-hub";
 
 type ProjectRow = typeof projects.$inferSelect;
 type LineRow = typeof lines.$inferSelect;
@@ -21,6 +22,7 @@ const toProject = ({
   ...row
 }: ProjectRow): Project => ({
   ...row,
+  hubPath: hubOfRepo(row.repoPath),
   createdAt: iso(row.createdAt),
   updatedAt: iso(row.updatedAt),
 });

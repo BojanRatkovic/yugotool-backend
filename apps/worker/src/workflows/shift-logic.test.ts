@@ -1,4 +1,6 @@
 import {
+  type AgentStation,
+  DEFAULT_STATIONS,
   HANDOFF_JSON_SCHEMA,
   type Handoff,
   handoffSchema,
@@ -6,8 +8,11 @@ import {
 } from "@zastava/contracts";
 import { describe, expect, it } from "vitest";
 import {
+  asShiftStation,
+  BUILD_SHIFT_GOAL,
   buildHandoffPrompt,
   buildShiftPrompt,
+  canResumeShift,
   contextPct,
   effectiveHandoffTokens,
   handoffFromFeedback,
@@ -15,6 +20,7 @@ import {
   isStuck,
   lastProgressEntries,
   relativeToWorktree,
+  renderGoal,
   renderProgressEntry,
 } from "./shift-logic";
 
@@ -162,5 +168,59 @@ describe("relativeToWorktree", () => {
   it("strips the worktree prefix and leaves relative paths alone", () => {
     expect(relativeToWorktree("/wt/run/src/a.js", "/wt/run")).toBe("src/a.js");
     expect(relativeToWorktree("src/a.js", "/wt/run")).toBe("src/a.js");
+  });
+});
+
+describe("builders in shifts (spec 0012)", () => {
+  const found = DEFAULT_STATIONS.find((s) => s.kind === "agent" && s.canEdit);
+  if (found?.kind !== "agent") throw new Error("the default line has no builder");
+  const build: AgentStation = found;
+
+  it("turns an editing station into a shift station with defaults or its own settings", () => {
+    const plan = asShiftStation(build);
+    expect(plan).toMatchObject({
+      key: build.key,
+      kind: "shift",
+      model: build.model,
+      allowedTools: build.allowedTools,
+      prompt: build.prompt,
+      goal: BUILD_SHIFT_GOAL,
+      doneCommand: null,
+      handoffAtPct: 50,
+      maxShifts: 8,
+      reviewHandoff: false,
+    });
+    expect(plan).not.toHaveProperty("maxBudgetUsd");
+    expect(
+      asShiftStation({
+        ...build,
+        handoffAtPct: 35,
+        maxShifts: 3,
+        reviewHandoff: true,
+        maxBudgetUsd: 2,
+      }),
+    ).toMatchObject({ handoffAtPct: 35, maxShifts: 3, reviewHandoff: true, maxBudgetUsd: 2 });
+  });
+
+  it("resumes the last session only when it finished below the handoff line with headroom", () => {
+    const done = { endReason: "done", sessionId: "s1", contextPct: 38 };
+    expect(canResumeShift(done, 50)).toBe(true);
+    expect(canResumeShift({ ...done, contextPct: 41 }, 50)).toBe(false);
+    expect(canResumeShift({ ...done, endReason: "threshold" }, 50)).toBe(false);
+    expect(canResumeShift({ ...done, sessionId: null }, 50)).toBe(false);
+    expect(canResumeShift(undefined, 50)).toBe(false);
+  });
+
+  it("uses the station brief as the goal instead of title and description", () => {
+    const goal = renderGoal({
+      title: "T",
+      description: "D",
+      station: asShiftStation(build),
+      brief: "# Work order: T\n\n## Previous stations\n### Research\n1. plan",
+    });
+    expect(goal).toContain("### Research\n1. plan");
+    expect(goal).not.toContain("## Work order: T\nD");
+    expect(goal).toContain(BUILD_SHIFT_GOAL);
+    expect(goal).toContain("No command: you decide when the goal is met");
   });
 });

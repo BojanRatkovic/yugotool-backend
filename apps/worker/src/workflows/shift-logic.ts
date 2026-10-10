@@ -1,5 +1,10 @@
 // Pure helpers for shift stations — deterministic, no I/O (imported by the workflow).
-import type { Handoff, ShiftStation } from "@zastava/contracts";
+import {
+  type AgentStation,
+  DEFAULT_SHIFT_SETTINGS,
+  type Handoff,
+  type ShiftStation,
+} from "@zastava/contracts";
 
 /** Used until the session reports its real window. */
 export const DEFAULT_CONTEXT_WINDOW = 200_000;
@@ -98,15 +103,62 @@ export function lastProgressEntries(progress: string, count = PROGRESS_ENTRIES_I
   return entries.slice(-count).join("\n").trim();
 }
 
+/** What an editing station's shifts aim for: its normal job, with no done command. */
+export const BUILD_SHIFT_GOAL =
+  "Do your station's job for the work order above, following the approved plan if there is one, then stop and summarize the changed files.";
+
+/**
+ * The shift engine's view of an editing agent station (spec 0012): every
+ * builder works in shifts, one session when the work fits. Done = the agent
+ * ends on its own; checks and validators come after it in the line.
+ */
+export function asShiftStation(station: AgentStation): ShiftStation {
+  return {
+    key: station.key,
+    kind: "shift",
+    name: station.name,
+    role: station.role,
+    model: station.model,
+    ...(station.effort ? { effort: station.effort } : {}),
+    allowedTools: station.allowedTools,
+    prompt: station.prompt,
+    goal: BUILD_SHIFT_GOAL,
+    doneCommand: null,
+    handoffAtPct: station.handoffAtPct ?? DEFAULT_SHIFT_SETTINGS.handoffAtPct,
+    maxShifts: station.maxShifts ?? DEFAULT_SHIFT_SETTINGS.maxShifts,
+    ...(station.maxBudgetUsd ? { maxBudgetUsd: station.maxBudgetUsd } : {}),
+    reviewHandoff: station.reviewHandoff ?? DEFAULT_SHIFT_SETTINGS.reviewHandoff,
+  };
+}
+
+/** Context room a resumed session must have left, in points below the handoff line. */
+export const RESUME_HEADROOM_PCT = 10;
+
+/**
+ * Work coming back to an editing station resumes its last session (it holds
+ * the context, a fresh shift re-reads everything) when that session finished
+ * its work and still has room; otherwise a new shift starts from the report.
+ */
+export function canResumeShift(
+  last: { endReason: string; sessionId: string | null; contextPct: number } | undefined,
+  handoffAtPct: number,
+): last is { endReason: "done"; sessionId: string; contextPct: number } {
+  if (!last || last.endReason !== "done" || !last.sessionId) return false;
+  return last.contextPct <= handoffAtPct - RESUME_HEADROOM_PCT;
+}
+
 export function renderGoal(input: {
   title: string;
   description: string;
   station: ShiftStation;
+  /** An editing station's full brief (work order + earlier stations); replaces title/description. */
+  brief?: string;
 }): string {
   return [
     `# Goal`,
-    `## Work order: ${input.title}`,
-    input.description || "(no description)",
+    ...(input.brief
+      ? [input.brief]
+      : [`## Work order: ${input.title}`, input.description || "(no description)"]),
     `## Station goal\n${input.station.goal}`,
     input.station.doneCommand
       ? `## Done check\n\`${input.station.doneCommand}\` exits 0 when the goal is met.`

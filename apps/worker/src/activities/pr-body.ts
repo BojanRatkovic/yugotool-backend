@@ -53,8 +53,9 @@ export function createPrBodyComposer(db: Database) {
         attempts: attempts.length,
         model: last?.model ? (MODELS.find((m) => m.id === last.model)?.label ?? last.model) : null,
         costUsd: attempts.reduce((sum, r) => sum + r.costUsd, 0),
+        // Builders work in shifts too (spec 0012).
         shifts:
-          station.kind === "shift"
+          station.kind === "shift" || (station.kind === "agent" && station.canEdit)
             ? attempts.reduce((sum, r) => sum + (shiftsByRun.get(r.id) ?? 0), 0)
             : null,
       };

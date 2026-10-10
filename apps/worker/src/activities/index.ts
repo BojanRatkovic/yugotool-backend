@@ -42,6 +42,7 @@ import { localRunner } from "../runner/local-runner";
 import { runRoots, strayListeners, tcpListeners } from "../runner/orphans";
 import { authRejection, withApiKey } from "../claude-env";
 import { sandboxFor } from "../runner/sandbox";
+import { hubOfRepo, hubPlugin, hubSession, linkIgnoredFiles } from "../runner/work-hub";
 import { createCiActivities } from "./ci";
 import { createKnowledgeActivities } from "./knowledge";
 import { createPrBodyComposer } from "./pr-body";
@@ -320,11 +321,13 @@ export function createActivities(
         .where(eq(workOrders.id, input.workOrderId));
       if (!row) throw new Error(`work order ${input.workOrderId} not found`);
 
+      const hub = hubOfRepo(row.project.repoPath);
       const workspace = await localRunner.prepareWorkspace({
         repoPath: row.project.repoPath,
         baseBranch: row.project.baseBranch,
         runId: input.runId,
         title: row.workOrder.title,
+        hub,
       });
       await db.update(runs).set({ worktreePath: workspace.path }).where(eq(runs.id, input.runId));
       await db
@@ -338,6 +341,22 @@ export function createActivities(
         // The worktree path is in the panel's Details rail.
         `Workspace ready on branch ${workspace.branch}`,
       );
+      if (hub) {
+        const linked = await linkIgnoredFiles(row.project.repoPath, workspace.path).catch(() => []);
+        const plugin = await hubPlugin(hub).catch(() => null);
+        await appendEvent(
+          input.runId,
+          null,
+          "system",
+          [
+            `Work hub ${hub}: worktree in its worktrees/, hub CLAUDE.md/AGENTS.md and knowledge readable`,
+            plugin ? `skills ${plugin.skills.join(", ")}` : null,
+            linked.length ? `linked ignored files ${linked.join(", ")}` : null,
+          ]
+            .filter(Boolean)
+            .join(" · "),
+        );
+      }
       await invalidateBoard();
 
       // A commit-msg rule (Conventional Commits…) rejects the work order title
@@ -563,7 +582,9 @@ export function createActivities(
       const abortController = new AbortController();
       ctx.cancellationSignal.addEventListener("abort", () => abortController.abort());
 
-      const readRoots = (input.knowledge ?? []).map((k) => k.dir);
+      const hub = await hubSession(input.worktreePath);
+      const readRoots = [...(input.knowledge ?? []).map((k) => k.dir), ...(hub?.readRoots ?? [])];
+      const tools = [...input.station.allowedTools, ...(hub?.tools ?? [])];
       const sandboxed = await withApiKey(await sandboxFor(input.worktreePath, { readRoots }));
       const session = query({
         prompt: input.prompt,
@@ -583,14 +604,19 @@ export function createActivities(
                 },
               }
             : {}),
-          tools: input.station.allowedTools,
-          allowedTools: input.station.allowedTools,
+          tools,
+          allowedTools: tools,
           // Without it Read outside cwd needs a permission dontAsk never grants (QA does the same).
           ...(readRoots.length > 0 ? { additionalDirectories: readRoots } : {}),
+          ...(hub?.plugins.length ? { plugins: hub.plugins } : {}),
           permissionMode: "dontAsk",
           ...sandboxed,
           settingSources: ["project"],
-          systemPrompt: { type: "preset", preset: "claude_code", append: input.station.prompt },
+          systemPrompt: {
+            type: "preset",
+            preset: "claude_code",
+            append: hub ? `${input.station.prompt}\n\n${hub.prompt}` : input.station.prompt,
+          },
           abortController,
           ...(input.resumeSessionId ? { resume: input.resumeSessionId } : {}),
           maxTurns: 60,
