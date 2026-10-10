@@ -341,8 +341,35 @@ export type Preview = z.infer<typeof previewSchema>;
 export const deliveryModeSchema = z.enum(["local", "draft_pr", "pr"]);
 export type DeliveryMode = z.infer<typeof deliveryModeSchema>;
 
+/** `repo`: one git repo. `hub`: a work hub; each run picks one of its repos (spec 0014). */
+export const projectKindSchema = z.enum(["repo", "hub"]);
+export type ProjectKind = z.infer<typeof projectKindSchema>;
+
+/** Per-repo settings of a hub project, stored by repo name. */
+export const hubRepoSettingsSchema = z.object({
+  baseBranch: z.string().trim().min(1),
+  preview: previewSchema.nullable().default(null),
+});
+export type HubRepoSettings = z.infer<typeof hubRepoSettingsSchema>;
+
+export const repoSettingsSchema = z.record(z.string(), hubRepoSettingsSchema);
+export type RepoSettings = z.infer<typeof repoSettingsSchema>;
+
+/** A repo of a hub project: `<hub>/repos/<name>` with its settings. */
+export const hubRepoSchema = z.object({
+  name: z.string(),
+  path: z.string(),
+  baseBranch: z.string(),
+  preview: previewSchema.nullable(),
+});
+export type HubRepo = z.infer<typeof hubRepoSchema>;
+
+export const updateHubRepoSchema = hubRepoSettingsSchema.partial();
+export type UpdateHubRepo = z.infer<typeof updateHubRepoSchema>;
+
 export const projectSchema = z.object({
   id: z.uuid(),
+  kind: projectKindSchema,
   name: z.string(),
   repoPath: z.string(),
   baseBranch: z.string(),
@@ -354,6 +381,8 @@ export const projectSchema = z.object({
    * null. Computed from the path, never stored.
    */
   hubPath: z.string().nullable(),
+  /** Hub projects: the hub's repos with their settings; empty for repo projects. */
+  repos: z.array(hubRepoSchema),
   createdAt: isoDate,
   updatedAt: isoDate,
 });
@@ -572,6 +601,30 @@ const { $schema: _planDialect, ...qaPlanJsonSchema } = z.toJSONSchema(qaPlanSche
   target: "draft-7",
 });
 export const QA_PLAN_JSON_SCHEMA: Record<string, unknown> = qaPlanJsonSchema;
+
+/** One work order of a split proposed by Research in a hub project. */
+export const splitItemSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  description: z.string().max(20_000),
+  repo: z.string().trim().min(1),
+});
+export type SplitItem = z.infer<typeof splitItemSchema>;
+
+/** What Research returns in a hub project (spec 0014; also its JSON schema). */
+export const researchPlanSchema = z.object({
+  /** The plan, as Research writes it for a repo project. */
+  plan: z.string(),
+  /** The hub repo the work belongs in (for a split: the first item's repo). */
+  repo: z.string(),
+  /** Only when more than one repo must change: one work order per repo, in order. */
+  split: z.array(splitItemSchema).optional(),
+});
+export type ResearchPlan = z.infer<typeof researchPlanSchema>;
+const { $schema: _researchDialect, ...researchPlanJsonSchema } = z.toJSONSchema(
+  researchPlanSchema,
+  { target: "draft-7" },
+);
+export const RESEARCH_PLAN_JSON_SCHEMA: Record<string, unknown> = researchPlanJsonSchema;
 
 export const createProjectSchema = z.object({
   id: z.uuid().optional(),
@@ -798,6 +851,10 @@ export const workOrderSchema = z.object({
   stationKey: z.string().nullable(),
   /** Fractional ordering inside a board column. */
   position: z.number(),
+  /** Hub projects: the repo the work goes in; null = Research picks (spec 0014). */
+  repo: z.string().nullable(),
+  /** Starts by itself once this work order is delivered (a split's follower). */
+  followsId: z.uuid().nullable(),
   branch: z.string().nullable(),
   currentRunId: z.uuid().nullable(),
   /** Overrides every agent station's model for this order. */
@@ -822,6 +879,8 @@ export const createWorkOrderSchema = z.object({
   title: z.string().trim().min(1).max(200),
   description: z.string().max(20_000).default(""),
   position: z.number().optional(),
+  /** Hub projects: preset repo; omitted/null = Research picks. */
+  repo: z.string().trim().min(1).nullable().optional(),
   modelOverride: z.string().nullable().optional(),
   effortOverride: effortSchema.nullable().optional(),
   maxBudgetUsd: z.number().positive().nullable().optional(),
@@ -841,6 +900,15 @@ export const updateWorkOrderSchema = z
 export type UpdateWorkOrder = z.infer<typeof updateWorkOrderSchema>;
 
 export const listWorkOrdersQuerySchema = z.object({ projectId: z.uuid() });
+
+/**
+ * Accept Research's split: the work order keeps item 1 (repo set, title kept);
+ * items 2..N become backlog work orders, each following the previous one.
+ */
+export const splitWorkOrderSchema = z.object({
+  items: z.array(splitItemSchema).min(2).max(10),
+});
+export type SplitWorkOrder = z.infer<typeof splitWorkOrderSchema>;
 
 /** Push the branch of work delivered locally and open a pull request for it. */
 export const openPullRequestSchema = z.object({ draft: z.boolean().default(false) });
@@ -928,6 +996,8 @@ export const stationRunSchema = z.object({
   output: z.string().nullable(),
   verdict: verdictSchema.nullable(),
   error: z.string().nullable(),
+  /** Research in a hub project: the chosen repo and an optional split (spec 0014). */
+  research: researchPlanSchema.nullable(),
   costUsd: z.number(),
   inputTokens: z.number().int(),
   outputTokens: z.number().int(),
@@ -968,6 +1038,8 @@ export const runSchema = z.object({
   status: runStatusSchema,
   workflowId: z.string(),
   worktreePath: z.string().nullable(),
+  /** Hub projects: the repo this run works on, once known; null on repo projects. */
+  repo: z.string().nullable(),
   costUsd: z.number(),
   startedAt: isoDate,
   finishedAt: isoDate.nullable(),
@@ -994,6 +1066,8 @@ export const gateDecisionSchema = z
      * (local only, draft PRs) for this run. Omitted = the project's settings.
      */
     delivery: deliveryModeSchema.optional(),
+    /** Approve at the plan gate of a hub run: overrides the repo Research chose. */
+    repo: z.string().trim().min(1).optional(),
   })
   .refine((d) => d.decision !== "request_changes" || d.comment.trim().length > 0, {
     message: "a comment is required when requesting changes",

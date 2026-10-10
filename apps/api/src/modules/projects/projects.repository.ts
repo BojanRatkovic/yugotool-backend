@@ -1,9 +1,11 @@
 import { Injectable } from "@nestjs/common";
 import type {
+  HubRepo,
   Line,
   LineKind,
   Project,
   ProjectStats,
+  RepoSettings,
   RouteMap,
   Station,
   UpdateProject,
@@ -19,13 +21,26 @@ type LineRow = typeof lines.$inferSelect;
 const toProject = ({
   routeMap: _map,
   routeDiscovery: _discovery,
+  repoSettings,
   ...row
 }: ProjectRow): Project => ({
   ...row,
-  hubPath: hubOfRepo(row.repoPath),
+  hubPath: row.kind === "hub" ? row.repoPath : hubOfRepo(row.repoPath),
+  repos: hubReposOf(row.repoPath, repoSettings),
   createdAt: iso(row.createdAt),
   updatedAt: iso(row.updatedAt),
 });
+
+/** A hub project's repos, by name, from its stored per-repo settings (spec 0014). */
+const hubReposOf = (hub: string, settings: RepoSettings | null): HubRepo[] =>
+  Object.entries(settings ?? {})
+    .toSorted(([a], [b]) => a.localeCompare(b))
+    .map(([name, s]) => ({
+      name,
+      path: `${hub}/repos/${name}`,
+      baseBranch: s.baseBranch,
+      preview: s.preview ?? null,
+    }));
 
 const toLine = (row: LineRow): Line => ({
   ...row,
