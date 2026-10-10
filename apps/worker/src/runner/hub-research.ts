@@ -124,7 +124,7 @@ export function hubResearchPrompt(input: {
     input.plans
       ? input.presetRepo
         ? `This work order is set to \`${input.presetRepo}\`: set \`repo\` to it and plan the work there. Propose a \`split\` only if other repos must change too.`
-        : "Pick the one repo the work belongs in and set `repo` to its name (one of the names above, without `repos/`)."
+        : "Pick the one repo whose code must change (where the builder will edit, not where you only read context) and set `repo` to its name (one of the names above, without `repos/`)."
       : null,
     input.plans
       ? "If more than one repo must change, propose a `split`: one work order per repo, in the order they must land (each with `title`, `description` holding that part of the plan, and `repo`); `repo` is then the first item's repo. Put the complete plan, as a numbered list, in `plan`."
@@ -192,6 +192,16 @@ function resolveSplit(items: SplitItem[] | undefined, repos: string[]): SplitIte
     return repo ? { ...item, repo } : null;
   });
   return resolved.every((i) => i !== null) ? resolved : null;
+}
+
+/**
+ * The plan when Research ended without a structured answer: its longest text
+ * of the session (the model sometimes ends on "I already sent the plan"),
+ * else the final result. Pure.
+ */
+export function fallbackPlan(texts: string[], result: string): string {
+  const longest = texts.reduce((best, text) => (text.length > best.length ? text : best), "");
+  return longest.length > result.length ? longest : result;
 }
 
 /** The station's output line: the plan, prefixed with the repo it goes in. Pure. */

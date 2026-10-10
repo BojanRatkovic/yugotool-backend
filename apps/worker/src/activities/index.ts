@@ -50,6 +50,7 @@ import {
   describeSync,
   hubResearchPrompt,
   researchOutput,
+  fallbackPlan,
   resolveResearch,
   syncHubRepos,
 } from "../runner/hub-research";
@@ -744,6 +745,8 @@ export function createActivities(db: Database) {
       let verdict: Verdict | null = null;
       let review: ReviewVerdict | null = null;
       let plan: StationResearch | null = null;
+      /** Hub planning: every text the session wrote, for a plan without a structured answer. */
+      const texts: string[] = [];
       /** Context size = everything the model read on its latest top-level turn. */
       let contextTokens = 0;
       for await (const message of session) {
@@ -782,6 +785,7 @@ export function createActivities(db: Database) {
           }
           for (const block of message.message.content) {
             if (block.type === "text" && block.text.trim()) {
+              if (research?.plans && message.parent_tool_use_id === null) texts.push(block.text);
               await appendEvent(input.runId, input.stationRunId, "text", block.text);
             } else if (block.type === "tool_use") {
               await appendEvent(
@@ -801,7 +805,9 @@ export function createActivities(db: Database) {
             // No structured answer: the plan is the text, the repo the first one it names.
             const parsed = researchPlanSchema.safeParse(message.structured_output);
             plan = resolveResearch(
-              parsed.success ? parsed.data : { plan: message.result, repo: "" },
+              parsed.success
+                ? parsed.data
+                : { plan: fallbackPlan(texts, message.result), repo: "" },
               research.repos,
               research.presetRepo,
             );
