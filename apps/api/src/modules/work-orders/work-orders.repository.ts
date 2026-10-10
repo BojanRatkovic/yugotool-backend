@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import type { NeedsYouItem, UpdateWorkOrder, WorkOrder } from "@zastava/contracts";
 import { type Executor, projects, workOrders } from "@zastava/db";
-import { and, asc, eq, inArray, max } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, max, sql } from "drizzle-orm";
 import { iso } from "../../common/mappers";
 
 type WorkOrderRow = typeof workOrders.$inferSelect;
@@ -70,6 +70,50 @@ export class WorkOrdersRepository {
     return rows.length;
   }
 
+  /** The project a work order belongs to (or would): kind and path, for hub checks. */
+  async projectOf(
+    db: Executor,
+    projectId: string,
+  ): Promise<{ kind: "repo" | "hub"; repoPath: string } | null> {
+    const [row] = await db
+      .select({ kind: projects.kind, repoPath: projects.repoPath })
+      .from(projects)
+      .where(eq(projects.id, projectId));
+    return row ?? null;
+  }
+
+  /** The chain that follows a work order, in order (a split's followers). */
+  async followers(db: Executor, id: string): Promise<WorkOrder[]> {
+    const chain: WorkOrder[] = [];
+    let previous = id;
+    for (let i = 0; i < 20; i++) {
+      const [row] = await db.select().from(workOrders).where(eq(workOrders.followsId, previous));
+      if (!row) break;
+      chain.push(toWorkOrder(row));
+      previous = row.id;
+    }
+    return chain;
+  }
+
+  /**
+   * Queues (asap) followers that never ran once their predecessor is done
+   * (delivered after a succeeded run). Followers of running or failed work wait.
+   */
+  async enqueueReadyFollowers(db: Executor): Promise<number> {
+    const rows = await db
+      .update(workOrders)
+      .set({ status: "queued", queueMode: "asap", queuedAt: new Date() })
+      .where(
+        and(
+          eq(workOrders.status, "backlog"),
+          isNull(workOrders.currentRunId),
+          sql`${workOrders.followsId} IN (SELECT ${workOrders.id} FROM ${workOrders} WHERE ${workOrders.status} = 'done')`,
+        ),
+      )
+      .returning({ id: workOrders.id });
+    return rows.length;
+  }
+
   /** Oldest first: the dispatcher's FIFO. */
   async listQueued(db: Executor): Promise<WorkOrder[]> {
     const rows = await db
@@ -105,6 +149,8 @@ export class WorkOrdersRepository {
       title: string;
       description: string;
       position: number;
+      repo?: string | null | undefined;
+      followsId?: string | null | undefined;
     },
   ): Promise<WorkOrder> {
     const { id, ...rest } = values;
