@@ -614,16 +614,17 @@ export type SystemInfo = z.infer<typeof systemInfoSchema>;
 
 // ── Doctor (first-run checks) ───────────────────────────────────────────────
 
+/**
+ * Spec 0013: only what the person has to provide, plus ZASTAVA's own services.
+ * Node versions and Chromium are fetched on demand; the repos folder is a setting.
+ */
 export const doctorCheckKeySchema = z.enum([
   "claude",
   "git",
+  "gh",
   "database",
   "temporal",
   "worker",
-  "repos",
-  "gh",
-  "chromium",
-  "nvm",
 ]);
 export type DoctorCheckKey = z.infer<typeof doctorCheckKeySchema>;
 
@@ -642,6 +643,8 @@ export const doctorCheckSchema = z.object({
   fix: z.string().nullable(),
   /** A shell command that fixes it, shown with a copy button; null when none. */
   fixCommand: z.string().nullable(),
+  /** machine: something the person provides · service: a part of ZASTAVA itself. */
+  group: z.enum(["machine", "service"]),
 });
 export type DoctorCheck = z.infer<typeof doctorCheckSchema>;
 

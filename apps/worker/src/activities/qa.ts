@@ -388,7 +388,7 @@ export function createQaActivities(db: Database, deps: QaDeps) {
           .where(eq(qaRuns.id, qaRun.id));
 
         // ── Capture + diff (deterministic) ──
-        browser = await launchBrowser();
+        browser = await launchBrowser((message) => void log("system", message));
         const consoleByPath = new Map<string, { base: string[]; pr: string[] }>();
         let position = 0;
         let unchanged = 0;

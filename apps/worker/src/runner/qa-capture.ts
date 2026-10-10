@@ -1,10 +1,15 @@
+import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { promisify } from "node:util";
 import { type Preview, QA_VIEWPORTS, type QaTheme, type QaViewport } from "@zastava/contracts";
 import pixelmatch from "pixelmatch";
 import { type Browser, chromium, type Page } from "playwright";
 import { PNG } from "pngjs";
 import { previewUrl, withPorts } from "./preview";
+
+const exec = promisify(execFile);
 
 /** Freezes animations and the caret so two captures of the same UI are pixel-equal. */
 const STABILIZE_CSS = `*,*::before,*::after{animation-duration:0s!important;animation-delay:0s!important;transition-duration:0s!important;transition-delay:0s!important;caret-color:transparent!important;scroll-behavior:auto!important}`;
@@ -16,13 +21,40 @@ const LOAD_TIMEOUT_MS = 90_000;
 /** Dev servers that compile on first request (Vite optimizing deps, Ember) render late. */
 const CONTENT_TIMEOUT_MS = 45_000;
 
-export function launchBrowser(): Promise<Browser> {
+export async function launchBrowser(onInstall?: (message: string) => void): Promise<Browser> {
+  await ensureChromium(onInstall);
   return chromium.launch({ headless: true });
 }
 
 /** A browser window the user works in (preview sign-in). */
-export function launchVisibleBrowser(): Promise<Browser> {
+export async function launchVisibleBrowser(
+  onInstall?: (message: string) => void,
+): Promise<Browser> {
+  await ensureChromium(onInstall);
   return chromium.launch({ headless: false });
+}
+
+let installingChromium: Promise<void> | null = null;
+
+/**
+ * Playwright's Chromium is fetched on first use (spec 0013), not set up by
+ * hand: about 150 MB, once per Playwright version.
+ */
+export async function ensureChromium(onInstall?: (message: string) => void): Promise<void> {
+  if (existsSync(chromium.executablePath())) return;
+  onInstall?.("Installing Chromium for QA (first run, about 150 MB)…");
+  installingChromium ??= (async () => {
+    // "./cli" is not in playwright's exports; its package.json is, and cli.js sits next to it.
+    const cli = path.join(path.dirname(require.resolve("playwright/package.json")), "cli.js");
+    // Inside the desktop app process.execPath is Electron: run it as plain Node.
+    const env = process.versions["electron"]
+      ? { ...process.env, ELECTRON_RUN_AS_NODE: "1" }
+      : process.env;
+    await exec(process.execPath, [cli, "install", "chromium"], { env, timeout: 15 * 60_000 });
+  })().finally(() => {
+    installingChromium = null;
+  });
+  await installingChromium;
 }
 
 /** The Chromium binary Playwright installed; the judge's MCP browser uses the same one. */

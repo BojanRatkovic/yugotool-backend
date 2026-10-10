@@ -71,7 +71,7 @@ export function detectPreview(facts: RepoFacts): PreviewDetection {
   const notes: string[] = [];
   if (nodeVersion) {
     notes.push(
-      `Node ${nodeVersion} is pinned in ${facts.nvmrc ? ".nvmrc" : ".node-version"}; the preview runs under it when nvm is installed.`,
+      `Node ${nodeVersion} is pinned in ${facts.nvmrc ? ".nvmrc" : ".node-version"}; ZASTAVA runs the preview, checks and agents under it (downloaded once).`,
     );
   }
 

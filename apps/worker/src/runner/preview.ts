@@ -1,9 +1,7 @@
 import { type ChildProcess, spawn } from "node:child_process";
-import { existsSync } from "node:fs";
 import net from "node:net";
-import os from "node:os";
-import nodePath from "node:path";
 import type { Preview } from "@zastava/contracts";
+import { pinnedNodeEnv } from "./node-versions";
 
 /** Log kept per preview; enough for a tail in the UI and the failure report. */
 const MAX_LOG_CHARS = 100_000;
@@ -105,41 +103,6 @@ export function previewUrl(origin: string, preview: Preview, path: string): stri
   return joinUrl(joinUrl(origin, preview.baseUrlPath), path);
 }
 
-/**
- * Repos pin Node in `.nvmrc` / `.node-version`; the worker runs whatever Node
- * it was started with. With nvm installed, commands run under the pinned
- * version unless they already call nvm. `nvm install` (not `use`): the base
- * branch may pin a version this Mac doesn't have yet — it is downloaded once,
- * and the log says so. Pure: the caller checks the files.
- */
-export function withPinnedNode(
-  command: string,
-  pin: { nvmrc: boolean; nodeVersion: boolean },
-  nvmScript: string | null,
-): string {
-  if (!nvmScript || /\bnvm\b/.test(command)) return command;
-  const use = pin.nvmrc
-    ? "nvm install --no-progress"
-    : pin.nodeVersion
-      ? 'nvm install --no-progress "$(cat .node-version)"'
-      : null;
-  // Grouped, so every part of a compound command (`a & b`, `a; b`) gets the pinned Node.
-  return use ? `. "${nvmScript}" && ${use} && {\n${command}\n}` : command;
-}
-
-function pinnedNode(command: string, cwd: string, env: NodeJS.ProcessEnv): string {
-  const nvmDir = env.NVM_DIR ?? nodePath.join(os.homedir(), ".nvm");
-  const script = nodePath.join(nvmDir, "nvm.sh");
-  return withPinnedNode(
-    command,
-    {
-      nvmrc: existsSync(nodePath.join(cwd, ".nvmrc")),
-      nodeVersion: existsSync(nodePath.join(cwd, ".node-version")),
-    },
-    existsSync(script) ? script : null,
-  );
-}
-
 function spawnGroup(command: string, cwd: string, env: NodeJS.ProcessEnv): ChildProcess {
   // detached = its own process group, so stop() can kill dev servers and their children.
   return spawn(command, {
@@ -187,10 +150,13 @@ export async function startPreview(options: PreviewOptions): Promise<RunningPrev
     CI: "1",
   };
 
+  // The Node the repo pins (.nvmrc / .node-version), downloaded once by ZASTAVA (spec 0013).
+  const nodeEnv = await pinnedNodeEnv(cwd, env, (message) => append(`${message}\n`));
+
   if (preview.install) {
-    const installCommand = pinnedNode(preview.install, cwd, env);
+    const installCommand = preview.install;
     append(`$ ${installCommand}\n`);
-    const install = spawnGroup(installCommand, cwd, env);
+    const install = spawnGroup(installCommand, cwd, nodeEnv);
     install.stdout?.on("data", (c: Buffer) => append(c.toString()));
     install.stderr?.on("data", (c: Buffer) => append(c.toString()));
     const abort = (): void => killGroup(install, "SIGKILL");
@@ -200,9 +166,9 @@ export async function startPreview(options: PreviewOptions): Promise<RunningPrev
     if (code !== 0) throw new PreviewError(`Install failed (exit ${code}) for ${label}`, log);
   }
 
-  const command = pinnedNode(withPorts(preview.start, ports), cwd, env);
+  const command = withPorts(preview.start, ports);
   append(`$ ${command}\n`);
-  const child = spawnGroup(command, cwd, env);
+  const child = spawnGroup(command, cwd, nodeEnv);
   child.stdout?.on("data", (c: Buffer) => append(c.toString()));
   child.stderr?.on("data", (c: Buffer) => append(c.toString()));
   let exited: number | null | undefined;

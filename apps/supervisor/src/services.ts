@@ -279,7 +279,7 @@ function temporalBin(config: SupervisorConfig): string {
 // ── API (NestJS, serves the built frontend) and worker ────────────────────────
 
 /**
- * Env shared by API and worker: the user's PATH (git, gh, nvm…) plus our
+ * Env shared by API and worker: the user's PATH (git, gh…) plus our
  * addresses. No NODE_ENV: the worker's children (previews, agents' Bash)
  * inherit it, and `npm ci` under NODE_ENV=production skips devDependencies.
  */

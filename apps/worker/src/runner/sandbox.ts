@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import type { HookCallback, Options } from "@anthropic-ai/claude-agent-sdk";
+import { pinnedNodeEnv } from "./node-versions";
 import { pathViolation } from "./tool-confinement";
 
 const exec = promisify(execFile);
@@ -69,11 +70,13 @@ export async function sandboxFor(
         }
       : {};
   };
+  // The agent's `npm test` runs under the Node the repo pins (spec 0013).
+  const env = await pinnedNodeEnv(worktreePath, process.env);
   return {
     sandbox,
     hooks: { PreToolUse: [{ hooks: [confine] }] },
     env: {
-      ...process.env,
+      ...env,
       npm_config_cache: path.join(cache, "npm"),
       YARN_CACHE_FOLDER: path.join(cache, "yarn"),
       PNPM_STORE_DIR: path.join(cache, "pnpm"),

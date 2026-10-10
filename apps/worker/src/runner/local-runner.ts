@@ -6,6 +6,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 
 import { SIGNATURE } from "./pr-body";
+import { pinnedNodeEnv } from "./node-versions";
 import { hubWorktreePath } from "./work-hub";
 
 const exec = promisify(execFile);
@@ -279,15 +280,19 @@ export const localRunner = {
     return stdout.trim();
   },
 
-  /** Runs a shell command, killing it after 15 min; output is stdout+stderr interleaved. */
-  runCommand(
+  /**
+   * Runs a shell command under the Node the repo pins, killing it after 15 min;
+   * output is stdout+stderr interleaved.
+   */
+  async runCommand(
     cwd: string,
     command: string,
     onProgress: () => void,
     options: { ci?: boolean } = {},
   ): Promise<{ passed: boolean; output: string }> {
+    const base = await pinnedNodeEnv(cwd, process.env);
     return new Promise((resolve) => {
-      const env = options.ci === false ? process.env : { ...process.env, CI: "1" };
+      const env = options.ci === false ? base : { ...base, CI: "1" };
       const child = spawn(command, { cwd, shell: true, env });
       let output = "";
       const append = (chunk: Buffer): void => {
