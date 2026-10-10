@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
@@ -80,6 +81,14 @@ export class WorkOrdersController {
     @Body() body: UpdateWorkOrderDto,
   ): Promise<WorkOrder> {
     return this.service.update(id, body);
+  }
+
+  /** 409 `work_order_active` while running or at a gate. */
+  @Delete(":id")
+  @ApiNoContentResponse()
+  @HttpCode(204)
+  delete(@Param("id", ParseUUIDPipe) id: string): Promise<void> {
+    return this.service.delete(id);
   }
 
   @Post(":id/start")

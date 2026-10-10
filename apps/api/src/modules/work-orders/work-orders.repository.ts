@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import type { NeedsYouItem, UpdateWorkOrder, WorkOrder } from "@zastava/contracts";
-import { type Executor, projects, workOrders } from "@zastava/db";
+import { type Executor, projects, runs, workOrders } from "@zastava/db";
 import { and, asc, eq, inArray, max } from "drizzle-orm";
 import { iso } from "../../common/mappers";
 
@@ -58,6 +58,36 @@ export class WorkOrdersRepository {
   async find(db: Executor, id: string): Promise<WorkOrder | null> {
     const [row] = await db.select().from(workOrders).where(eq(workOrders.id, id));
     return row ? toWorkOrder(row) : null;
+  }
+
+  /** Locks the order for a delete; null when it's already gone. */
+  async lockForDelete(
+    db: Executor,
+    id: string,
+  ): Promise<{ status: WorkOrder["status"]; repoPath: string } | null> {
+    const [row] = await db
+      .select({ status: workOrders.status, repoPath: projects.repoPath })
+      .from(workOrders)
+      .innerJoin(projects, eq(projects.id, workOrders.projectId))
+      .where(eq(workOrders.id, id))
+      .for("update", { of: workOrders });
+    return row ?? null;
+  }
+
+  /** Every run of the order with its worktree, if one was made. */
+  async runFiles(
+    db: Executor,
+    id: string,
+  ): Promise<{ runId: string; worktreePath: string | null }[]> {
+    return db
+      .select({ runId: runs.id, worktreePath: runs.worktreePath })
+      .from(runs)
+      .where(eq(runs.workOrderId, id));
+  }
+
+  /** Runs, events, shifts and QA rows go with it (FK cascade). */
+  async delete(db: Executor, id: string): Promise<void> {
+    await db.delete(workOrders).where(eq(workOrders.id, id));
   }
 
   /** Moves every backlog order of a project into the queue, oldest position first. */

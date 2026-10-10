@@ -20,6 +20,11 @@ export class WorkOrderNotRunningError extends DomainError {
   readonly kind = "conflict";
 }
 
+export class WorkOrderActiveError extends DomainError {
+  readonly code = "work_order_active";
+  readonly kind = "conflict";
+}
+
 export class PullRequestNotPossibleError extends DomainError {
   readonly code = "pull_request_not_possible";
   readonly kind = "conflict";

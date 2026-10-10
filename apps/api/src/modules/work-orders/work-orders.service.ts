@@ -17,10 +17,12 @@ import { eq } from "drizzle-orm";
 import { DatabaseService } from "../../core/database/database.service";
 import { EventsService } from "../../core/events/events.service";
 import { TEMPORAL_CLIENT } from "../../core/temporal/temporal.module";
+import { removeRunFiles } from "../projects/project-cleanup";
 import {
   CiNotAvailableError,
   PullRequestFailedError,
   PullRequestNotPossibleError,
+  WorkOrderActiveError,
   WorkOrderNotFoundError,
   WorkOrderNotQueuedError,
   WorkOrderNotRunningError,
@@ -130,6 +132,42 @@ export class WorkOrdersService {
     if (!workOrder) throw new WorkOrderNotFoundError(`work order ${id} not found`);
     await this.notify();
     return workOrder;
+  }
+
+  /**
+   * Deletes the order with its run history, then its worktrees and artifacts
+   * on disk. Refused while an agent is on it or it waits at a gate; a queued
+   * order just leaves the queue. Branches are kept. Idempotent: an order
+   * that's already gone is a no-op (offline replay).
+   */
+  async delete(id: string): Promise<void> {
+    const removed = await this.database.transaction(async (tx) => {
+      const found = await this.repository.lockForDelete(tx, id);
+      if (!found) return null;
+      if (found.status === "running" || found.status === "awaiting_approval") {
+        throw new WorkOrderActiveError(
+          "An agent is on this work order or it's waiting at a gate. Cancel the run first.",
+        );
+      }
+      const files = await this.repository.runFiles(tx, id);
+      await this.repository.delete(tx, id);
+      return { repoPath: found.repoPath, files };
+    });
+    if (!removed) return;
+    await this.temporal.workflow
+      .getHandle(`ci-${id}`)
+      .terminate("work order deleted")
+      .catch(() => undefined);
+    const failed = await removeRunFiles({
+      repoPath: removed.repoPath,
+      worktrees: removed.files.flatMap((f) =>
+        f.worktreePath ? [{ runId: f.runId, worktreePath: f.worktreePath }] : [],
+      ),
+      runIds: removed.files.map((f) => f.runId),
+    });
+    if (failed.length) this.logger.warn(`could not remove: ${failed.join(", ")}`);
+    await this.notifyQueue();
+    await this.events.publish({ type: "invalidate", collection: "runs" });
   }
 
   /**
