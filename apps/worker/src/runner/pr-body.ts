@@ -124,7 +124,8 @@ function renderVerdict(verdict: Verdict): string {
 function renderPipeline(stations: PrStation[], estimated: boolean): string {
   const rows = stations.map((s) => {
     const runs =
-      s.kind === "shift" && s.shifts
+      // One shift is just a run; the count matters once a handoff happened.
+      s.shifts && (s.kind === "shift" || s.shifts > 1)
         ? `${s.shifts} shift${s.shifts === 1 ? "" : "s"}`
         : s.attempts > 0
           ? String(s.attempts)

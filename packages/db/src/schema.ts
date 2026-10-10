@@ -4,7 +4,10 @@ import type {
   NotificationJob,
   NotificationKind,
   Preview,
+  ProjectKind,
   QaStep,
+  RepoSettings,
+  StationResearch,
   RouteDiscovery,
   RouteMap,
   Station,
@@ -14,6 +17,7 @@ import type {
 } from "@zastava/contracts";
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   bigserial,
   boolean,
   check,
@@ -123,22 +127,30 @@ export const lineKind = pgEnum("line_kind", ["build", "review"]);
 
 export const authSource = pgEnum("auth_source", ["subscription", "api_key", "unknown"]);
 
-export const projects = pgTable("projects", {
-  id: id(),
-  name: text("name").notNull(),
-  repoPath: text("repo_path").notNull(),
-  baseBranch: text("base_branch").notNull().default("main"),
-  /** How to run the app locally for QA stations; null = not set up. */
-  preview: jsonb("preview").$type<Preview>(),
-  /** What approving the final gate does by default; each approval can pick another. */
-  deliveryDefault: deliveryMode("delivery_default").notNull().default("local"),
-  /** The app's screens for QA's planner; null = not discovered yet. */
-  routeMap: jsonb("route_map").$type<RouteMap>(),
-  /** Outcome of the last route discovery session. */
-  routeDiscovery: jsonb("route_discovery").$type<RouteDiscovery>(),
-  createdAt: createdAt(),
-  updatedAt: updatedAt(),
-});
+export const projects = pgTable(
+  "projects",
+  {
+    id: id(),
+    name: text("name").notNull(),
+    /** `repo` or `hub` (spec 0014). Text, not a pg enum: no same-transaction enum trap. */
+    kind: text("kind").$type<ProjectKind>().notNull().default("repo"),
+    repoPath: text("repo_path").notNull(),
+    baseBranch: text("base_branch").notNull().default("main"),
+    /** How to run the app locally for QA stations; null = not set up. */
+    preview: jsonb("preview").$type<Preview>(),
+    /** What approving the final gate does by default; each approval can pick another. */
+    deliveryDefault: deliveryMode("delivery_default").notNull().default("local"),
+    /** The app's screens for QA's planner; null = not discovered yet. */
+    routeMap: jsonb("route_map").$type<RouteMap>(),
+    /** Outcome of the last route discovery session. */
+    routeDiscovery: jsonb("route_discovery").$type<RouteDiscovery>(),
+    /** Hub projects: base branch and preview per repo name; null for repo projects. */
+    repoSettings: jsonb("repo_settings").$type<RepoSettings>(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [check("projects_kind_check", sql`${t.kind} in ('repo', 'hub')`)],
+);
 
 export const lines = pgTable(
   "lines",
@@ -171,6 +183,12 @@ export const workOrders = pgTable(
     status: workOrderStatus("status").notNull().default("backlog"),
     stationKey: text("station_key"),
     position: doublePrecision("position").notNull().default(0),
+    /** Hub projects: the repo the work goes in; null = Research picks. */
+    repo: text("repo"),
+    /** A split's follower starts once this work order is delivered. */
+    followsId: uuid("follows_id").references((): AnyPgColumn => workOrders.id, {
+      onDelete: "set null",
+    }),
     branch: text("branch"),
     currentRunId: uuid("current_run_id"),
     modelOverride: text("model_override"),
@@ -186,6 +204,7 @@ export const workOrders = pgTable(
   },
   (t) => [
     index("work_orders_project_id_idx").on(t.projectId),
+    index("work_orders_follows_id_idx").on(t.followsId),
     // The dispatcher's hot query: oldest queued orders first.
     index("work_orders_queued_idx")
       .on(t.queuedAt)
@@ -203,6 +222,8 @@ export const runs = pgTable(
     status: runStatus("status").notNull().default("running"),
     workflowId: text("workflow_id").notNull(),
     worktreePath: text("worktree_path"),
+    /** Hub projects: the repo this run works on, once known. */
+    repo: text("repo"),
     startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
     finishedAt: timestamp("finished_at", { withTimezone: true }),
   },
@@ -226,6 +247,8 @@ export const stationRuns = pgTable(
     verdict: jsonb("verdict").$type<Verdict>(),
     /** Review stations (structuredVerdict "review"): the PR review verdict. */
     review: jsonb("review").$type<ReviewVerdict>(),
+    /** Research in a hub project: chosen repo and optional split. */
+    research: jsonb("research").$type<StationResearch>(),
     error: text("error"),
     costUsd: doublePrecision("cost_usd").notNull().default(0),
     inputTokens: integer("input_tokens").notNull().default(0),

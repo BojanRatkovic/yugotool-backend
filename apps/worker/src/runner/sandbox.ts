@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import type { HookCallback, Options } from "@anthropic-ai/claude-agent-sdk";
+import { pinnedNodeEnv } from "./node-versions";
 import { pathViolation } from "./tool-confinement";
 
 const exec = promisify(execFile);
@@ -31,21 +32,30 @@ const ALLOWED_DOMAINS = [
  */
 export async function sandboxFor(
   worktreePath: string,
-  options: { readRoots?: string[] } = {},
+  /** `readOnly`: nothing but the temp dir is writable (Research in a hub, spec 0014). */
+  options: { readRoots?: string[]; readOnly?: boolean } = {},
 ): Promise<Pick<Options, "sandbox" | "env" | "hooks">> {
-  const { stdout } = await exec("git", [
-    "-C",
-    worktreePath,
-    "rev-parse",
-    "--path-format=absolute",
-    "--git-common-dir",
-  ]);
+  const writable = options.readOnly
+    ? [os.tmpdir()]
+    : [
+        worktreePath,
+        (
+          await exec("git", [
+            "-C",
+            worktreePath,
+            "rev-parse",
+            "--path-format=absolute",
+            "--git-common-dir",
+          ])
+        ).stdout.trim(),
+        os.tmpdir(),
+      ];
   const sandbox: NonNullable<Options["sandbox"]> = {
     enabled: true,
     failIfUnavailable: true,
     autoAllowBashIfSandboxed: true,
     allowUnsandboxedCommands: false,
-    filesystem: { allowWrite: [worktreePath, stdout.trim(), os.tmpdir()] },
+    filesystem: { allowWrite: writable },
     network: { allowedDomains: ALLOWED_DOMAINS, allowLocalBinding: true },
   };
   // Package-manager caches default to the home dir, which the sandbox cannot write.
@@ -58,6 +68,7 @@ export async function sandboxFor(
       input.tool_input,
       worktreePath,
       options.readRoots,
+      options.readOnly,
     );
     return reason
       ? {
@@ -69,11 +80,13 @@ export async function sandboxFor(
         }
       : {};
   };
+  // The agent's `npm test` runs under the Node the repo pins (spec 0013).
+  const env = await pinnedNodeEnv(worktreePath, process.env);
   return {
     sandbox,
     hooks: { PreToolUse: [{ hooks: [confine] }] },
     env: {
-      ...process.env,
+      ...env,
       npm_config_cache: path.join(cache, "npm"),
       YARN_CACHE_FOLDER: path.join(cache, "yarn"),
       PNPM_STORE_DIR: path.join(cache, "pnpm"),

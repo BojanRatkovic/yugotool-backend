@@ -16,8 +16,12 @@ import {
   type ServerEvent,
   type StationRunStatus,
   type Station,
+  RESEARCH_PLAN_JSON_SCHEMA,
+  researchPlanSchema,
   REVIEW_VERDICT_JSON_SCHEMA,
   type ReviewVerdict,
+  runTarget,
+  type StationResearch,
   reviewVerdictSchema,
   VERDICT_JSON_SCHEMA,
   type Verdict,
@@ -42,6 +46,20 @@ import { localRunner } from "../runner/local-runner";
 import { runRoots, strayListeners, tcpListeners } from "../runner/orphans";
 import { authRejection, withApiKey } from "../claude-env";
 import { sandboxFor } from "../runner/sandbox";
+import {
+  describeSync,
+  hubResearchPrompt,
+  researchOutput,
+  resolveResearch,
+  syncHubRepos,
+} from "../runner/hub-research";
+import {
+  hubOfRepo,
+  hubPlugin,
+  hubRepoNames,
+  hubSession,
+  linkIgnoredFiles,
+} from "../runner/work-hub";
 import { createCiActivities } from "./ci";
 import { createKnowledgeActivities } from "./knowledge";
 import { createPrBodyComposer } from "./pr-body";
@@ -84,6 +102,25 @@ export interface RunContext {
   modelOverride: string | null;
   effortOverride: Effort | null;
   maxBudgetUsd: number | null;
+  /**
+   * Hub projects (spec 0014): until the repo is chosen, `worktreePath` is the
+   * hub and `branch`/`baseBranch` are empty. Absent on runs started before.
+   */
+  kind?: "repo" | "hub";
+  hubPath?: string | null;
+  /** The hub's repos, by name. */
+  repos?: string[];
+  /** The work order's preset repo; null = Research picks. */
+  repo?: string | null;
+}
+
+/** A read-only station running in a hub project's hub (spec 0014). */
+export interface HubResearchInput {
+  hub: string;
+  repos: string[];
+  presetRepo: string | null;
+  /** This station returns the plan (structured: plan, repo, split). */
+  plans: boolean;
 }
 
 export interface AgentStationResult {
@@ -94,6 +131,8 @@ export interface AgentStationResult {
   verdict: Verdict | null;
   /** Review stations (structuredVerdict "review", spec 0009). */
   review: ReviewVerdict | null;
+  /** The planning station of a hub run (spec 0014). */
+  research?: StationResearch | null;
 }
 
 export interface ChecksResult {
@@ -122,6 +161,23 @@ function toAuthSource(source: ApiKeySource): AuthSource {
 
 const describeListeners = (list: { port: string; pid: number }[]): string =>
   list.map((l) => `:${l.port} (pid ${l.pid})`).join(", ");
+
+/** Fails the run (not retried) when the repo's commit-msg hook rejects the title. */
+async function checkTitle(worktreePath: string, title: string): Promise<void> {
+  const message = await localRunner.checkCommitMessage(worktreePath, title).catch(() => null);
+  if (!message || message.passed) return;
+  const why = message.output.replace(ANSI_COLOR, "");
+  // A hook that can't run yet (its tool isn't installed before `npm ci`) is not a verdict.
+  if (/command not found|not found|ENOENT|Cannot find module/i.test(why)) return;
+  const first =
+    why
+      .split("\n")
+      .find((line) => line.trim())
+      ?.trim() ?? "rejected";
+  throw ApplicationFailure.nonRetryable(
+    `Work order title rejected by the repo's commit-msg hook: ${first}. Rename the work order and run it again.`,
+  );
+}
 
 export function createActivities(db: Database) {
   async function notify(event: ServerEvent): Promise<void> {
@@ -225,13 +281,14 @@ export function createActivities(db: Database) {
           );
         }
         const [row] = await db
-          .select({ baseBranch: projects.baseBranch })
+          .select({ project: projects, runRepo: runs.repo })
           .from(runs)
           .innerJoin(workOrders, eq(workOrders.id, runs.workOrderId))
           .innerJoin(projects, eq(projects.id, workOrders.projectId))
           .where(eq(runs.id, input.runId));
         if (row) {
-          const baseSha = await localRunner.mergeBase(input.worktreePath, row.baseBranch);
+          const { baseBranch } = runTarget(row.project, row.runRepo);
+          const baseSha = await localRunner.mergeBase(input.worktreePath, baseBranch);
           const reverted = await localRunner.revertIncidentalLockfiles(input.worktreePath, baseSha);
           if (reverted.length) {
             await appendEvent(
@@ -275,11 +332,48 @@ export function createActivities(db: Database) {
         .where(eq(workOrders.id, input.workOrderId));
       if (!row) throw new Error(`work order ${input.workOrderId} not found`);
 
+      // A hub project (spec 0014): Research runs in the hub; the worktree comes
+      // once the repo is chosen (prepareRepoWorkspace).
+      if (row.project.kind === "hub") {
+        const hub = row.project.repoPath;
+        const repos = hubRepoNames(hub);
+        const repoSettings = row.project.repoSettings ?? {};
+        await appendEvent(
+          input.runId,
+          null,
+          "system",
+          `Work hub ${hub}: planning runs in the hub, read-only${row.workOrder.repo ? ` · repo ${row.workOrder.repo}` : " · Research picks the repo"}`,
+        );
+        const synced = await syncHubRepos(
+          hub,
+          repos.map((name) => ({ name, baseBranch: repoSettings[name]?.baseBranch ?? "main" })),
+        );
+        if (synced.length) await appendEvent(input.runId, null, "system", describeSync(synced));
+        await invalidateBoard();
+        return {
+          stations: row.line.stations,
+          worktreePath: hub,
+          branch: "",
+          baseBranch: "",
+          title: row.workOrder.title,
+          description: row.workOrder.description,
+          modelOverride: row.workOrder.modelOverride,
+          effortOverride: row.workOrder.effortOverride,
+          maxBudgetUsd: row.workOrder.maxBudgetUsd,
+          kind: "hub",
+          hubPath: hub,
+          repos,
+          repo: row.workOrder.repo,
+        };
+      }
+
+      const hub = hubOfRepo(row.project.repoPath);
       const workspace = await localRunner.prepareWorkspace({
         repoPath: row.project.repoPath,
         baseBranch: row.project.baseBranch,
         runId: input.runId,
         title: row.workOrder.title,
+        hub,
       });
       await db.update(runs).set({ worktreePath: workspace.path }).where(eq(runs.id, input.runId));
       await db
@@ -293,28 +387,28 @@ export function createActivities(db: Database) {
         // The worktree path is in the panel's Details rail.
         `Workspace ready on branch ${workspace.branch}`,
       );
+      if (hub) {
+        const linked = await linkIgnoredFiles(row.project.repoPath, workspace.path).catch(() => []);
+        const plugin = await hubPlugin(hub).catch(() => null);
+        await appendEvent(
+          input.runId,
+          null,
+          "system",
+          [
+            `Work hub ${hub}: worktree in its worktrees/, hub CLAUDE.md/AGENTS.md and knowledge readable`,
+            plugin ? `skills ${plugin.skills.join(", ")}` : null,
+            linked.length ? `linked ignored files ${linked.join(", ")}` : null,
+          ]
+            .filter(Boolean)
+            .join(" · "),
+        );
+      }
       await invalidateBoard();
 
       // A commit-msg rule (Conventional Commits…) rejects the work order title
       // only at delivery, after every station ran — and no agent can fix a
       // title. Check it before spending anything.
-      const message = await localRunner
-        .checkCommitMessage(workspace.path, row.workOrder.title)
-        .catch(() => null);
-      if (message && !message.passed) {
-        const why = message.output.replace(ANSI_COLOR, "");
-        // A hook that can't run yet (its tool isn't installed before `npm ci`) is not a verdict.
-        if (!/command not found|not found|ENOENT|Cannot find module/i.test(why)) {
-          const first =
-            why
-              .split("\n")
-              .find((line) => line.trim())
-              ?.trim() ?? "rejected";
-          throw ApplicationFailure.nonRetryable(
-            `Work order title rejected by the repo's commit-msg hook: ${first}. Rename the work order and run it again.`,
-          );
-        }
-      }
+      await checkTitle(workspace.path, row.workOrder.title);
 
       return {
         stations: row.line.stations,
@@ -327,6 +421,76 @@ export function createActivities(db: Database) {
         effortOverride: row.workOrder.effortOverride,
         maxBudgetUsd: row.workOrder.maxBudgetUsd,
       };
+    },
+
+    /**
+     * A hub run's worktree, once its repo is chosen (spec 0014): made as for a
+     * hub repo project (0012) in `<hub>/worktrees/`, off the repo's base branch.
+     * From here the run is a normal run on that repo.
+     */
+    async prepareRepoWorkspace(input: {
+      runId: string;
+      workOrderId: string;
+      hub: string;
+      repo: string;
+    }): Promise<{ worktreePath: string; branch: string; baseBranch: string }> {
+      const [row] = await db
+        .select({ workOrder: workOrders, project: projects, run: runs })
+        .from(runs)
+        .innerJoin(workOrders, eq(workOrders.id, runs.workOrderId))
+        .innerJoin(projects, eq(projects.id, workOrders.projectId))
+        .where(eq(runs.id, input.runId));
+      if (!row) throw new Error(`run ${input.runId} not found`);
+      const repoPath = path.join(input.hub, "repos", input.repo);
+      if (!existsSync(path.join(repoPath, ".git"))) {
+        throw ApplicationFailure.nonRetryable(
+          `${input.repo} is not a repo of the hub ${input.hub}`,
+        );
+      }
+      const baseBranch = row.project.repoSettings?.[input.repo]?.baseBranch ?? "main";
+      // A retried activity finds the worktree it already made.
+      const existing = row.run.worktreePath !== input.hub ? row.run.worktreePath : null;
+      if (existing && row.run.repo === input.repo && row.workOrder.branch && existsSync(existing)) {
+        return { worktreePath: existing, branch: row.workOrder.branch, baseBranch };
+      }
+      const workspace = await localRunner.prepareWorkspace({
+        repoPath,
+        baseBranch,
+        runId: input.runId,
+        title: row.workOrder.title,
+        hub: input.hub,
+      });
+      await db
+        .update(runs)
+        .set({ worktreePath: workspace.path, repo: input.repo })
+        .where(eq(runs.id, input.runId));
+      await db
+        .update(workOrders)
+        .set({ branch: workspace.branch, repo: input.repo })
+        .where(eq(workOrders.id, input.workOrderId));
+      await appendEvent(
+        input.runId,
+        null,
+        "system",
+        `Workspace ready for ${input.repo} on branch ${workspace.branch} (from ${baseBranch})`,
+      );
+      const linked = await linkIgnoredFiles(repoPath, workspace.path).catch(() => []);
+      const plugin = await hubPlugin(input.hub).catch(() => null);
+      await appendEvent(
+        input.runId,
+        null,
+        "system",
+        [
+          `Work hub ${input.hub}: worktree in its worktrees/, hub CLAUDE.md/AGENTS.md and knowledge readable`,
+          plugin ? `skills ${plugin.skills.join(", ")}` : null,
+          linked.length ? `linked ignored files ${linked.join(", ")}` : null,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+      );
+      await invalidateBoard();
+      await checkTitle(workspace.path, row.workOrder.title);
+      return { worktreePath: workspace.path, branch: workspace.branch, baseBranch };
     },
 
     async beginStation(input: {
@@ -397,7 +561,8 @@ export function createActivities(db: Database) {
         .select({
           worktreePath: runs.worktreePath,
           status: runs.status,
-          repoPath: projects.repoPath,
+          runRepo: runs.repo,
+          project: projects,
         })
         .from(runs)
         .innerJoin(workOrders, eq(workOrders.id, runs.workOrderId))
@@ -406,7 +571,7 @@ export function createActivities(db: Database) {
       if (!row?.worktreePath) return;
       try {
         const snapshot = await localRunner.archiveWorkspace({
-          repoPath: row.repoPath,
+          repoPath: runTarget(row.project, row.runRepo).repoPath,
           worktreePath: row.worktreePath,
           memoryDir: path.join(runArtifactsDir(input.runId), "memory"),
           message: `wip: unfinished changes of ZASTAVA run ${input.runId.slice(0, 8)} (${row.status})`,
@@ -517,6 +682,8 @@ export function createActivities(db: Database) {
       resumeSessionId?: string | null;
       /** Planning stations: the project's knowledge folders, readable but not writable. */
       knowledge?: KnowledgeMount[];
+      /** A read-only station of a hub run, in the hub itself (`worktreePath` = the hub). */
+      hubResearch?: HubResearchInput;
     }): Promise<AgentStationResult> {
       const model = input.modelOverride ?? input.station.model;
       const effort = input.effortOverride ?? input.station.effort;
@@ -524,8 +691,23 @@ export function createActivities(db: Database) {
       const abortController = new AbortController();
       ctx.cancellationSignal.addEventListener("abort", () => abortController.abort());
 
-      const readRoots = (input.knowledge ?? []).map((k) => k.dir);
-      const sandboxed = await withApiKey(await sandboxFor(input.worktreePath, { readRoots }));
+      const research = input.hubResearch ?? null;
+      // In the hub the project settings load its own skills; a hub worktree gets them as a plugin.
+      const hub = research
+        ? { readRoots: [], plugins: [], tools: ["Skill"], prompt: hubResearchPrompt(research) }
+        : await hubSession(input.worktreePath);
+      const readRoots = [...(input.knowledge ?? []).map((k) => k.dir), ...(hub?.readRoots ?? [])];
+      const tools = [...input.station.allowedTools, ...(hub?.tools ?? [])];
+      const sandboxed = await withApiKey(
+        await sandboxFor(input.worktreePath, { readRoots, readOnly: research !== null }),
+      );
+      const outputSchema = research?.plans
+        ? RESEARCH_PLAN_JSON_SCHEMA
+        : input.station.structuredVerdict === "review"
+          ? REVIEW_VERDICT_JSON_SCHEMA
+          : input.station.structuredVerdict
+            ? VERDICT_JSON_SCHEMA
+            : null;
       const session = query({
         prompt: input.prompt,
         options: {
@@ -533,25 +715,22 @@ export function createActivities(db: Database) {
           model,
           ...(effort ? { effort } : {}),
           ...(input.station.maxBudgetUsd ? { maxBudgetUsd: input.station.maxBudgetUsd } : {}),
-          ...(input.station.structuredVerdict
-            ? {
-                outputFormat: {
-                  type: "json_schema" as const,
-                  schema:
-                    input.station.structuredVerdict === "review"
-                      ? REVIEW_VERDICT_JSON_SCHEMA
-                      : VERDICT_JSON_SCHEMA,
-                },
-              }
+          ...(outputSchema
+            ? { outputFormat: { type: "json_schema" as const, schema: outputSchema } }
             : {}),
-          tools: input.station.allowedTools,
-          allowedTools: input.station.allowedTools,
+          tools,
+          allowedTools: tools,
           // Without it Read outside cwd needs a permission dontAsk never grants (QA does the same).
           ...(readRoots.length > 0 ? { additionalDirectories: readRoots } : {}),
+          ...(hub?.plugins.length ? { plugins: hub.plugins } : {}),
           permissionMode: "dontAsk",
           ...sandboxed,
           settingSources: ["project"],
-          systemPrompt: { type: "preset", preset: "claude_code", append: input.station.prompt },
+          systemPrompt: {
+            type: "preset",
+            preset: "claude_code",
+            append: hub ? `${input.station.prompt}\n\n${hub.prompt}` : input.station.prompt,
+          },
           abortController,
           ...(input.resumeSessionId ? { resume: input.resumeSessionId } : {}),
           maxTurns: 60,
@@ -564,6 +743,7 @@ export function createActivities(db: Database) {
       let costUsd = 0;
       let verdict: Verdict | null = null;
       let review: ReviewVerdict | null = null;
+      let plan: StationResearch | null = null;
       /** Context size = everything the model read on its latest top-level turn. */
       let contextTokens = 0;
       for await (const message of session) {
@@ -617,7 +797,16 @@ export function createActivities(db: Database) {
           costUsd = message.total_cost_usd;
           output =
             message.subtype === "success" ? message.result : `Station ended: ${message.subtype}`;
-          if (message.subtype === "success" && message.structured_output !== undefined) {
+          if (research?.plans && message.subtype === "success") {
+            // No structured answer: the plan is the text, the repo the first one it names.
+            const parsed = researchPlanSchema.safeParse(message.structured_output);
+            plan = resolveResearch(
+              parsed.success ? parsed.data : { plan: message.result, repo: "" },
+              research.repos,
+              research.presetRepo,
+            );
+            output = researchOutput(plan);
+          } else if (message.subtype === "success" && message.structured_output !== undefined) {
             if (input.station.structuredVerdict === "review") {
               const parsed = reviewVerdictSchema.safeParse(message.structured_output);
               review = parsed.success ? parsed.data : null;
@@ -636,6 +825,7 @@ export function createActivities(db: Database) {
               costUsd: message.total_cost_usd,
               verdict,
               review,
+              ...(research?.plans ? { research: plan } : {}),
               inputTokens: message.usage.input_tokens,
               outputTokens: message.usage.output_tokens,
               cacheReadTokens: message.usage.cache_read_input_tokens,
@@ -659,7 +849,7 @@ export function createActivities(db: Database) {
         const stat = await localRunner.diffStat(input.worktreePath);
         if (stat) await appendEvent(input.runId, input.stationRunId, "system", `Changes:\n${stat}`);
       }
-      return { sessionId, output, isError, costUsd, verdict, review };
+      return { sessionId, output, isError, costUsd, verdict, review, research: plan };
     },
 
     /** Runs the station's shell command in the worktree; non-zero exit = failed. */
@@ -808,8 +998,8 @@ export function createActivities(db: Database) {
           title: workOrders.title,
           branch: workOrders.branch,
           runId: workOrders.currentRunId,
-          repoPath: projects.repoPath,
-          baseBranch: projects.baseBranch,
+          project: projects,
+          runRepo: runs.repo,
           worktreePath: runs.worktreePath,
         })
         .from(workOrders)
@@ -819,19 +1009,20 @@ export function createActivities(db: Database) {
       if (!row?.branch || !row.runId) {
         return { prUrl: null, error: "This work order has no delivered branch." };
       }
-      const dir =
-        row.worktreePath && existsSync(row.worktreePath) ? row.worktreePath : row.repoPath;
+      // A hub run delivers from its repo (spec 0014); a repo run from the project's.
+      const { repoPath, baseBranch } = runTarget(row.project, row.runRepo);
+      const dir = row.worktreePath && existsSync(row.worktreePath) ? row.worktreePath : repoPath;
       try {
         const body = await composePrBody({
           runId: row.runId,
           workOrderId: input.workOrderId,
           worktreePath: dir,
-          baseBranch: row.baseBranch,
+          baseBranch,
         });
         const result = await localRunner.openPullRequest({
           dir,
           branch: row.branch,
-          baseBranch: row.baseBranch,
+          baseBranch,
           title: row.title,
           body,
           draft: input.draft,
@@ -863,7 +1054,11 @@ export function createActivities(db: Database) {
   return {
     ...activities,
     runAgentStation: (input: Parameters<typeof activities.runAgentStation>[0]) =>
-      sweepAfter(input, () => uncommitAfter(input, () => activities.runAgentStation(input))),
+      // In the hub itself nothing is ours to sweep or uncommit: the hub, its
+      // repos and their servers are the person's (spec 0014).
+      input.hubResearch
+        ? activities.runAgentStation(input)
+        : sweepAfter(input, () => uncommitAfter(input, () => activities.runAgentStation(input))),
     runShift: (input: Parameters<typeof activities.runShift>[0]) =>
       sweepAfter(input, () => activities.runShift(input)),
   };

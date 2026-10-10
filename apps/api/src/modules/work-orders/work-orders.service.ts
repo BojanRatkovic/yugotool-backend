@@ -9,6 +9,7 @@ import {
   type NeedsYouItem,
   type OpenPullRequest,
   type OpenPullRequestResult,
+  type SplitWorkOrder,
   type WorkOrder,
 } from "@zastava/contracts";
 import { runs } from "@zastava/db";
@@ -25,9 +26,13 @@ import {
   WorkOrderActiveError,
   WorkOrderNotFoundError,
   WorkOrderNotQueuedError,
+  WorkOrderNotSplittableError,
+  WorkOrderRepoInvalidError,
   WorkOrderNotRunningError,
   WorkOrderNotStartableError,
 } from "./work-order.errors";
+import { hubRepos } from "../projects/work-hub";
+import { followerOf, type ProjectRepos, repoProblem, splitProblem } from "./hub-work";
 import { WorkOrdersRepository } from "./work-orders.repository";
 
 /** Workflow type name registered by the worker. */
@@ -120,11 +125,56 @@ export class WorkOrdersService {
   }
 
   async create(input: CreateWorkOrder): Promise<WorkOrder> {
+    const problem = repoProblem(await this.projectRepos(input.projectId), input.repo);
+    if (problem) throw new WorkOrderRepoInvalidError(problem);
     const position =
       input.position ?? (await this.repository.nextPosition(this.database.db, input.projectId));
     const workOrder = await this.repository.insert(this.database.db, { ...input, position });
     await this.notify();
     return workOrder;
+  }
+
+  /**
+   * Accepts Research's split (spec 0014): this work order keeps item 1 (its
+   * repo set, title kept); items 2..N become backlog work orders on their
+   * repos, each following the previous one. Idempotent: a work order that
+   * already has followers returns its chain unchanged.
+   */
+  async split(id: string, input: SplitWorkOrder): Promise<WorkOrder[]> {
+    const chain = await this.database.transaction(async (tx) => {
+      const workOrder = await this.repository.find(tx, id);
+      if (!workOrder) throw new WorkOrderNotFoundError(`work order ${id} not found`);
+      const existing = await this.repository.followers(tx, id);
+      if (existing.length) return [workOrder, ...existing];
+      const project = await this.projectRepos(workOrder.projectId);
+      const problem = splitProblem(workOrder, project, input.items);
+      if (problem) throw new WorkOrderNotSplittableError(problem);
+      const [first, ...rest] = input.items;
+      const head =
+        (first && (await this.repository.update(tx, id, { repo: first.repo }))) ?? workOrder;
+      const created: WorkOrder[] = [];
+      let previous = head.id;
+      for (const item of rest) {
+        const position = await this.repository.nextPosition(tx, workOrder.projectId);
+        const follower = await this.repository.insert(tx, {
+          projectId: workOrder.projectId,
+          position,
+          ...followerOf(item, previous),
+        });
+        created.push(follower);
+        previous = follower.id;
+      }
+      return [head, ...created];
+    });
+    await this.notify();
+    return chain;
+  }
+
+  /** A project's kind and, for a hub, its repos on disk. */
+  private async projectRepos(projectId: string): Promise<ProjectRepos> {
+    const project = await this.repository.projectOf(this.database.db, projectId);
+    if (project?.kind !== "hub") return { kind: "repo", repos: [] };
+    return { kind: "hub", repos: hubRepos(project.repoPath).map((r) => r.name) };
   }
 
   async update(id: string, patch: UpdateWorkOrder): Promise<WorkOrder> {
@@ -151,7 +201,7 @@ export class WorkOrdersService {
       }
       const files = await this.repository.runFiles(tx, id);
       await this.repository.delete(tx, id);
-      return { repoPath: found.repoPath, files };
+      return { repoPath: found.repoPath, kind: found.kind, files };
     });
     if (!removed) return;
     await this.temporal.workflow
@@ -159,9 +209,10 @@ export class WorkOrdersService {
       .terminate("work order deleted")
       .catch(() => undefined);
     const failed = await removeRunFiles({
+      kind: removed.kind,
       repoPath: removed.repoPath,
       worktrees: removed.files.flatMap((f) =>
-        f.worktreePath ? [{ runId: f.runId, worktreePath: f.worktreePath }] : [],
+        f.worktreePath ? [{ runId: f.runId, worktreePath: f.worktreePath, repo: f.repo }] : [],
       ),
       runIds: removed.files.map((f) => f.runId),
     });

@@ -7,6 +7,7 @@ import { ConfigService } from "@nestjs/config";
 import type { Repo } from "@zastava/contracts";
 import type { Env } from "../../core/config/env.schema";
 import { RepoPathInvalidError } from "../projects/project.errors";
+import { hubRepos, isHubRoot } from "../projects/work-hub";
 import { SettingsService } from "../settings/settings.service";
 
 const exec = promisify(execFile);
@@ -39,14 +40,46 @@ export class ReposService {
 
   async branches(repoPath: string): Promise<string[]> {
     if (!(await isGitRepo(repoPath)))
-      throw new RepoPathInvalidError(`${repoPath} is not a git repository`);
+      throw new RepoPathInvalidError(`${repoPath} is not a Git repository`);
     const { stdout } = await exec("git", ["-C", repoPath, "branch", "--format=%(refname:short)"]);
     return stdout.split("\n").filter(Boolean);
   }
 
   private async scan(dir: string, depth: number, out: Repo[]): Promise<void> {
+    // A work hub is listed itself (a hub project, spec 0014) and with its
+    // repos (`work/frontend`, each a project on its own, spec 0012).
+    if (isHubRoot(dir)) {
+      const hubName = path.basename(dir);
+      const repos = hubRepos(dir);
+      out.push({
+        name: hubName,
+        path: dir,
+        currentBranch: await currentBranch(dir),
+        hubPath: dir,
+        kind: "hub",
+        repoCount: repos.length,
+      });
+      for (const repo of repos) {
+        out.push({
+          name: `${hubName}/${repo.name}`,
+          path: repo.path,
+          currentBranch: await currentBranch(repo.path),
+          hubPath: dir,
+          kind: "repo",
+          repoCount: null,
+        });
+      }
+      return;
+    }
     if (await isGitRepo(dir)) {
-      out.push({ name: path.basename(dir), path: dir, currentBranch: await currentBranch(dir) });
+      out.push({
+        name: path.basename(dir),
+        path: dir,
+        currentBranch: await currentBranch(dir),
+        hubPath: null,
+        kind: "repo",
+        repoCount: null,
+      });
       return;
     }
     if (depth >= MAX_DEPTH) return;

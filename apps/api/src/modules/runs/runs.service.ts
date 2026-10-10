@@ -24,6 +24,7 @@ import { TEMPORAL_CLIENT } from "../../core/temporal/temporal.module";
 import {
   ArtifactNotFoundError,
   GateNotPendingError,
+  GateRepoInvalidError,
   QaCheckNotAcceptableError,
   QaCheckNotFoundError,
   RunNotFoundError,
@@ -31,7 +32,9 @@ import {
   ShiftReviewNotPendingError,
   WorkspaceGoneError,
 } from "./run.errors";
+import { hubRepos } from "../projects/work-hub";
 import { branchDiff, gitCapped, worktreeDiff } from "./git-diff";
+import { gateRepoProblem } from "./hub-gate";
 import { RunsRepository } from "./runs.repository";
 
 /** Shift station memory inside the worktree (written by the worker). */
@@ -77,6 +80,11 @@ export class RunsService {
     if (!workflowId) throw new RunNotFoundError(`run ${runId} not found`);
     const gate = await this.repository.findPendingGate(this.database.db, runId, stationKey);
     if (!gate) throw new GateNotPendingError(`gate ${stationKey} is not awaiting approval`);
+    const ctx = await this.repository.findGateRepoContext(this.database.db, runId);
+    if (!ctx) throw new RunNotFoundError(`run ${runId} not found`);
+    const repos = ctx.kind === "hub" ? hubRepos(ctx.repoPath).map((r) => r.name) : [];
+    const problem = gateRepoProblem({ ...ctx, repos }, decision);
+    if (problem) throw new GateRepoInvalidError(problem);
     await this.temporal.workflow
       .getHandle(workflowId)
       .signal(GATE_DECISION_SIGNAL, { stationKey, ...decision });

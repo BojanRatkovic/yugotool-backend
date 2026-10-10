@@ -83,6 +83,10 @@ export class DispatcherService implements OnModuleInit, OnModuleDestroy {
 
   private async evaluate(now: Date): Promise<DispatcherState> {
     const settings = await this.settings.get();
+    // A split's follower joins the queue once its predecessor is delivered (spec 0014).
+    if ((await this.repository.enqueueReadyFollowers(this.database.db)) > 0) {
+      await this.events.publish({ type: "invalidate", collection: "work_orders" });
+    }
     const running = await this.repository.countByStatus(this.database.db, ["running"]);
     const queued = await this.repository.listQueued(this.database.db);
     const night = inWindow(now, settings.nightShiftStart, settings.nightShiftEnd);

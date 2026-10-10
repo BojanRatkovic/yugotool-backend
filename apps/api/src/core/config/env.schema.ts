@@ -29,10 +29,6 @@ const envSchema = z.object({
   DESKTOP_NOTICES: z.enum(["osascript", "app"]).default("osascript"),
   /** Interface to bind; the desktop app keeps it on loopback. */
   HOST: z.string().optional(),
-  /** Where Playwright keeps browsers (Doctor's Chromium check); unset = Playwright's default. */
-  PLAYWRIGHT_BROWSERS_PATH: z.string().optional(),
-  /** nvm's home (Doctor's nvm check); unset = ~/.nvm. */
-  NVM_DIR: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

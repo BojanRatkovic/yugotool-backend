@@ -8,6 +8,7 @@ import {
   type Shift,
   type ShiftStatus,
   type StationRun,
+  runTarget,
 } from "@zastava/contracts";
 import {
   type Executor,
@@ -20,7 +21,7 @@ import {
   stationRuns,
   workOrders,
 } from "@zastava/db";
-import { and, asc, desc, eq, gt, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNotNull } from "drizzle-orm";
 import { iso } from "../../common/mappers";
 
 type StationRunRow = typeof stationRuns.$inferSelect;
@@ -268,15 +269,50 @@ export class RunsRepository {
     const [row] = await db
       .select({
         worktreePath: runs.worktreePath,
-        baseBranch: projects.baseBranch,
-        repoPath: projects.repoPath,
+        project: projects,
+        runRepo: runs.repo,
         branch: workOrders.branch,
       })
       .from(runs)
       .innerJoin(workOrders, eq(workOrders.id, runs.workOrderId))
       .innerJoin(projects, eq(projects.id, workOrders.projectId))
       .where(eq(runs.id, runId));
-    return row ?? null;
+    if (!row) return null;
+    // A hub run's work lives in its repo (spec 0014).
+    const { repoPath, baseBranch } = runTarget(row.project, row.runRepo);
+    return { worktreePath: row.worktreePath, branch: row.branch, repoPath, baseBranch };
+  }
+
+  /** What a hub run's gate needs to check a repo choice (spec 0014). */
+  async findGateRepoContext(
+    db: Executor,
+    runId: string,
+  ): Promise<{
+    kind: "repo" | "hub";
+    repoPath: string;
+    runRepo: string | null;
+    presetRepo: string | null;
+    researchRepo: string | null;
+  } | null> {
+    const [row] = await db
+      .select({
+        kind: projects.kind,
+        repoPath: projects.repoPath,
+        runRepo: runs.repo,
+        presetRepo: workOrders.repo,
+      })
+      .from(runs)
+      .innerJoin(workOrders, eq(workOrders.id, runs.workOrderId))
+      .innerJoin(projects, eq(projects.id, workOrders.projectId))
+      .where(eq(runs.id, runId));
+    if (!row) return null;
+    const [latest] = await db
+      .select({ research: stationRuns.research })
+      .from(stationRuns)
+      .where(and(eq(stationRuns.runId, runId), isNotNull(stationRuns.research)))
+      .orderBy(desc(stationRuns.startedAt))
+      .limit(1);
+    return { ...row, researchRepo: latest?.research?.repo ?? null };
   }
 
   async findWorkflowId(db: Executor, runId: string): Promise<string | null> {

@@ -19,6 +19,7 @@ import {
   NeedsYouItemDto,
   OpenPullRequestDto,
   OpenPullRequestResultDto,
+  SplitWorkOrderDto,
   UpdateWorkOrderDto,
   WorkOrderDto,
 } from "./work-orders.dto";
@@ -47,6 +48,17 @@ export class WorkOrdersController {
   @ApiOkResponse({ type: [NeedsYouItemDto] })
   running(): Promise<NeedsYouItem[]> {
     return this.service.running();
+  }
+
+  /** Hub projects: accept Research's split into a chain of work orders (spec 0014). */
+  @Post(":id/split")
+  @HttpCode(200)
+  @ApiOkResponse({ type: [WorkOrderDto] })
+  split(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() body: SplitWorkOrderDto,
+  ): Promise<WorkOrder[]> {
+    return this.service.split(id, body);
   }
 
   /** Push a locally delivered branch and open a PR (draft or ready). */

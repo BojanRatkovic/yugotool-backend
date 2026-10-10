@@ -5,6 +5,17 @@ export class WorkOrderNotFoundError extends DomainError {
   readonly kind = "not_found";
 }
 
+/** A repo the work order's project doesn't have, or a split it can't take (spec 0014). */
+export class WorkOrderRepoInvalidError extends DomainError {
+  readonly code = "work_order_repo_invalid";
+  readonly kind = "validation";
+}
+
+export class WorkOrderNotSplittableError extends DomainError {
+  readonly code = "work_order_not_splittable";
+  readonly kind = "conflict";
+}
+
 export class WorkOrderNotStartableError extends DomainError {
   readonly code = "work_order_not_startable";
   readonly kind = "conflict";

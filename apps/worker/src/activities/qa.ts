@@ -21,6 +21,7 @@ import {
   type RouteMap,
   type RunEventType,
   type ServerEvent,
+  runTarget,
 } from "@zastava/contracts";
 import {
   type Database,
@@ -195,16 +196,20 @@ export function createQaActivities(db: Database, deps: QaDeps) {
         appendEvent(runId, stationRunId, type, message);
 
       const [row] = await db
-        .select({
-          projectId: projects.id,
-          preview: projects.preview,
-          repoPath: projects.repoPath,
-          routeMap: projects.routeMap,
-        })
+        .select({ project: projects, runRepo: runs.repo })
         .from(runs)
         .innerJoin(workOrders, eq(workOrders.id, runs.workOrderId))
         .innerJoin(projects, eq(projects.id, workOrders.projectId))
-        .where(eq(runs.id, runId));
+        .where(eq(runs.id, runId))
+        .then((rows) =>
+          rows.map(({ project, runRepo }) => ({
+            projectId: project.id,
+            // A hub run's QA previews its repo (spec 0014), without a route map (per repo later).
+            preview: runTarget(project, runRepo).preview,
+            routeMap: project.kind === "hub" ? null : project.routeMap,
+            canDiscover: project.kind !== "hub",
+          })),
+        );
       const preview = row?.preview ?? null;
       const session = row ? existingSession(row.projectId) : null;
 
@@ -257,6 +262,7 @@ export function createQaActivities(db: Database, deps: QaDeps) {
             projectId: row.projectId,
             preview,
             routeMap: row.routeMap ?? null,
+            canDiscover: row.canDiscover,
             baseSha,
             diffStat,
             signal: abort.signal,
@@ -388,7 +394,7 @@ export function createQaActivities(db: Database, deps: QaDeps) {
           .where(eq(qaRuns.id, qaRun.id));
 
         // ── Capture + diff (deterministic) ──
-        browser = await launchBrowser();
+        browser = await launchBrowser((message) => void log("system", message));
         const consoleByPath = new Map<string, { base: string[]; pr: string[] }>();
         let position = 0;
         let unchanged = 0;
@@ -773,6 +779,8 @@ export function createQaActivities(db: Database, deps: QaDeps) {
     projectId: string;
     preview: Preview;
     routeMap: RouteMap | null;
+    /** Hub runs never discover: the map is per project, the repo per run (spec 0014). */
+    canDiscover: boolean;
     baseSha: string;
     diffStat: string;
     signal: AbortSignal;
@@ -789,7 +797,7 @@ export function createQaActivities(db: Database, deps: QaDeps) {
       const currentHash = routeMap?.routerFiles.length
         ? await routeSourceHash(args.worktreePath, args.baseSha, routeMap.routerFiles)
         : null;
-      if (needsDiscovery(routeMap, currentHash)) {
+      if (args.canDiscover && needsDiscovery(routeMap, currentHash)) {
         await log(
           "system",
           routeMap

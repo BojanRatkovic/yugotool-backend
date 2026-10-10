@@ -28,8 +28,15 @@ import {
   type StationNote,
   validatorPassed,
 } from "./line-logic";
-import { handoffFromFeedback, isStuck, type ShiftTally } from "./shift-logic";
+import {
+  asShiftStation,
+  canResumeShift,
+  handoffFromFeedback,
+  isStuck,
+  type ShiftTally,
+} from "./shift-logic";
 import { startCiWatch } from "./watch-ci.workflow";
+import { hubPlanIndex, needsWorkspace, runsInHub } from "./hub-logic";
 
 export const gateDecisionSignal =
   defineSignal<[GateDecision & { stationKey: string }]>(GATE_DECISION_SIGNAL);
@@ -130,6 +137,10 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
     let index = 0;
     /** Each agent station's last Claude session (by line index), resumed when work comes back to it. */
     const sessions = new Map<number, string>();
+    /** Each editing station's last shift (by line index): resumed when work comes back and it has room. */
+    const lastShifts = new Map<number, ShiftResult>();
+    // Editing agent stations work in shifts (spec 0012); runs started before replay the old path.
+    const buildsInShifts = patched("build-in-shifts");
     /** Why a station is running again; null on a first pass. */
     let followUp: StationNote | null = null;
     /** The station `followUp` is for: the builder, or where a human sent changes. */
@@ -138,6 +149,36 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
     let lastQaReport: string | null = null;
 
     const pendingFollowUp = (): StationNote | null => followUp;
+    // A hub project (spec 0014): planning runs in the hub; runs started before replay as repo runs.
+    const hub = run.kind === "hub" && run.hubPath && patched("hub-projects") ? run.hubPath : null;
+    const planIndex = hub ? hubPlanIndex(run.stations) : -1;
+    /** Hub runs get their worktree once the repo is chosen; repo runs have it from the start. */
+    let workspaceReady = hub === null;
+    /** The repo a hub run will work in: preset, then Research's pick, then the plan gate's. */
+    let chosenRepo: string | null = run.repo ?? null;
+    /** A hub run's pre-commit check skipped at a final gate that came before its worktree. */
+    let hooksDeferred = false;
+    const ensureWorkspace = async (): Promise<boolean> => {
+      if (workspaceReady || !hub) return true;
+      if (!chosenRepo) {
+        await finish(
+          "failed",
+          "No repo chosen for this work: Research named none of the hub's repos",
+        );
+        return false;
+      }
+      const workspace = await housekeeping.prepareRepoWorkspace({
+        runId: input.runId,
+        workOrderId: input.workOrderId,
+        hub,
+        repo: chosenRepo,
+      });
+      run.worktreePath = workspace.worktreePath;
+      run.branch = workspace.branch;
+      run.baseBranch = workspace.baseBranch;
+      workspaceReady = true;
+      return true;
+    };
 
     const sendBack = (reason: StationNote, target: number = buildIndex): void => {
       notes.push(reason);
@@ -157,6 +198,9 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
     while (index < run.stations.length) {
       const station = run.stations[index];
       if (!station) break;
+      if (hub && !workspaceReady && needsWorkspace(run.stations, index)) {
+        if (!(await ensureWorkspace())) return;
+      }
       const attempt = (attempts.get(station.key) ?? 0) + 1;
       attempts.set(station.key, attempt);
       const begin = (status: "running" | "awaiting_approval") =>
@@ -166,7 +210,8 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
         // Before the last gate (what delivery follows), make sure the repo's own
         // pre-commit hook accepts the work; otherwise it goes back to the builder.
         // patched(): runs started before this check existed replay without it.
-        if (index === finalGateIndex && patched("repo-hooks-preflight")) {
+        if (index === finalGateIndex && !workspaceReady) hooksDeferred = true;
+        else if (index === finalGateIndex && patched("repo-hooks-preflight")) {
           const hooks = await work.repoHooks({
             runId: input.runId,
             worktreePath: run.worktreePath,
@@ -229,6 +274,8 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
           notes.push({ station: station.name, text: `Human reviewer: ${decision.comment}` });
         }
         if (decision.delivery) delivery = decision.delivery;
+        // The plan gate of a hub run may switch the repo before the worktree exists.
+        if (!workspaceReady && decision.repo) chosenRepo = decision.repo;
         index += 1;
         continue;
       }
@@ -257,32 +304,54 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
         continue;
       }
 
-      if (station.kind === "shift") {
+      const shiftStation =
+        station.kind === "shift"
+          ? station
+          : station.kind === "agent" && station.canEdit && buildsInShifts
+            ? asShiftStation(station)
+            : null;
+      if (shiftStation) {
+        const autoShifts = station.kind === "agent";
+        if (autoShifts && run.maxBudgetUsd !== null && spentUsd >= run.maxBudgetUsd) {
+          await finish(
+            "failed",
+            `Budget exhausted: $${spentUsd.toFixed(2)} of $${run.maxBudgetUsd.toFixed(2)} spent before ${station.name}`,
+          );
+          return;
+        }
         const stationRunId = await begin("running");
         const ids = { runId: input.runId, workOrderId: input.workOrderId, stationRunId };
-        await bookkeeping.prepareShiftStation({
+        const pending = index === followUpTarget ? pendingFollowUp() : null;
+        const startSha = await bookkeeping.prepareShiftStation({
           runId: input.runId,
           stationRunId,
           worktreePath: run.worktreePath,
-          station,
+          station: shiftStation,
           title: run.title,
           description: run.description,
+          ...(station.kind === "agent" ? { brief: buildPrompt(run, station, notes) } : {}),
         });
-        const pending = pendingFollowUp();
-        followUp = null;
-        let handoff: Handoff | null = pending
-          ? handoffFromFeedback(pending.station, pending.text)
-          : null;
+        if (index === followUpTarget) followUp = null;
+        const previous = lastShifts.get(index);
+        // Work back at a builder whose last session finished with room left: continue it.
+        let resume: { sessionId: string; prompt: string } | null =
+          autoShifts && pending && canResumeShift(previous, shiftStation.handoffAtPct)
+            ? { sessionId: previous.sessionId, prompt: buildFollowUp(pending, true) }
+            : null;
+        let handoff: Handoff | null =
+          pending && !resume ? handoffFromFeedback(pending.station, pending.text) : null;
         stopAfterShift = false;
         const history: ShiftTally[] = [];
         let stationSpent = 0;
         let last: ShiftResult | null = null;
         let endReason: ShiftEndReason = "max_shifts";
 
-        for (let n = 1; n <= station.maxShifts; n++) {
+        for (let n = 1; n <= shiftStation.maxShifts; n++) {
           const runLeft = run.maxBudgetUsd === null ? null : run.maxBudgetUsd - spentUsd;
           const stationLeft =
-            station.maxBudgetUsd === undefined ? null : station.maxBudgetUsd - stationSpent;
+            shiftStation.maxBudgetUsd === undefined
+              ? null
+              : shiftStation.maxBudgetUsd - stationSpent;
           const left =
             runLeft === null
               ? stationLeft
@@ -293,7 +362,7 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
             endReason = "budget";
             break;
           }
-          if (last && station.reviewHandoff) {
+          if (last && shiftStation.reviewHandoff) {
             shiftReview = null;
             await bookkeeping.awaitShiftReview({
               ...ids,
@@ -319,15 +388,18 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
           const result: ShiftResult = await work.runShift({
             runId: input.runId,
             stationRunId,
-            station,
+            station: shiftStation,
             worktreePath: run.worktreePath,
             number: shiftNumber,
             previousHandoff: handoff,
             modelOverride: run.modelOverride,
             effortOverride: run.effortOverride,
             maxBudgetUsd: left,
+            ...(resume ? { resume } : {}),
           });
+          resume = null;
           last = result;
+          if (autoShifts) lastShifts.set(index, result);
           spentUsd += result.costUsd;
           stationSpent += result.costUsd;
           handoff = result.handoff;
@@ -354,6 +426,15 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
             endReason,
           });
         }
+        // Builders leave one uncommitted change behind, as before shifts (spec 0012).
+        if (autoShifts && startSha) {
+          await bookkeeping.foldCheckpoints({
+            runId: input.runId,
+            stationRunId,
+            worktreePath: run.worktreePath,
+            sha: startSha,
+          });
+        }
         const summary = last?.output ?? "";
         // A human stop or a met goal hands the work to the rest of the line.
         const passed = endReason === "done" || endReason === "manual";
@@ -369,7 +450,7 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
               ? `Stuck after shift ${shiftNumber}: two shifts in a row changed no code`
               : endReason === "budget"
                 ? `Budget exhausted in ${station.name} after shift ${shiftNumber}`
-                : `${station.name} reached ${station.maxShifts} shifts without meeting its goal`;
+                : `${station.name} reached ${shiftStation.maxShifts} shifts without ${autoShifts ? "finishing" : "meeting its goal"}`;
           await finish("failed", why);
           return;
         }
@@ -423,6 +504,11 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
         continue;
       }
 
+      // Shift stations were handled above; this narrows for TS.
+      if (station.kind !== "agent") {
+        index += 1;
+        continue;
+      }
       if (run.maxBudgetUsd !== null && spentUsd >= run.maxBudgetUsd) {
         await finish(
           "failed",
@@ -436,15 +522,31 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
       const pending: StationNote | null = followUp;
       const sessionId = sessions.get(index) ?? null;
       const resume: boolean = index === followUpTarget && pending !== null && sessionId !== null;
+      const inHub = hub !== null && runsInHub(run.stations, index);
       const result: AgentStationResult = await work.runAgentStation({
         runId: input.runId,
         stationRunId,
         station,
-        worktreePath: run.worktreePath,
+        worktreePath: inHub ? hub : run.worktreePath,
         prompt:
           resume && pending
             ? buildFollowUp(pending, station.canEdit)
-            : buildPrompt(run, station, notes, readsKnowledge(station) ? knowledge : []),
+            : buildPrompt(
+                inHub ? { ...run, hub } : run,
+                station,
+                notes,
+                readsKnowledge(station) ? knowledge : [],
+              ),
+        ...(inHub
+          ? {
+              hubResearch: {
+                hub,
+                repos: run.repos ?? [],
+                presetRepo: run.repo ?? null,
+                plans: index === planIndex,
+              },
+            }
+          : {}),
         modelOverride: run.modelOverride,
         effortOverride: run.effortOverride,
         resumeSessionId: resume ? sessionId : null,
@@ -452,6 +554,7 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
       });
       if (result.sessionId) sessions.set(index, result.sessionId);
       if (index === followUpTarget) followUp = null;
+      if (!workspaceReady && result.research?.repo) chosenRepo = result.research.repo;
       spentUsd += result.costUsd ?? 0;
       await bookkeeping.finishStation({
         runId: input.runId,
@@ -473,7 +576,8 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
       index += 1;
     }
 
-    if (finalGateIndex < 0 && patched("repo-hooks-preflight")) {
+    if (!(await ensureWorkspace())) return;
+    if ((finalGateIndex < 0 || hooksDeferred) && patched("repo-hooks-preflight")) {
       // No human gate: the hook check happens here, with nobody to send it back for.
       const hooks = await work.repoHooks({
         runId: input.runId,

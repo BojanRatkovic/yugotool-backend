@@ -1,16 +1,21 @@
 import { Injectable } from "@nestjs/common";
 import type {
+  HubRepo,
   Line,
   LineKind,
   Project,
+  ProjectKind,
   ProjectStats,
+  RepoSettings,
   RouteMap,
   Station,
+  UpdateHubRepo,
   UpdateProject,
 } from "@zastava/contracts";
 import { type Executor, lines, projects, runs, stationRuns, workOrders } from "@zastava/db";
 import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { iso } from "../../common/mappers";
+import { hubOfRepo } from "./work-hub";
 
 type ProjectRow = typeof projects.$inferSelect;
 type LineRow = typeof lines.$inferSelect;
@@ -18,12 +23,26 @@ type LineRow = typeof lines.$inferSelect;
 const toProject = ({
   routeMap: _map,
   routeDiscovery: _discovery,
+  repoSettings,
   ...row
 }: ProjectRow): Project => ({
   ...row,
+  hubPath: row.kind === "hub" ? row.repoPath : hubOfRepo(row.repoPath),
+  repos: hubReposOf(row.repoPath, repoSettings),
   createdAt: iso(row.createdAt),
   updatedAt: iso(row.updatedAt),
 });
+
+/** A hub project's repos, by name, from its stored per-repo settings (spec 0014). */
+const hubReposOf = (hub: string, settings: RepoSettings | null): HubRepo[] =>
+  Object.entries(settings ?? {})
+    .toSorted(([a], [b]) => a.localeCompare(b))
+    .map(([name, s]) => ({
+      name,
+      path: `${hub}/repos/${name}`,
+      baseBranch: s.baseBranch,
+      preview: s.preview ?? null,
+    }));
 
 const toLine = (row: LineRow): Line => ({
   ...row,
@@ -59,14 +78,17 @@ export class ProjectsRepository {
   }
 
   /** Every run of the project with its worktree path (null once cleaned up). */
-  async runWorktrees(db: Executor, id: string): Promise<{ runId: string; worktreePath: string }[]> {
+  async runWorktrees(
+    db: Executor,
+    id: string,
+  ): Promise<{ runId: string; worktreePath: string; repo: string | null }[]> {
     const rows = await db
-      .select({ runId: runs.id, worktreePath: runs.worktreePath })
+      .select({ runId: runs.id, worktreePath: runs.worktreePath, repo: runs.repo })
       .from(runs)
       .innerJoin(workOrders, eq(workOrders.id, runs.workOrderId))
       .where(and(eq(workOrders.projectId, id), isNotNull(runs.worktreePath)));
     return rows.flatMap((r) =>
-      r.worktreePath ? [{ runId: r.runId, worktreePath: r.worktreePath }] : [],
+      r.worktreePath ? [{ runId: r.runId, worktreePath: r.worktreePath, repo: r.repo }] : [],
     );
   }
 
@@ -92,15 +114,19 @@ export class ProjectsRepository {
   /** Idempotent on a client-supplied id: a replayed offline create returns the original. */
   async insert(
     db: Executor,
-    values: { id?: string | undefined; name: string; repoPath: string; baseBranch: string },
+    values: {
+      id?: string | undefined;
+      name: string;
+      repoPath: string;
+      baseBranch: string;
+      kind?: ProjectKind;
+      repoSettings?: RepoSettings | null;
+    },
   ): Promise<{ project: Project; created: boolean }> {
+    const { id, ...rest } = values;
     const [row] = await db
       .insert(projects)
-      .values(
-        values.id
-          ? values
-          : { name: values.name, repoPath: values.repoPath, baseBranch: values.baseBranch },
-      )
+      .values(id ? { id, ...rest } : rest)
       .onConflictDoNothing({ target: projects.id })
       .returning();
     if (row) return { project: toProject(row), created: true };
@@ -132,6 +158,37 @@ export class ProjectsRepository {
       .where(eq(projects.id, id))
       .returning({ id: projects.id });
     return rows.length > 0;
+  }
+
+  /** Adds settings for repos new to a hub; never overwrites an existing repo's entry. */
+  async addRepoSettings(db: Executor, id: string, added: RepoSettings): Promise<void> {
+    await db
+      .update(projects)
+      .set({
+        repoSettings: sql`${JSON.stringify(added)}::jsonb || coalesce(${projects.repoSettings}, '{}'::jsonb)`,
+      })
+      .where(eq(projects.id, id));
+  }
+
+  /** Merges a patch into one hub repo's settings. */
+  async updateRepoSettings(
+    db: Executor,
+    id: string,
+    repo: string,
+    patch: UpdateHubRepo,
+  ): Promise<Project | null> {
+    const [row] = await db
+      .update(projects)
+      .set({
+        repoSettings: sql`jsonb_set(
+          coalesce(${projects.repoSettings}, '{}'::jsonb),
+          array[${repo}::text],
+          coalesce(${projects.repoSettings} -> ${repo}::text, '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb
+        )`,
+      })
+      .where(eq(projects.id, id))
+      .returning();
+    return row ? toProject(row) : null;
   }
 
   async update(db: Executor, id: string, patch: UpdateProject): Promise<Project | null> {

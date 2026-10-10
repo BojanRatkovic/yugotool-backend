@@ -1,8 +1,4 @@
 import { execFile } from "node:child_process";
-import { existsSync } from "node:fs";
-import { readdir } from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
 import { promisify } from "node:util";
 import { Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -17,7 +13,6 @@ import { sql } from "drizzle-orm";
 import type { Env } from "../../core/config/env.schema";
 import { DatabaseService } from "../../core/database/database.service";
 import { TEMPORAL_CLIENT } from "../../core/temporal/temporal.module";
-import { ReposService } from "../repos/repos.service";
 import { SettingsService } from "../settings/settings.service";
 import { PlanUsageService } from "./plan-usage.service";
 
@@ -27,7 +22,7 @@ const TEMPORAL_DEADLINE_MS = 3_000;
 /** `git hook run` (repo-hooks preflight) needs 2.36. */
 const GIT_HOOK_RUN = [2, 36] as const;
 
-type Result = Omit<DoctorCheck, "key" | "label" | "required" | "neededFor">;
+type Result = Omit<DoctorCheck, "key" | "label" | "group" | "required" | "neededFor">;
 const ok = (detail: string): Result => ({ status: "ok", detail, fix: null, fixCommand: null });
 const problem = (
   status: "warn" | "fail",
@@ -39,6 +34,7 @@ const problem = (
 interface Check {
   key: DoctorCheckKey;
   label: string;
+  group: DoctorCheck["group"];
   required: boolean;
   neededFor: string | null;
   run: () => Promise<Result>;
@@ -54,7 +50,6 @@ export class DoctorService {
     private readonly config: ConfigService<Env, true>,
     private readonly database: DatabaseService,
     private readonly planUsage: PlanUsageService,
-    private readonly repos: ReposService,
     private readonly settings: SettingsService,
     @Inject(TEMPORAL_CLIENT) private readonly temporal: Client,
   ) {}
@@ -97,11 +92,35 @@ export class DoctorService {
 
   private checks(temporal: Promise<Result>): Check[] {
     return [
-      { key: "claude", label: "Claude", required: true, neededFor: null, run: () => this.claude() },
-      { key: "git", label: "git", required: true, neededFor: null, run: () => git() },
+      {
+        key: "claude",
+        label: "Claude",
+        group: "machine",
+        required: true,
+        neededFor: null,
+        run: () => this.claude(),
+      },
+      {
+        key: "git",
+        label: "Git",
+        group: "machine",
+        required: true,
+        neededFor: null,
+        run: () => git(),
+      },
+      {
+        key: "gh",
+        label: "GitHub CLI",
+        group: "machine",
+        required: false,
+        neededFor: "Needed for pull requests",
+        run: () => gh(),
+      },
+      // ZASTAVA's own services: the desktop app starts them; dev starts them by hand.
       {
         key: "database",
         label: "Database",
+        group: "service",
         required: true,
         neededFor: null,
         run: () => this.db(),
@@ -109,6 +128,7 @@ export class DoctorService {
       {
         key: "temporal",
         label: "Temporal",
+        group: "service",
         required: true,
         neededFor: null,
         run: () => temporal,
@@ -116,37 +136,10 @@ export class DoctorService {
       {
         key: "worker",
         label: "Worker",
+        group: "service",
         required: true,
         neededFor: null,
         run: () => this.worker(temporal),
-      },
-      {
-        key: "repos",
-        label: "Repos folder",
-        required: false,
-        neededFor: "Needed to pick repos from a list",
-        run: () => this.reposFolder(),
-      },
-      {
-        key: "gh",
-        label: "GitHub CLI",
-        required: false,
-        neededFor: "Needed for pull requests",
-        run: () => gh(),
-      },
-      {
-        key: "chromium",
-        label: "Chromium",
-        required: false,
-        neededFor: "Needed for QA stations",
-        run: () => this.chromium(),
-      },
-      {
-        key: "nvm",
-        label: "nvm",
-        required: false,
-        neededFor: "Needed when repos pin Node in .nvmrc",
-        run: () => this.nvm(),
       },
     ];
   }
@@ -212,47 +205,6 @@ export class DoctorService {
         ok("Running")
       : problem("fail", "Not running", "Start the worker; runs stay queued until it is up.");
   }
-
-  private async reposFolder(): Promise<Result> {
-    const root = await this.repos.root();
-    if (!existsSync(root)) {
-      return problem(
-        "warn",
-        `${tilde(root)} does not exist`,
-        "Pick your repos folder in Settings.",
-      );
-    }
-    const count = (await this.repos.list()).length;
-    return count > 0
-      ? ok(`${tilde(root)} · ${count} ${count === 1 ? "repo" : "repos"}`)
-      : problem("warn", `No git repos in ${tilde(root)}`, "Pick your repos folder in Settings.");
-  }
-
-  private async chromium(): Promise<Result> {
-    const dir =
-      this.config.get("PLAYWRIGHT_BROWSERS_PATH", { infer: true }) ?? defaultPlaywrightCache();
-    const entries = await readdir(dir).catch(() => [] as string[]);
-    const builds = entries.filter((e) => /^chromium-\d+$/.test(e));
-    return builds.length
-      ? ok(`Playwright Chromium (${builds.length} ${builds.length === 1 ? "build" : "builds"})`)
-      : problem(
-          "warn",
-          "Not installed",
-          "Install Playwright's Chromium (about 150 MB).",
-          "npx playwright install chromium",
-        );
-  }
-
-  private async nvm(): Promise<Result> {
-    const dir = this.config.get("NVM_DIR", { infer: true }) ?? path.join(os.homedir(), ".nvm");
-    return existsSync(path.join(dir, "nvm.sh"))
-      ? ok(tilde(dir))
-      : problem(
-          "warn",
-          "Not installed",
-          "Install nvm (github.com/nvm-sh/nvm); previews then run under the Node a repo pins.",
-        );
-  }
 }
 
 async function git(): Promise<Result> {
@@ -264,7 +216,7 @@ async function git(): Promise<Result> {
     return problem(
       "fail",
       "Not installed",
-      "Install git (Xcode command line tools).",
+      "Install Git (Xcode command line tools).",
       "xcode-select --install",
     );
   const match = out.match(/(\d+)\.(\d+)(?:\.(\d+))?/);
@@ -272,11 +224,11 @@ async function git(): Promise<Result> {
   const [major, minor] = [Number(match?.[1] ?? 0), Number(match?.[2] ?? 0)];
   const recent = major > GIT_HOOK_RUN[0] || (major === GIT_HOOK_RUN[0] && minor >= GIT_HOOK_RUN[1]);
   return recent
-    ? ok(`git ${version}`)
+    ? ok(`Git ${version}`)
     : problem(
         "warn",
-        `git ${version}`,
-        "Update git to 2.36 or newer; older versions skip the repo-hooks check before delivery.",
+        `Git ${version}`,
+        "Update Git to 2.36 or newer; older versions skip the repo-hooks check before delivery.",
         "brew install git",
       );
 }
@@ -295,18 +247,6 @@ async function gh(): Promise<Result> {
   return loggedIn
     ? ok(`gh ${installed} · logged in`)
     : problem("warn", `gh ${installed} · not logged in`, "Log in to GitHub.", "gh auth login");
-}
-
-function defaultPlaywrightCache(): string {
-  const home = os.homedir();
-  if (process.platform === "darwin") return path.join(home, "Library", "Caches", "ms-playwright");
-  if (process.platform === "win32") return path.join(home, "AppData", "Local", "ms-playwright");
-  return path.join(home, ".cache", "ms-playwright");
-}
-
-function tilde(p: string): string {
-  const home = os.homedir();
-  return p === home || p.startsWith(`${home}${path.sep}`) ? `~${p.slice(home.length)}` : p;
 }
 
 function capitalize(s: string): string {

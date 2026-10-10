@@ -127,6 +127,20 @@
       "when": 1791099468571,
       "tag": "0017_add_notification_external",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1791666660638,
+      "tag": "0018_retire_shift_stations",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791671085221,
+      "tag": "0019_hub_projects",
+      "breakpoints": true
     }
   ]
 }

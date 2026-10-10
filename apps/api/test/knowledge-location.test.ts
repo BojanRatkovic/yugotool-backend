@@ -17,7 +17,7 @@ describe("locationProblem", () => {
 
   it("explains a missing path or a folder that is not a repo", () => {
     expect(locationProblem("path", path.join(dir, "nope"))).toMatch(/does not exist/);
-    expect(locationProblem("git_local", dir)).toMatch(/not a git repository/);
+    expect(locationProblem("git_local", dir)).toMatch(/not a Git repository/);
   });
 
   it("wants a git URL for remotes", () => {

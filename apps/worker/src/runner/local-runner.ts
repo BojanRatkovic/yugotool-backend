@@ -6,6 +6,8 @@ import path from "node:path";
 import { promisify } from "node:util";
 
 import { SIGNATURE } from "./pr-body";
+import { pinnedNodeEnv } from "./node-versions";
+import { hubWorktreePath } from "./work-hub";
 
 const exec = promisify(execFile);
 
@@ -28,10 +30,19 @@ export const localRunner = {
     baseBranch: string;
     runId: string;
     title: string;
+    /** A work hub's repo (spec 0012): the worktree goes in `<hub>/worktrees/`, as the hub expects. */
+    hub?: string | null;
   }): Promise<Workspace> {
-    await mkdir(WORKTREES_ROOT, { recursive: true });
-    const worktreePath = path.join(WORKTREES_ROOT, input.runId);
-    const branch = `zastava/${slugify(input.title)}-${input.runId.slice(0, 8)}`;
+    const suffix = `${slugify(input.title)}-${input.runId.slice(0, 8)}`;
+    const worktreePath = input.hub
+      ? hubWorktreePath(input.hub, input.repoPath, suffix)
+      : path.join(WORKTREES_ROOT, input.runId);
+    await mkdir(path.dirname(worktreePath), { recursive: true });
+    const branch = `zastava/${suffix}`;
+    // Best effort: a fresh origin/<base>, so the run doesn't start from a days-old ref.
+    await exec("git", ["-C", input.repoPath, "fetch", "--quiet", "origin", input.baseBranch], {
+      timeout: 120_000,
+    }).catch(() => undefined);
     // Start where the PR will land: origin/<base> when there is one (the local base can be stale).
     const start = await localRunner.baseRef(input.repoPath, input.baseBranch);
     await exec("git", [
@@ -269,15 +280,19 @@ export const localRunner = {
     return stdout.trim();
   },
 
-  /** Runs a shell command, killing it after 15 min; output is stdout+stderr interleaved. */
-  runCommand(
+  /**
+   * Runs a shell command under the Node the repo pins, killing it after 15 min;
+   * output is stdout+stderr interleaved.
+   */
+  async runCommand(
     cwd: string,
     command: string,
     onProgress: () => void,
     options: { ci?: boolean } = {},
   ): Promise<{ passed: boolean; output: string }> {
+    const base = await pinnedNodeEnv(cwd, process.env);
     return new Promise((resolve) => {
-      const env = options.ci === false ? process.env : { ...process.env, CI: "1" };
+      const env = options.ci === false ? base : { ...base, CI: "1" };
       const child = spawn(command, { cwd, shell: true, env });
       let output = "";
       const append = (chunk: Buffer): void => {
