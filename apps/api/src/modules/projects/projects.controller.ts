@@ -46,6 +46,7 @@ import {
   RouteMapStatusDto,
   UpdateLineDto,
   UpdateReviewLineDto,
+  UpdateHubRepoDto,
   UpdateProjectDto,
   UpdateRoutesDto,
 } from "./projects.dto";
@@ -109,6 +110,17 @@ export class ProjectsController {
   @ApiOkResponse({ type: ProjectDto })
   update(@Param("id", ParseUUIDPipe) id: string, @Body() body: UpdateProjectDto): Promise<Project> {
     return this.service.update(id, body);
+  }
+
+  /** Hub projects: one repo's base branch and preview (spec 0014). */
+  @Patch(":id/repos/:repo")
+  @ApiOkResponse({ type: ProjectDto })
+  updateRepo(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Param("repo") repo: string,
+    @Body() body: UpdateHubRepoDto,
+  ): Promise<Project> {
+    return this.service.updateHubRepo(id, repo, body);
   }
 
   @Delete(":id")

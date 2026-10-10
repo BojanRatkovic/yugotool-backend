@@ -16,6 +16,12 @@ export class RepoPathIsHubError extends DomainError {
   readonly kind = "validation";
 }
 
+/** Not a repo of this hub project (or the project is not a hub). */
+export class HubRepoNotFoundError extends DomainError {
+  readonly code = "hub_repo_not_found";
+  readonly kind = "not_found";
+}
+
 export class PreviewNotConfiguredError extends DomainError {
   readonly code = "preview_not_configured";
   readonly kind = "conflict";

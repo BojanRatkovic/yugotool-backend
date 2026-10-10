@@ -1,8 +1,12 @@
 // Work hubs (spec 0012): `<hub>/repos/<name>` checkouts under a folder whose
 // CLAUDE.md/AGENTS.md teaches agents that code. Mirrors apps/worker/src/runner/work-hub.ts.
+import { execFile } from "node:child_process";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
+import { promisify } from "node:util";
 import { hubCandidateOf } from "@zastava/contracts";
+
+const exec = promisify(execFile);
 
 const isDirectory = (dir: string): boolean => {
   try {
@@ -22,6 +26,30 @@ export function isHubRoot(dir: string): boolean {
 export function hubOfRepo(repoPath: string): string | null {
   const hub = hubCandidateOf(path.resolve(repoPath));
   return hub && isHubRoot(hub) ? hub : null;
+}
+
+/** Branches a hub repo's work usually starts from, in order of preference. */
+const BASE_CANDIDATES = ["develop", "main", "master"];
+
+/**
+ * The branch a repo's work starts from (spec 0014): `origin/HEAD`, else the
+ * first of develop → main → master that exists (remote or local), else the
+ * checked-out branch, else "main".
+ */
+export async function detectBaseBranch(repoPath: string): Promise<string> {
+  const git = (...args: string[]) =>
+    exec("git", ["-C", repoPath, ...args]).then(
+      ({ stdout }) => stdout.trim(),
+      () => "",
+    );
+  const originHead = await git("symbolic-ref", "--short", "refs/remotes/origin/HEAD");
+  if (originHead.startsWith("origin/")) return originHead.slice("origin/".length);
+  for (const name of BASE_CANDIDATES) {
+    for (const ref of [`refs/remotes/origin/${name}`, `refs/heads/${name}`]) {
+      if (await git("rev-parse", "--verify", "--quiet", ref)) return name;
+    }
+  }
+  return (await git("branch", "--show-current")) || "main";
 }
 
 /** The git checkouts in a hub's `repos/`, by name. */

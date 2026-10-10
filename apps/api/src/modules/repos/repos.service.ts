@@ -46,15 +46,27 @@ export class ReposService {
   }
 
   private async scan(dir: string, depth: number, out: Repo[]): Promise<void> {
-    // A work hub stands for its repos (`work/frontend`), never for itself (spec 0012).
+    // A work hub is listed itself (a hub project, spec 0014) and with its
+    // repos (`work/frontend`, each a project on its own, spec 0012).
     if (isHubRoot(dir)) {
       const hubName = path.basename(dir);
-      for (const repo of hubRepos(dir)) {
+      const repos = hubRepos(dir);
+      out.push({
+        name: hubName,
+        path: dir,
+        currentBranch: await currentBranch(dir),
+        hubPath: dir,
+        kind: "hub",
+        repoCount: repos.length,
+      });
+      for (const repo of repos) {
         out.push({
           name: `${hubName}/${repo.name}`,
           path: repo.path,
           currentBranch: await currentBranch(repo.path),
           hubPath: dir,
+          kind: "repo",
+          repoCount: null,
         });
       }
       return;
@@ -65,6 +77,8 @@ export class ReposService {
         path: dir,
         currentBranch: await currentBranch(dir),
         hubPath: null,
+        kind: "repo",
+        repoCount: null,
       });
       return;
     }

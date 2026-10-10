@@ -18,6 +18,8 @@ import {
   REVIEW_LINE_STATIONS,
   type RouteMapStatus,
   TASK_QUEUE,
+  type RepoSettings,
+  type UpdateHubRepo,
   type UpdateLine,
   type UpdateProject,
   type UpdateRoutes,
@@ -32,17 +34,25 @@ import {
   PreviewTestRunningError,
   ProjectHasActiveWorkError,
   ProjectNotFoundError,
+  HubRepoNotFoundError,
   RepoPathInvalidError,
-  RepoPathIsHubError,
   RouteDiscoveryRunningError,
 } from "./project.errors";
-import { hubRepos, isHubRoot } from "./work-hub";
+import { detectBaseBranch, hubRepos, isHubRoot } from "./work-hub";
 import { detectPreview } from "./preview-detect";
 import { removeProjectFiles } from "./project-cleanup";
 import { projectRemote } from "./project-remote";
 import { ProjectsRepository } from "./projects.repository";
 import { readRepoFacts } from "./repo-facts";
 import { baseRef, routeSourceHash } from "./route-hash";
+
+/** Detected base branch per repo, no preview yet (spec 0014). */
+async function detectRepoSettings(repos: { name: string; path: string }[]): Promise<RepoSettings> {
+  const entries = await Promise.all(
+    repos.map(async (r) => [r.name, { baseBranch: await detectBaseBranch(r.path), preview: null }]),
+  );
+  return Object.fromEntries(entries);
+}
 
 const discoveryWorkflowId = (projectId: string): string => `discover-routes-${projectId}`;
 
@@ -56,25 +66,25 @@ export class ProjectsService {
     @Inject(TEMPORAL_CLIENT) private readonly temporal: Client,
   ) {}
 
-  list(): Promise<Project[]> {
-    return this.repository.list(this.database.db);
+  async list(): Promise<Project[]> {
+    const projects = await this.repository.list(this.database.db);
+    return Promise.all(projects.map((p) => this.withHubRepos(p)));
   }
 
   async create(input: CreateProject): Promise<Project> {
     const repoPath = path.resolve(input.repoPath);
-    if (!existsSync(path.join(repoPath, ".git"))) {
+    // A work hub is a hub project: each run picks one of its repos (spec 0014).
+    const hub = isHubRoot(repoPath);
+    if (!hub && !existsSync(path.join(repoPath, ".git"))) {
       throw new RepoPathInvalidError(`${repoPath} is not a Git repository`);
     }
-    // A hub's own repo holds its knowledge, not the code: runs must branch off one of its repos.
-    if (isHubRoot(repoPath)) {
-      const repos = hubRepos(repoPath);
-      throw new RepoPathIsHubError(
-        `${repoPath} is a work hub; pick one of its repos${repos.length ? ` (${repos.map((r) => r.name).join(", ")})` : ""}`,
-        { repos },
-      );
-    }
+    const repoSettings = hub ? await detectRepoSettings(hubRepos(repoPath)) : null;
     const project = await this.database.transaction(async (tx) => {
-      const result = await this.repository.insert(tx, { ...input, repoPath });
+      const result = await this.repository.insert(tx, {
+        ...input,
+        repoPath,
+        ...(hub ? { kind: "hub" as const, repoSettings } : {}),
+      });
       if (result.created) await this.repository.insertLine(tx, result.project.id, DEFAULT_STATIONS);
       return result.project;
     });
@@ -121,6 +131,47 @@ export class ProjectsService {
     for (const collection of ["projects", "work_orders", "runs", "dispatcher"] as const) {
       await this.events.publish({ type: "invalidate", collection });
     }
+  }
+
+  /** Hub projects: one repo's base branch and preview (spec 0014). */
+  async updateHubRepo(projectId: string, repo: string, input: UpdateHubRepo): Promise<Project> {
+    const found = await this.repository.find(this.database.db, projectId);
+    if (!found) throw new ProjectNotFoundError(`project ${projectId} not found`);
+    const project = await this.withHubRepos(found);
+    if (project.kind !== "hub" || !project.repos.some((r) => r.name === repo)) {
+      throw new HubRepoNotFoundError(`${repo} is not a repo of project ${project.name}`);
+    }
+    const updated = await this.repository.updateRepoSettings(
+      this.database.db,
+      projectId,
+      repo,
+      input,
+    );
+    if (!updated) throw new ProjectNotFoundError(`project ${projectId} not found`);
+    await this.events.publish({ type: "invalidate", collection: "projects" });
+    return this.withHubRepos(updated);
+  }
+
+  /**
+   * A hub project's repos as they are on disk now: a repo cloned into the hub
+   * later gets its base branch detected and saved; a removed one is left out.
+   */
+  private async withHubRepos(project: Project): Promise<Project> {
+    if (project.kind !== "hub") return project;
+    const onDisk = hubRepos(project.repoPath);
+    const known = new Set(project.repos.map((r) => r.name));
+    const added = onDisk.filter((r) => !known.has(r.name));
+    if (added.length) {
+      await this.repository.addRepoSettings(
+        this.database.db,
+        project.id,
+        await detectRepoSettings(added),
+      );
+      const fresh = await this.repository.find(this.database.db, project.id);
+      if (fresh) project = fresh;
+    }
+    const present = new Set(onDisk.map((r) => r.name));
+    return { ...project, repos: project.repos.filter((r) => present.has(r.name)) };
   }
 
   async update(projectId: string, input: UpdateProject): Promise<Project> {

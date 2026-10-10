@@ -14,6 +14,7 @@ import {
   updateLineSchema,
   updateReviewLineSchema,
   updateProjectSchema,
+  updateHubRepoSchema,
 } from "@zastava/contracts";
 import { createZodDto } from "nestjs-zod";
 
@@ -24,6 +25,7 @@ export class UpdateLineDto extends createZodDto(updateLineSchema) {}
 export class UpdateReviewLineDto extends createZodDto(updateReviewLineSchema) {}
 export class ProjectStatsDto extends createZodDto(projectStatsSchema) {}
 export class UpdateProjectDto extends createZodDto(updateProjectSchema) {}
+export class UpdateHubRepoDto extends createZodDto(updateHubRepoSchema) {}
 export class PreviewTestResultDto extends createZodDto(previewTestResultSchema) {}
 export class PreviewStatusDto extends createZodDto(previewStatusSchema) {}
 export class RouteMapStatusDto extends createZodDto(routeMapStatusSchema) {}

@@ -4,10 +4,12 @@ import type {
   Line,
   LineKind,
   Project,
+  ProjectKind,
   ProjectStats,
   RepoSettings,
   RouteMap,
   Station,
+  UpdateHubRepo,
   UpdateProject,
 } from "@zastava/contracts";
 import { type Executor, lines, projects, runs, stationRuns, workOrders } from "@zastava/db";
@@ -109,15 +111,19 @@ export class ProjectsRepository {
   /** Idempotent on a client-supplied id: a replayed offline create returns the original. */
   async insert(
     db: Executor,
-    values: { id?: string | undefined; name: string; repoPath: string; baseBranch: string },
+    values: {
+      id?: string | undefined;
+      name: string;
+      repoPath: string;
+      baseBranch: string;
+      kind?: ProjectKind;
+      repoSettings?: RepoSettings | null;
+    },
   ): Promise<{ project: Project; created: boolean }> {
+    const { id, ...rest } = values;
     const [row] = await db
       .insert(projects)
-      .values(
-        values.id
-          ? values
-          : { name: values.name, repoPath: values.repoPath, baseBranch: values.baseBranch },
-      )
+      .values(id ? { id, ...rest } : rest)
       .onConflictDoNothing({ target: projects.id })
       .returning();
     if (row) return { project: toProject(row), created: true };
@@ -149,6 +155,37 @@ export class ProjectsRepository {
       .where(eq(projects.id, id))
       .returning({ id: projects.id });
     return rows.length > 0;
+  }
+
+  /** Adds settings for repos new to a hub; never overwrites an existing repo's entry. */
+  async addRepoSettings(db: Executor, id: string, added: RepoSettings): Promise<void> {
+    await db
+      .update(projects)
+      .set({
+        repoSettings: sql`${JSON.stringify(added)}::jsonb || coalesce(${projects.repoSettings}, '{}'::jsonb)`,
+      })
+      .where(eq(projects.id, id));
+  }
+
+  /** Merges a patch into one hub repo's settings. */
+  async updateRepoSettings(
+    db: Executor,
+    id: string,
+    repo: string,
+    patch: UpdateHubRepo,
+  ): Promise<Project | null> {
+    const [row] = await db
+      .update(projects)
+      .set({
+        repoSettings: sql`jsonb_set(
+          coalesce(${projects.repoSettings}, '{}'::jsonb),
+          array[${repo}::text],
+          coalesce(${projects.repoSettings} -> ${repo}::text, '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb
+        )`,
+      })
+      .where(eq(projects.id, id))
+      .returning();
+    return row ? toProject(row) : null;
   }
 
   async update(db: Executor, id: string, patch: UpdateProject): Promise<Project | null> {
