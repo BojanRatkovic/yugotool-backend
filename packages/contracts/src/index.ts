@@ -402,6 +402,32 @@ export function hubCandidateOf(repoPath: string): string | null {
   return parts.slice(0, -2).join("/") || null;
 }
 
+/**
+ * The repo a run works in (spec 0014): in a hub project the run's repo
+ * (`<hub>/repos/<repo>`, with that repo's base branch and preview), else the
+ * project's own repo. Before a hub run has its repo, the hub itself. Pure.
+ */
+export function runTarget(
+  project: {
+    kind: ProjectKind;
+    repoPath: string;
+    baseBranch: string;
+    preview: Preview | null;
+    repoSettings: RepoSettings | null;
+  },
+  runRepo: string | null,
+): { repoPath: string; baseBranch: string; preview: Preview | null } {
+  if (project.kind !== "hub" || !runRepo) {
+    return { repoPath: project.repoPath, baseBranch: project.baseBranch, preview: project.preview };
+  }
+  const settings = project.repoSettings?.[runRepo];
+  return {
+    repoPath: `${project.repoPath.replace(/\/+$/, "")}/repos/${runRepo}`,
+    baseBranch: settings?.baseBranch ?? "main",
+    preview: settings?.preview ?? null,
+  };
+}
+
 export const updateProjectSchema = z
   .object({
     name: z.string().trim().min(1).max(120),
@@ -441,6 +467,9 @@ export const previewDetectionSchema = z.object({
 export type PreviewDetection = z.infer<typeof previewDetectionSchema>;
 
 /** Where approved work can go: checked live from the repo and gh. */
+/** Hub projects: the repo whose remote to check (spec 0014). */
+export const projectRemoteQuerySchema = z.object({ repo: z.string().trim().min(1).optional() });
+
 export const projectRemoteSchema = z.object({
   /** `origin` URL; null when the repo has none. */
   origin: z.string().nullable(),

@@ -20,6 +20,7 @@ import {
   researchPlanSchema,
   REVIEW_VERDICT_JSON_SCHEMA,
   type ReviewVerdict,
+  runTarget,
   type StationResearch,
   reviewVerdictSchema,
   VERDICT_JSON_SCHEMA,
@@ -325,13 +326,14 @@ export function createActivities(
           );
         }
         const [row] = await db
-          .select({ baseBranch: projects.baseBranch })
+          .select({ project: projects, runRepo: runs.repo })
           .from(runs)
           .innerJoin(workOrders, eq(workOrders.id, runs.workOrderId))
           .innerJoin(projects, eq(projects.id, workOrders.projectId))
           .where(eq(runs.id, input.runId));
         if (row) {
-          const baseSha = await localRunner.mergeBase(input.worktreePath, row.baseBranch);
+          const { baseBranch } = runTarget(row.project, row.runRepo);
+          const baseSha = await localRunner.mergeBase(input.worktreePath, baseBranch);
           const reverted = await localRunner.revertIncidentalLockfiles(input.worktreePath, baseSha);
           if (reverted.length) {
             await appendEvent(
@@ -601,7 +603,8 @@ export function createActivities(
         .select({
           worktreePath: runs.worktreePath,
           status: runs.status,
-          repoPath: projects.repoPath,
+          runRepo: runs.repo,
+          project: projects,
         })
         .from(runs)
         .innerJoin(workOrders, eq(workOrders.id, runs.workOrderId))
@@ -610,7 +613,7 @@ export function createActivities(
       if (!row?.worktreePath) return;
       try {
         const snapshot = await localRunner.archiveWorkspace({
-          repoPath: row.repoPath,
+          repoPath: runTarget(row.project, row.runRepo).repoPath,
           worktreePath: row.worktreePath,
           memoryDir: path.join(runArtifactsDir(input.runId), "memory"),
           message: `wip: unfinished changes of ZASTAVA run ${input.runId.slice(0, 8)} (${row.status})`,
@@ -1034,8 +1037,8 @@ export function createActivities(
           title: workOrders.title,
           branch: workOrders.branch,
           runId: workOrders.currentRunId,
-          repoPath: projects.repoPath,
-          baseBranch: projects.baseBranch,
+          project: projects,
+          runRepo: runs.repo,
           worktreePath: runs.worktreePath,
         })
         .from(workOrders)
@@ -1045,19 +1048,20 @@ export function createActivities(
       if (!row?.branch || !row.runId) {
         return { prUrl: null, error: "This work order has no delivered branch." };
       }
-      const dir =
-        row.worktreePath && existsSync(row.worktreePath) ? row.worktreePath : row.repoPath;
+      // A hub run delivers from its repo (spec 0014); a repo run from the project's.
+      const { repoPath, baseBranch } = runTarget(row.project, row.runRepo);
+      const dir = row.worktreePath && existsSync(row.worktreePath) ? row.worktreePath : repoPath;
       try {
         const body = await composePrBody({
           runId: row.runId,
           workOrderId: input.workOrderId,
           worktreePath: dir,
-          baseBranch: row.baseBranch,
+          baseBranch,
         });
         const result = await localRunner.openPullRequest({
           dir,
           branch: row.branch,
-          baseBranch: row.baseBranch,
+          baseBranch,
           title: row.title,
           body,
           draft: input.draft,

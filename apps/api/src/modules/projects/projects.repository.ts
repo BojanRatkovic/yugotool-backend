@@ -78,14 +78,17 @@ export class ProjectsRepository {
   }
 
   /** Every run of the project with its worktree path (null once cleaned up). */
-  async runWorktrees(db: Executor, id: string): Promise<{ runId: string; worktreePath: string }[]> {
+  async runWorktrees(
+    db: Executor,
+    id: string,
+  ): Promise<{ runId: string; worktreePath: string; repo: string | null }[]> {
     const rows = await db
-      .select({ runId: runs.id, worktreePath: runs.worktreePath })
+      .select({ runId: runs.id, worktreePath: runs.worktreePath, repo: runs.repo })
       .from(runs)
       .innerJoin(workOrders, eq(workOrders.id, runs.workOrderId))
       .where(and(eq(workOrders.projectId, id), isNotNull(runs.worktreePath)));
     return rows.flatMap((r) =>
-      r.worktreePath ? [{ runId: r.runId, worktreePath: r.worktreePath }] : [],
+      r.worktreePath ? [{ runId: r.runId, worktreePath: r.worktreePath, repo: r.repo }] : [],
     );
   }
 

@@ -11,6 +11,7 @@ import {
   Patch,
   Post,
   Put,
+  Query,
   StreamableFile,
 } from "@nestjs/common";
 import {
@@ -39,6 +40,7 @@ import {
   PreviewDetectionDto,
   PreviewSessionStatusDto,
   ProjectRemoteDto,
+  ProjectRemoteQueryDto,
   PreviewStatusDto,
   PreviewTestResultDto,
   ProjectDto,
@@ -140,8 +142,11 @@ export class ProjectsController {
   /** Where approved work can go (origin, GitHub, gh login); checked live. */
   @Get(":id/remote")
   @ApiOkResponse({ type: ProjectRemoteDto })
-  remote(@Param("id", ParseUUIDPipe) id: string): Promise<ProjectRemote> {
-    return this.service.remote(id);
+  remote(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Query() query: ProjectRemoteQueryDto,
+  ): Promise<ProjectRemote> {
+    return this.service.remote(id, query.repo);
   }
 
   @Post(":id/preview/detect")

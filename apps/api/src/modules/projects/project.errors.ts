@@ -22,6 +22,12 @@ export class HubRepoNotFoundError extends DomainError {
   readonly kind = "not_found";
 }
 
+/** Something hub projects don't do (yet), e.g. route discovery (spec 0014 §5). */
+export class NotForHubProjectsError extends DomainError {
+  readonly code = "not_for_hub_projects";
+  readonly kind = "validation";
+}
+
 export class PreviewNotConfiguredError extends DomainError {
   readonly code = "preview_not_configured";
   readonly kind = "conflict";

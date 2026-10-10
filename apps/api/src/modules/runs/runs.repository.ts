@@ -8,6 +8,7 @@ import {
   type Shift,
   type ShiftStatus,
   type StationRun,
+  runTarget,
 } from "@zastava/contracts";
 import {
   type Executor,
@@ -268,15 +269,18 @@ export class RunsRepository {
     const [row] = await db
       .select({
         worktreePath: runs.worktreePath,
-        baseBranch: projects.baseBranch,
-        repoPath: projects.repoPath,
+        project: projects,
+        runRepo: runs.repo,
         branch: workOrders.branch,
       })
       .from(runs)
       .innerJoin(workOrders, eq(workOrders.id, runs.workOrderId))
       .innerJoin(projects, eq(projects.id, workOrders.projectId))
       .where(eq(runs.id, runId));
-    return row ?? null;
+    if (!row) return null;
+    // A hub run's work lives in its repo (spec 0014).
+    const { repoPath, baseBranch } = runTarget(row.project, row.runRepo);
+    return { worktreePath: row.worktreePath, branch: row.branch, repoPath, baseBranch };
   }
 
   /** What a hub run's gate needs to check a repo choice (spec 0014). */

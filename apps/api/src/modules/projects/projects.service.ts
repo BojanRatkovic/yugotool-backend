@@ -35,6 +35,7 @@ import {
   ProjectHasActiveWorkError,
   ProjectNotFoundError,
   HubRepoNotFoundError,
+  NotForHubProjectsError,
   RepoPathInvalidError,
   RouteDiscoveryRunningError,
 } from "./project.errors";
@@ -122,6 +123,7 @@ export class ProjectsService {
     if (project) {
       const failed = await removeProjectFiles({
         projectId,
+        kind: project.kind,
         repoPath: project.repoPath,
         worktrees,
         runIds,
@@ -203,9 +205,16 @@ export class ProjectsService {
     }
   }
 
-  async remote(projectId: string): Promise<ProjectRemote> {
+  /** Hub projects: where one repo's work can go (`repo`); the hub's own remote says nothing. */
+  async remote(projectId: string, repo?: string): Promise<ProjectRemote> {
     const project = await this.repository.find(this.database.db, projectId);
     if (!project) throw new ProjectNotFoundError(`project ${projectId} not found`);
+    if (project.kind === "hub" && repo) {
+      const target = (await this.withHubRepos(project)).repos.find((r) => r.name === repo);
+      if (!target)
+        throw new HubRepoNotFoundError(`${repo} is not a repo of project ${project.name}`);
+      return projectRemote(target.path);
+    }
     return projectRemote(project.repoPath);
   }
 
@@ -254,6 +263,9 @@ export class ProjectsService {
   async discoverRoutes(projectId: string): Promise<RouteMapStatus> {
     const project = await this.repository.find(this.database.db, projectId);
     if (!project) throw new ProjectNotFoundError(`project ${projectId} not found`);
+    if (project.kind === "hub") {
+      throw new NotForHubProjectsError("route discovery is per repo, not yet for hub projects");
+    }
     if (await this.discoveryRunning(projectId)) {
       throw new RouteDiscoveryRunningError("route discovery is already running for this project");
     }
