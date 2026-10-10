@@ -124,7 +124,7 @@ export function hubResearchPrompt(input: {
     input.plans
       ? input.presetRepo
         ? `This work order is set to \`${input.presetRepo}\`: set \`repo\` to it and plan the work there. Propose a \`split\` only if other repos must change too.`
-        : "Pick the one repo the work belongs in and set `repo` to its name (one of the names above, without `repos/`)."
+        : "Pick the one repo whose code must change (where the builder will edit, not where you only read context) and set `repo` to its name (one of the names above, without `repos/`)."
       : null,
     input.plans
       ? "If more than one repo must change, propose a `split`: one work order per repo, in the order they must land (each with `title`, `description` holding that part of the plan, and `repo`); `repo` is then the first item's repo. Put the complete plan, as a numbered list, in `plan`."
