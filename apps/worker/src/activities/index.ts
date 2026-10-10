@@ -165,6 +165,23 @@ function stationName(line: Station[], key: string): string {
   return line.find((s) => s.key === key)?.name ?? key;
 }
 
+/** Fails the run (not retried) when the repo's commit-msg hook rejects the title. */
+async function checkTitle(worktreePath: string, title: string): Promise<void> {
+  const message = await localRunner.checkCommitMessage(worktreePath, title).catch(() => null);
+  if (!message || message.passed) return;
+  const why = message.output.replace(ANSI_COLOR, "");
+  // A hook that can't run yet (its tool isn't installed before `npm ci`) is not a verdict.
+  if (/command not found|not found|ENOENT|Cannot find module/i.test(why)) return;
+  const first =
+    why
+      .split("\n")
+      .find((line) => line.trim())
+      ?.trim() ?? "rejected";
+  throw ApplicationFailure.nonRetryable(
+    `Work order title rejected by the repo's commit-msg hook: ${first}. Rename the work order and run it again.`,
+  );
+}
+
 export function createActivities(
   db: Database,
   options: { desktopNotices: "osascript" | "app" } = { desktopNotices: "osascript" },
@@ -434,23 +451,7 @@ export function createActivities(
       // A commit-msg rule (Conventional Commits…) rejects the work order title
       // only at delivery, after every station ran — and no agent can fix a
       // title. Check it before spending anything.
-      const message = await localRunner
-        .checkCommitMessage(workspace.path, row.workOrder.title)
-        .catch(() => null);
-      if (message && !message.passed) {
-        const why = message.output.replace(ANSI_COLOR, "");
-        // A hook that can't run yet (its tool isn't installed before `npm ci`) is not a verdict.
-        if (!/command not found|not found|ENOENT|Cannot find module/i.test(why)) {
-          const first =
-            why
-              .split("\n")
-              .find((line) => line.trim())
-              ?.trim() ?? "rejected";
-          throw ApplicationFailure.nonRetryable(
-            `Work order title rejected by the repo's commit-msg hook: ${first}. Rename the work order and run it again.`,
-          );
-        }
-      }
+      await checkTitle(workspace.path, row.workOrder.title);
 
       return {
         stations: row.line.stations,
@@ -463,6 +464,76 @@ export function createActivities(
         effortOverride: row.workOrder.effortOverride,
         maxBudgetUsd: row.workOrder.maxBudgetUsd,
       };
+    },
+
+    /**
+     * A hub run's worktree, once its repo is chosen (spec 0014): made as for a
+     * hub repo project (0012) in `<hub>/worktrees/`, off the repo's base branch.
+     * From here the run is a normal run on that repo.
+     */
+    async prepareRepoWorkspace(input: {
+      runId: string;
+      workOrderId: string;
+      hub: string;
+      repo: string;
+    }): Promise<{ worktreePath: string; branch: string; baseBranch: string }> {
+      const [row] = await db
+        .select({ workOrder: workOrders, project: projects, run: runs })
+        .from(runs)
+        .innerJoin(workOrders, eq(workOrders.id, runs.workOrderId))
+        .innerJoin(projects, eq(projects.id, workOrders.projectId))
+        .where(eq(runs.id, input.runId));
+      if (!row) throw new Error(`run ${input.runId} not found`);
+      const repoPath = path.join(input.hub, "repos", input.repo);
+      if (!existsSync(path.join(repoPath, ".git"))) {
+        throw ApplicationFailure.nonRetryable(
+          `${input.repo} is not a repo of the hub ${input.hub}`,
+        );
+      }
+      const baseBranch = row.project.repoSettings?.[input.repo]?.baseBranch ?? "main";
+      // A retried activity finds the worktree it already made.
+      const existing = row.run.worktreePath !== input.hub ? row.run.worktreePath : null;
+      if (existing && row.run.repo === input.repo && row.workOrder.branch && existsSync(existing)) {
+        return { worktreePath: existing, branch: row.workOrder.branch, baseBranch };
+      }
+      const workspace = await localRunner.prepareWorkspace({
+        repoPath,
+        baseBranch,
+        runId: input.runId,
+        title: row.workOrder.title,
+        hub: input.hub,
+      });
+      await db
+        .update(runs)
+        .set({ worktreePath: workspace.path, repo: input.repo })
+        .where(eq(runs.id, input.runId));
+      await db
+        .update(workOrders)
+        .set({ branch: workspace.branch, repo: input.repo })
+        .where(eq(workOrders.id, input.workOrderId));
+      await appendEvent(
+        input.runId,
+        null,
+        "system",
+        `Workspace ready for ${input.repo} on branch ${workspace.branch} (from ${baseBranch})`,
+      );
+      const linked = await linkIgnoredFiles(repoPath, workspace.path).catch(() => []);
+      const plugin = await hubPlugin(input.hub).catch(() => null);
+      await appendEvent(
+        input.runId,
+        null,
+        "system",
+        [
+          `Work hub ${input.hub}: worktree in its worktrees/, hub CLAUDE.md/AGENTS.md and knowledge readable`,
+          plugin ? `skills ${plugin.skills.join(", ")}` : null,
+          linked.length ? `linked ignored files ${linked.join(", ")}` : null,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+      );
+      await invalidateBoard();
+      await checkTitle(workspace.path, row.workOrder.title);
+      return { worktreePath: workspace.path, branch: workspace.branch, baseBranch };
     },
 
     async beginStation(input: {

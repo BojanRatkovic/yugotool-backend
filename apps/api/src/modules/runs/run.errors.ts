@@ -10,6 +10,12 @@ export class WorkspaceGoneError extends DomainError {
   readonly kind = "conflict";
 }
 
+/** A hub run's gate decision names a repo it can't use, or none when one is needed (spec 0014). */
+export class GateRepoInvalidError extends DomainError {
+  readonly code = "gate_repo_invalid";
+  readonly kind = "validation";
+}
+
 export class GateNotPendingError extends DomainError {
   readonly code = "gate_not_pending";
   readonly kind = "conflict";

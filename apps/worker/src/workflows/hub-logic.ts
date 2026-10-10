@@ -23,3 +23,17 @@ export function runsInHub(stations: Station[], index: number): boolean {
   const edit = firstEditIndex(stations);
   return station?.kind === "agent" && !station.canEdit && (edit < 0 || index < edit);
 }
+
+/**
+ * A hub run needs its repo's worktree before this station: anything but a
+ * station that runs in the hub or a gate before the first editing station
+ * (the plan gate). So the workspace comes after the plan gate, or right after
+ * Research when there is no gate in between.
+ */
+export function needsWorkspace(stations: Station[], index: number): boolean {
+  const station = stations[index];
+  if (!station) return false;
+  if (runsInHub(stations, index)) return false;
+  const edit = firstEditIndex(stations);
+  return !(station.kind === "gate" && (edit < 0 || index < edit));
+}

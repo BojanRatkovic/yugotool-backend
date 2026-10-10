@@ -36,7 +36,7 @@ import {
   type ShiftTally,
 } from "./shift-logic";
 import { startCiWatch } from "./watch-ci.workflow";
-import { hubPlanIndex, runsInHub } from "./hub-logic";
+import { hubPlanIndex, needsWorkspace, runsInHub } from "./hub-logic";
 
 export const gateDecisionSignal =
   defineSignal<[GateDecision & { stationKey: string }]>(GATE_DECISION_SIGNAL);
@@ -152,6 +152,33 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
     // A hub project (spec 0014): planning runs in the hub; runs started before replay as repo runs.
     const hub = run.kind === "hub" && run.hubPath && patched("hub-projects") ? run.hubPath : null;
     const planIndex = hub ? hubPlanIndex(run.stations) : -1;
+    /** Hub runs get their worktree once the repo is chosen; repo runs have it from the start. */
+    let workspaceReady = hub === null;
+    /** The repo a hub run will work in: preset, then Research's pick, then the plan gate's. */
+    let chosenRepo: string | null = run.repo ?? null;
+    /** A hub run's pre-commit check skipped at a final gate that came before its worktree. */
+    let hooksDeferred = false;
+    const ensureWorkspace = async (): Promise<boolean> => {
+      if (workspaceReady || !hub) return true;
+      if (!chosenRepo) {
+        await finish(
+          "failed",
+          "No repo chosen for this work: Research named none of the hub's repos",
+        );
+        return false;
+      }
+      const workspace = await housekeeping.prepareRepoWorkspace({
+        runId: input.runId,
+        workOrderId: input.workOrderId,
+        hub,
+        repo: chosenRepo,
+      });
+      run.worktreePath = workspace.worktreePath;
+      run.branch = workspace.branch;
+      run.baseBranch = workspace.baseBranch;
+      workspaceReady = true;
+      return true;
+    };
 
     const sendBack = (reason: StationNote, target: number = buildIndex): void => {
       notes.push(reason);
@@ -171,6 +198,9 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
     while (index < run.stations.length) {
       const station = run.stations[index];
       if (!station) break;
+      if (hub && !workspaceReady && needsWorkspace(run.stations, index)) {
+        if (!(await ensureWorkspace())) return;
+      }
       const attempt = (attempts.get(station.key) ?? 0) + 1;
       attempts.set(station.key, attempt);
       const begin = (status: "running" | "awaiting_approval") =>
@@ -180,7 +210,8 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
         // Before the last gate (what delivery follows), make sure the repo's own
         // pre-commit hook accepts the work; otherwise it goes back to the builder.
         // patched(): runs started before this check existed replay without it.
-        if (index === finalGateIndex && patched("repo-hooks-preflight")) {
+        if (index === finalGateIndex && !workspaceReady) hooksDeferred = true;
+        else if (index === finalGateIndex && patched("repo-hooks-preflight")) {
           const hooks = await work.repoHooks({
             runId: input.runId,
             worktreePath: run.worktreePath,
@@ -243,6 +274,8 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
           notes.push({ station: station.name, text: `Human reviewer: ${decision.comment}` });
         }
         if (decision.delivery) delivery = decision.delivery;
+        // The plan gate of a hub run may switch the repo before the worktree exists.
+        if (!workspaceReady && decision.repo) chosenRepo = decision.repo;
         index += 1;
         continue;
       }
@@ -521,6 +554,7 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
       });
       if (result.sessionId) sessions.set(index, result.sessionId);
       if (index === followUpTarget) followUp = null;
+      if (!workspaceReady && result.research?.repo) chosenRepo = result.research.repo;
       spentUsd += result.costUsd ?? 0;
       await bookkeeping.finishStation({
         runId: input.runId,
@@ -542,7 +576,8 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
       index += 1;
     }
 
-    if (finalGateIndex < 0 && patched("repo-hooks-preflight")) {
+    if (!(await ensureWorkspace())) return;
+    if ((finalGateIndex < 0 || hooksDeferred) && patched("repo-hooks-preflight")) {
       // No human gate: the hook check happens here, with nobody to send it back for.
       const hooks = await work.repoHooks({
         runId: input.runId,
