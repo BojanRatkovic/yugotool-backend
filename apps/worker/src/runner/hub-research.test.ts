@@ -6,6 +6,7 @@ import { RESEARCH_PLAN_JSON_SCHEMA, stationResearchSchema } from "@zastava/contr
 import { afterAll, describe, expect, it } from "vitest";
 import {
   describeSync,
+  fallbackPlan,
   firstMentioned,
   hubResearchPrompt,
   researchOutput,
@@ -174,5 +175,15 @@ describe("read-only confinement", () => {
     expect(pathViolation("Write", { file_path: "/tmp/x" }, hub, [], true)).toMatch(/read-only/);
     expect(pathViolation("Read", { file_path: `${hub}/repos/api/a.ts` }, hub, [], true)).toBeNull();
     expect(pathViolation("Edit", { file_path: `${hub}/a.md` }, hub)).toBeNull();
+  });
+});
+
+describe("fallbackPlan", () => {
+  it("takes the session's longest text over a short closing line", () => {
+    const plan = "## Summary\n1. Edit repos/web/src/card.tsx to show the due date";
+    expect(
+      fallbackPlan(["Mapping the code.", plan, "I already sent it."], "I already sent it."),
+    ).toBe(plan);
+    expect(fallbackPlan([], "1. Do it")).toBe("1. Do it");
   });
 });

@@ -194,6 +194,16 @@ function resolveSplit(items: SplitItem[] | undefined, repos: string[]): SplitIte
   return resolved.every((i) => i !== null) ? resolved : null;
 }
 
+/**
+ * The plan when Research ended without a structured answer: its longest text
+ * of the session (the model sometimes ends on "I already sent the plan"),
+ * else the final result. Pure.
+ */
+export function fallbackPlan(texts: string[], result: string): string {
+  const longest = texts.reduce((best, text) => (text.length > best.length ? text : best), "");
+  return longest.length > result.length ? longest : result;
+}
+
 /** The station's output line: the plan, prefixed with the repo it goes in. Pure. */
 export function researchOutput(research: StationResearch): string {
   const head = research.split
