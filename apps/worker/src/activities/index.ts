@@ -63,6 +63,7 @@ import {
   linkIgnoredFiles,
 } from "../runner/work-hub";
 import { installStepsFor } from "../runner/dependencies";
+import { ensurePinnedPnpm, pinnedNodeEnv } from "../runner/node-versions";
 import { skillPlan, skillSection } from "../runner/station-skills";
 import { sessionSkills } from "@zastava/skills";
 import { createCiActivities } from "./ci";
@@ -918,6 +919,11 @@ export function createActivities(db: Database) {
      * fatal: the agents then say what they could not check.
      */
     async installDependencies(input: { runId: string; worktreePath: string }): Promise<void> {
+      const pnpm = await ensurePinnedPnpm(
+        input.worktreePath,
+        await pinnedNodeEnv(input.worktreePath, process.env),
+      );
+      if (pnpm) await appendEvent(input.runId, null, "system", pnpm);
       for (const step of installStepsFor(input.worktreePath)) {
         await appendEvent(input.runId, null, "tool_use", `$ ${step.command}`);
         const started = Date.now();

@@ -189,7 +189,72 @@ export function withBinFirst(env: NodeJS.ProcessEnv, binDir: string): NodeJS.Pro
  * `env` with the Node `dir` pins first on PATH; unchanged when it pins none or
  * the version can't be had. Best effort: a run never fails over this.
  */
+const PNPM_ROOT = path.join(os.homedir(), ".zastava", "tools");
+
+/** The exact pnpm a checkout pins in package.json's packageManager ("pnpm@12.4.1+sha512…"). */
+export async function pinnedPnpm(dir: string): Promise<string | null> {
+  try {
+    const pkg: unknown = JSON.parse(await readFile(path.join(dir, "package.json"), "utf8"));
+    const value =
+      typeof pkg === "object" && pkg !== null ? Reflect.get(pkg, "packageManager") : null;
+    const match = typeof value === "string" ? /^pnpm@(\d[\w.-]*)/.exec(value) : null;
+    return match?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+const pnpmBin = (version: string): string =>
+  path.join(PNPM_ROOT, `pnpm-${version}`, "node_modules", ".bin");
+
+/**
+ * The pinned pnpm, installed once with npm under ~/.zastava/tools. A global
+ * pnpm switches itself to the pinned version, but an older one cannot install
+ * pnpm 12 (its native binary comes from a postinstall it skips): every pnpm
+ * command in such a repo failed with "Failed to switch pnpm to v12.4.1".
+ * npm runs the postinstall. Returns what happened, for Activity; null when
+ * nothing was needed.
+ */
+export async function ensurePinnedPnpm(
+  dir: string,
+  env: NodeJS.ProcessEnv,
+): Promise<string | null> {
+  const version = await pinnedPnpm(dir);
+  if (!version || existsSync(path.join(pnpmBin(version), "pnpm"))) return null;
+  const prefix = path.join(PNPM_ROOT, `pnpm-${version}`);
+  await mkdir(prefix, { recursive: true });
+  try {
+    await exec(
+      "npm",
+      ["install", "--prefix", prefix, "--no-audit", "--no-fund", `pnpm@${version}`],
+      {
+        env,
+        timeout: 300_000,
+      },
+    );
+    return `pnpm ${version} (pinned) installed for ZASTAVA's agents`;
+  } catch (error) {
+    await rm(prefix, { recursive: true, force: true });
+    return `Could not install pnpm ${version} (pinned): ${error instanceof Error ? error.message : String(error)}`;
+  }
+}
+
+/** `env` with the pinned pnpm first on PATH, when ZASTAVA has it. */
+async function withPinnedPnpm(dir: string, env: NodeJS.ProcessEnv): Promise<NodeJS.ProcessEnv> {
+  const version = await pinnedPnpm(dir);
+  const bin = version ? pnpmBin(version) : null;
+  return bin && existsSync(path.join(bin, "pnpm")) ? withBinFirst(env, bin) : env;
+}
+
 export async function pinnedNodeEnv(
+  dir: string,
+  env: NodeJS.ProcessEnv,
+  log?: (message: string) => void,
+): Promise<NodeJS.ProcessEnv> {
+  return withPinnedPnpm(dir, await pinnedNodeOnly(dir, env, log));
+}
+
+async function pinnedNodeOnly(
   dir: string,
   env: NodeJS.ProcessEnv,
   log?: (message: string) => void,
