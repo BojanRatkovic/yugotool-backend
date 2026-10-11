@@ -776,6 +776,8 @@ export const doctorCheckSchema = z.object({
   fixCommand: z.string().nullable(),
   /** machine: something the person provides · service: a part of ZASTAVA itself. */
   group: z.enum(["machine", "service"]),
+  /** A "claude" check of one Claude account (spec 0016); null for every other check. */
+  accountId: z.uuid().nullable(),
 });
 export type DoctorCheck = z.infer<typeof doctorCheckSchema>;
 

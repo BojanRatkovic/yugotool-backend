@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { claudeAccounts, type Executor, settings } from "@zastava/db";
+import { claudeAccounts, type Executor, projects, settings } from "@zastava/db";
 import { asc, eq } from "drizzle-orm";
 
 export type ClaudeAccountRow = typeof claudeAccounts.$inferSelect;
@@ -50,6 +50,16 @@ export class ClaudeAccountsRepository {
   async delete(db: Executor, id: string): Promise<ClaudeAccountRow | null> {
     const [row] = await db.delete(claudeAccounts).where(eq(claudeAccounts.id, id)).returning();
     return row ?? null;
+  }
+
+  /** The project's own account, if it has one. */
+  async projectAccount(db: Executor, projectId: string): Promise<ClaudeAccountRow | null> {
+    const [row] = await db
+      .select({ account: claudeAccounts })
+      .from(projects)
+      .innerJoin(claudeAccounts, eq(claudeAccounts.id, projects.claudeAccountId))
+      .where(eq(projects.id, projectId));
+    return row?.account ?? null;
   }
 
   async defaultId(db: Executor): Promise<string | null> {

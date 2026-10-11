@@ -2,6 +2,7 @@ import { mkdir, readdir, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { Injectable } from "@nestjs/common";
 import type {
+  ClaudeAuthTarget,
   ClaudeAccount,
   ClaudeAccountStatus,
   CreateClaudeAccount,
@@ -23,6 +24,20 @@ import {
 } from "./claude-accounts.errors";
 import { type ClaudeAccountRow, ClaudeAccountsRepository } from "./claude-accounts.repository";
 import { type ClaudeAuthStatus, ClaudeCli } from "./claude-cli";
+
+/**
+ * Who a project's sessions run as, as far as plan limits go (spec 0016). The
+ * same precedence as the worker's `claudeAuthFor`: the project's account, the
+ * default, else the environment (with the key saved in Settings, if any).
+ */
+export interface AccountAuth {
+  /** null: the environment, no account. */
+  accountId: string | null;
+  label: string;
+  target: ClaudeAuthTarget | null;
+  /** Sessions draw on a claude.ai plan, so its limits apply. */
+  billsPlan: boolean;
+}
 
 /** A rejected key stays rejected for a while; no need to ask Anthropic on every list. */
 const KEY_CHECK_CACHE_MS = 5 * 60_000;
@@ -71,6 +86,32 @@ export class ClaudeAccountsService {
         return toAccount(row, row.id === defaultId, status);
       }),
     );
+  }
+
+  /** `projectId` null: what a project without its own account gets (the default). */
+  async authFor(projectId: string | null): Promise<AccountAuth> {
+    const db = this.database.db;
+    const own = projectId ? await this.repository.projectAccount(db, projectId) : null;
+    const defaultId = own ? null : await this.repository.defaultId(db);
+    const row = own ?? (defaultId ? await this.repository.find(db, defaultId) : null);
+    if (row) return accountAuth(row);
+    return {
+      accountId: null,
+      label: "This machine",
+      target: null,
+      billsPlan: (await this.settings.apiKey()) === null,
+    };
+  }
+
+  /** Every account a plan meter can show: each one, plus this machine's when nothing is default. */
+  async usageTargets(): Promise<AccountAuth[]> {
+    const db = this.database.db;
+    const [rows, defaultId] = await Promise.all([
+      this.repository.list(db),
+      this.repository.defaultId(db),
+    ]);
+    const accounts = rows.map(accountAuth);
+    return defaultId ? accounts : [await this.authFor(null), ...accounts];
   }
 
   async exists(id: string): Promise<boolean> {
@@ -288,6 +329,15 @@ function toAccount(
     isDefault,
     status,
     createdAt: iso(row.createdAt),
+  };
+}
+
+function accountAuth(row: ClaudeAccountRow): AccountAuth {
+  return {
+    accountId: row.id,
+    label: row.email ?? row.label,
+    target: { kind: row.kind, configDir: row.configDir, apiKey: row.apiKey },
+    billsPlan: row.kind === "config_dir",
   };
 }
 
