@@ -21,6 +21,8 @@ export interface CiWatch {
   settledPolls: number;
   /** A poll of this watch saw a pending check. */
   sawPending: boolean;
+  /** The PR is still open: a merged or closed one gets no new checks. */
+  prOpen: boolean;
 }
 
 /** Whether a poll counts towards "settled": checks exist and none is pending. */
@@ -31,13 +33,16 @@ export function isSettled(checks: CiCheck[]): boolean {
 /** This poll's verdict; "pending" keeps the watch going (spec 0006 §3). */
 export function evaluateCi(checks: CiCheck[], watch: CiWatch): CiState {
   if (checks.length === 0) {
-    if (watch.mode === "refresh" || watch.elapsedMs >= CI_NO_CHECKS_MS) return "no_ci";
+    if (watch.mode === "refresh" || !watch.prOpen || watch.elapsedMs >= CI_NO_CHECKS_MS) {
+      return "no_ci";
+    }
     return "pending";
   }
   if (!isSettled(checks)) return watch.elapsedMs >= CI_TIMEOUT_MS ? "timed_out" : "pending";
   // A refresh that finds everything done believes it at once; a fresh push or a
   // rerun it watched start waits for late statuses.
-  const needsConfirming = watch.mode === "delivery" || watch.sawPending;
+  // A merged or closed PR gets no late statuses worth waiting for.
+  const needsConfirming = watch.prOpen && (watch.mode === "delivery" || watch.sawPending);
   if (needsConfirming) {
     const waited = watch.mode === "refresh" || watch.elapsedMs >= CI_MIN_WAIT_MS;
     if (watch.settledPolls < CI_SETTLED_POLLS || !waited) return "pending";

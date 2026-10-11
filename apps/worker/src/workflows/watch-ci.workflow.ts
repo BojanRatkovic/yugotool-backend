@@ -36,6 +36,7 @@ export async function watchCi(input: WatchCiInput): Promise<CiState | null> {
       elapsedMs,
       settledPolls,
       sawPending,
+      prOpen: poll.prState === "open",
     });
     await ci.recordCi({
       workOrderId: input.workOrderId,
@@ -45,8 +46,9 @@ export async function watchCi(input: WatchCiInput): Promise<CiState | null> {
       summary: ciSummary(state, poll.checks),
       poll,
     });
-    // A merged or closed PR gets no new checks.
-    if (state !== "pending" || poll.prState !== "open") return state;
+    // Never stop on "pending": the station would stay running for good. A
+    // merged or closed PR settles at once unless a check is still running.
+    if (state !== "pending") return state;
     await sleep(CI_POLL_MS);
     elapsedMs += CI_POLL_MS;
   }

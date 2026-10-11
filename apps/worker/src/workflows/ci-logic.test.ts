@@ -23,6 +23,7 @@ const delivery = (patch: Partial<CiWatch> = {}): CiWatch => ({
   elapsedMs: CI_MIN_WAIT_MS,
   settledPolls: 2,
   sawPending: true,
+  prOpen: true,
   ...patch,
 });
 
@@ -57,7 +58,13 @@ describe("evaluateCi", () => {
   });
 
   it("a refresh that finds everything done believes it at once", () => {
-    const refresh: CiWatch = { mode: "refresh", elapsedMs: 0, settledPolls: 1, sawPending: false };
+    const refresh: CiWatch = {
+      mode: "refresh",
+      elapsedMs: 0,
+      settledPolls: 1,
+      sawPending: false,
+      prOpen: true,
+    };
     expect(evaluateCi([check("fail")], refresh)).toBe("failed");
     expect(evaluateCi([], refresh)).toBe("no_ci");
   });
@@ -68,9 +75,30 @@ describe("evaluateCi", () => {
       elapsedMs: 30_000,
       settledPolls: 1,
       sawPending: true,
+      prOpen: true,
     };
     expect(evaluateCi([check("pass")], refresh)).toBe("pending");
     expect(evaluateCi([check("pass")], { ...refresh, settledPolls: 2 })).toBe("passed");
+  });
+});
+
+describe("evaluateCi on a merged or closed PR", () => {
+  // cavyro-frontend#170: merged 36 s after delivery, no CI on PRs into develop.
+  it("with no checks is no CI at once, not a watch left pending", () => {
+    expect(evaluateCi([], delivery({ elapsedMs: 30_000, settledPolls: 0, prOpen: false }))).toBe(
+      "no_ci",
+    );
+  });
+
+  it("with every check done gives the verdict without the late-status wait", () => {
+    const merged = delivery({ elapsedMs: 30_000, settledPolls: 1, prOpen: false });
+    expect(evaluateCi([check("pass")], merged)).toBe("passed");
+    expect(evaluateCi([check("fail"), check("pass")], merged)).toBe("failed");
+  });
+
+  it("keeps watching a check that is still running", () => {
+    const merged = delivery({ elapsedMs: 30_000, settledPolls: 0, prOpen: false });
+    expect(evaluateCi([check("pass"), check("pending")], merged)).toBe("pending");
   });
 });
 

@@ -34,6 +34,7 @@ import {
 import { hubRepos } from "../projects/work-hub";
 import { followerOf, type ProjectRepos, repoProblem, splitProblem } from "./hub-work";
 import { WorkOrdersRepository } from "./work-orders.repository";
+import { ciRefreshMode } from "./ci-refresh";
 
 /** Workflow type name registered by the worker. */
 const WORK_ORDER_RUN_WORKFLOW = "workOrderRun";
@@ -104,12 +105,23 @@ export class WorkOrdersService {
     const workOrder = await this.repository.find(this.database.db, id);
     if (!workOrder) throw new WorkOrderNotFoundError(`work order ${id} not found`);
     if (!workOrder.prUrl) throw new CiNotAvailableError("This work order has no pull request.");
+    const mode = ciRefreshMode(workOrder.ci, await this.deliveredAt(workOrder.currentRunId));
     await this.temporal.workflow.start(WATCH_CI_WORKFLOW, {
       taskQueue: TASK_QUEUE,
       workflowId: `ci-${id}`,
       workflowIdConflictPolicy: "USE_EXISTING",
-      args: [{ workOrderId: id, mode: "refresh" }],
+      args: [{ workOrderId: id, mode }],
     });
+  }
+
+  /** When the latest run delivered (finished as succeeded); null otherwise. */
+  private async deliveredAt(runId: string | null): Promise<Date | null> {
+    if (!runId) return null;
+    const [run] = await this.database.db
+      .select({ status: runs.status, finishedAt: runs.finishedAt })
+      .from(runs)
+      .where(eq(runs.id, runId));
+    return run?.status === "succeeded" ? run.finishedAt : null;
   }
 
   needsYou(): Promise<NeedsYouItem[]> {
