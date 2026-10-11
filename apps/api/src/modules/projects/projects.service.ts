@@ -182,7 +182,9 @@ export class ProjectsService {
   async skills(projectId: string): Promise<ProjectSkill[]> {
     const project = await this.repository.find(this.database.db, projectId);
     if (!project) throw new ProjectNotFoundError(`project ${projectId} not found`);
-    return projectSkills(project);
+    // The `/` menu offers what the project's account has installed (spec 0016).
+    const configDir = await this.repository.accountConfigDir(this.database.db, projectId);
+    return configDir ? projectSkills(project, configDir) : projectSkills(project);
   }
 
   async update(projectId: string, input: UpdateProject): Promise<Project> {

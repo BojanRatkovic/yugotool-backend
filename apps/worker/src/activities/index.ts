@@ -44,7 +44,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { runArtifactsDir } from "../runner/artifacts";
 import { hookMissingDependencies, localRunner } from "../runner/local-runner";
 import { runRoots, strayListeners, tcpListeners } from "../runner/orphans";
-import { authRejection, withApiKey } from "../claude-env";
+import { authRejection, claudeAuthFor, withClaudeAuth } from "../claude-env";
 import { sandboxFor } from "../runner/sandbox";
 import {
   describeSync,
@@ -700,21 +700,22 @@ export function createActivities(db: Database) {
       ctx.cancellationSignal.addEventListener("abort", () => abortController.abort());
 
       const research = input.hubResearch ?? null;
+      const auth = await claudeAuthFor({ runId: input.runId });
       // In the hub its CLAUDE.md loads as the project's; its plugins load in both places.
       const hub = research
         ? {
             hub: input.worktreePath,
             readRoots: [],
-            plugins: await hubPlugins(input.worktreePath),
+            plugins: await hubPlugins(input.worktreePath, auth.configDir),
             tools: ["Skill"],
             prompt: hubResearchPrompt(research),
           }
-        : await hubSession(input.worktreePath);
+        : await hubSession(input.worktreePath, auth.configDir);
       const readRoots = [...(input.knowledge ?? []).map((k) => k.dir), ...(hub?.readRoots ?? [])];
       const skills = skillPlan(
         input.station.skills ?? [],
         `${input.skillText ?? ""}\n${input.station.prompt}`,
-        sessionSkills(input.worktreePath, hub?.hub ?? null),
+        sessionSkills(input.worktreePath, hub?.hub ?? null, auth.configDir),
       );
       const tools = [
         ...new Set([
@@ -723,8 +724,9 @@ export function createActivities(db: Database) {
           ...(skills.load.length ? ["Skill"] : []),
         ]),
       ];
-      const sandboxed = await withApiKey(
+      const sandboxed = withClaudeAuth(
         await sandboxFor(input.worktreePath, { readRoots, readOnly: research !== null }),
+        auth,
       );
       const outputSchema = research?.plans
         ? RESEARCH_PLAN_JSON_SCHEMA
@@ -793,13 +795,14 @@ export function createActivities(db: Database) {
               sessionId: message.session_id,
               model: message.model,
               authSource: toAuthSource(message.apiKeySource),
+              accountLabel: auth.label,
             })
             .where(eq(stationRuns.id, input.stationRunId));
           await appendEvent(
             input.runId,
             input.stationRunId,
             "system",
-            `${input.resumeSessionId ? "Resumed session" : "Session"} ${message.session_id} · ${message.model}${effort ? ` · effort ${effort}` : ""} · ${AUTH_LABEL[toAuthSource(message.apiKeySource)]}`,
+            `${input.resumeSessionId ? "Resumed session" : "Session"} ${message.session_id} · ${message.model}${effort ? ` · effort ${effort}` : ""} · ${auth.label ?? AUTH_LABEL[toAuthSource(message.apiKeySource)]}`,
           );
           const skillNote = [
             skills.load.length ? `Skills to load: ${skills.load.join(", ")}` : null,

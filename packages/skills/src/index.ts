@@ -86,8 +86,11 @@ function skillsIn(
   });
 }
 
-/** Where Claude Code keeps the person's settings and installed plugins. */
-const claudeConfigDir = (): string =>
+/**
+ * Where Claude Code keeps the person's settings and installed plugins, when no
+ * Claude account names another dir (spec 0016).
+ */
+export const claudeConfigDir = (): string =>
   process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), ".claude");
 
 function readJson(file: string): unknown {
@@ -161,8 +164,8 @@ export function hubUserPlugins(hub: string, configDir = claudeConfigDir()): stri
   });
 }
 
-function hubFound(hub: string): Found[] {
-  const fromUser = hubUserPlugins(hub).flatMap((dir) =>
+function hubFound(hub: string, configDir: string): Found[] {
+  const fromUser = hubUserPlugins(hub, configDir).flatMap((dir) =>
     skillsIn(path.join(dir, "skills"), manifestName(dir), "hub", null),
   );
   return [...hubOwnFound(hub), ...fromUser];
@@ -186,10 +189,14 @@ const repoFound = (repoPath: string, repo: string | null): Found[] =>
 /**
  * Every skill a project's agents can load. A hub: its plugins, then each
  * repo's own skills that no hub plugin already serves. A repo: its own.
+ * `configDir`: the project's Claude account dir, whose plugins a hub may invoke.
  */
-export function projectSkills(project: { kind: "repo" | "hub"; repoPath: string }): ProjectSkill[] {
+export function projectSkills(
+  project: { kind: "repo" | "hub"; repoPath: string },
+  configDir = claudeConfigDir(),
+): ProjectSkill[] {
   if (project.kind !== "hub") return strip(repoFound(project.repoPath, null));
-  const hub = hubFound(project.repoPath);
+  const hub = hubFound(project.repoPath, configDir);
   const served = new Set(hub.map((s) => s.file));
   const reposDir = path.join(project.repoPath, "repos");
   const repos = subdirs(reposDir).flatMap((name) =>
@@ -202,8 +209,15 @@ export function projectSkills(project: { kind: "repo" | "hub"; repoPath: string 
  * The invocations a session can load: the hub's plugins (when it runs on a
  * hub) plus the skills of the checkout it runs in.
  */
-export function sessionSkills(cwd: string, hub: string | null): string[] {
-  const found = [...(hub ? hubFound(hub) : []), ...(cwd === hub ? [] : repoFound(cwd, null))];
+export function sessionSkills(
+  cwd: string,
+  hub: string | null,
+  configDir = claudeConfigDir(),
+): string[] {
+  const found = [
+    ...(hub ? hubFound(hub, configDir) : []),
+    ...(cwd === hub ? [] : repoFound(cwd, null)),
+  ];
   return [...new Set(found.map((s) => s.invocation))];
 }
 

@@ -171,8 +171,14 @@ export async function hubPluginNames(hub: string): Promise<string[]> {
   );
 }
 
-/** Every plugin a session on this hub loads: the bundled ones, plus `.claude/skills` as one. */
-export async function hubPlugins(hub: string): Promise<{ type: "local"; path: string }[]> {
+/**
+ * Every plugin a session on this hub loads: the bundled ones, plus `.claude/skills`
+ * as one, plus the account's plugins the hub invokes (`configDir`, spec 0016).
+ */
+export async function hubPlugins(
+  hub: string,
+  configDir?: string,
+): Promise<{ type: "local"; path: string }[]> {
   const bundled = bundledHubPlugins(hub);
   const generated = await hubPlugin(hub).catch(() => null);
   // A bundled plugin named like the hub already is "the hub's skills"; two would clash.
@@ -181,7 +187,7 @@ export async function hubPlugins(hub: string): Promise<{ type: "local"; path: st
     ...bundled,
     ...(generated && !clash ? [generated.path] : []),
     // Plugins the hub's instructions invoke, from where the person installed them.
-    ...hubUserPlugins(hub),
+    ...hubUserPlugins(hub, configDir),
   ];
   return paths.map((p) => ({ type: "local" as const, path: p }));
 }
@@ -199,7 +205,10 @@ function isDirectory(dir: string): boolean {
  * its plugins (with the Skill tool to use them) and the hub section of the
  * system prompt, with the hub's instructions in it. Null outside a hub.
  */
-export async function hubSession(worktreePath: string): Promise<{
+export async function hubSession(
+  worktreePath: string,
+  configDir?: string,
+): Promise<{
   hub: string;
   readRoots: string[];
   plugins: { type: "local"; path: string }[];
@@ -208,7 +217,7 @@ export async function hubSession(worktreePath: string): Promise<{
 } | null> {
   const hub = hubOfWorktree(worktreePath);
   if (!hub) return null;
-  const plugins = await hubPlugins(hub);
+  const plugins = await hubPlugins(hub, configDir);
   const instructions = await hubInstructions(hub);
   return {
     hub,

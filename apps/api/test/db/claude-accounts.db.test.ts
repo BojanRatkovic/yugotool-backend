@@ -2,10 +2,12 @@ import {
   claudeAccounts,
   createDbClient,
   type DbClient,
+  projects,
   settings,
   type Transaction as Tx,
 } from "@zastava/db";
 import { eq, sql } from "drizzle-orm";
+import { ProjectsRepository } from "../../src/modules/projects/projects.repository";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -87,5 +89,33 @@ describe("0021: the Settings API key becomes the default account (spec 0016)", (
           .values({ label: "b", kind: "config_dir", configDir: "/u/.claude-a" }),
       );
       await fails((sp) => sp.insert(claudeAccounts).values({ label: "k", kind: "api_key" }));
+    }));
+});
+
+describe("the account dir a project's / menu reads (spec 0016)", () => {
+  it("is the project's account, else the default, else the environment's", () =>
+    isolated(async (tx) => {
+      const repo = new ProjectsRepository();
+      const [own, fallback, key] = await tx
+        .insert(claudeAccounts)
+        .values([
+          { label: "own", kind: "config_dir", configDir: "/u/.claude-own" },
+          { label: "default", kind: "config_dir", configDir: "/u/.claude-default" },
+          { label: "key", kind: "api_key", apiKey: "sk-ant-x" },
+        ])
+        .returning();
+      const [project] = await tx
+        .insert(projects)
+        .values({ name: "demo", repoPath: "/tmp/demo-accounts" })
+        .returning();
+      const id = project!.id;
+      await tx.insert(settings).values({ id: "default" });
+      expect(await repo.accountConfigDir(tx, id)).toBeNull();
+      await tx.update(settings).set({ defaultClaudeAccountId: fallback!.id });
+      expect(await repo.accountConfigDir(tx, id)).toBe("/u/.claude-default");
+      await tx.update(projects).set({ claudeAccountId: own!.id }).where(eq(projects.id, id));
+      expect(await repo.accountConfigDir(tx, id)).toBe("/u/.claude-own");
+      await tx.update(projects).set({ claudeAccountId: key!.id }).where(eq(projects.id, id));
+      expect(await repo.accountConfigDir(tx, id)).toBeNull();
     }));
 });

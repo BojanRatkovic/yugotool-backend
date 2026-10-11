@@ -13,7 +13,7 @@ import { type Database, projects } from "@zastava/db";
 import { eq } from "drizzle-orm";
 import { localRunner } from "../runner/local-runner";
 import { buildDiscoveryPrompt, normalizeDiscovery, routeSourceHash } from "../runner/route-map";
-import { withApiKey } from "../claude-env";
+import { accountNote, type ClaudeAuth, claudeAuthFor, withClaudeAuth } from "../claude-env";
 import { sandboxFor } from "../runner/sandbox";
 
 const HEARTBEAT_MS = 10_000;
@@ -50,13 +50,15 @@ export async function runStructuredSession(args: {
   model: string;
   effort: Effort | null;
   maxTurns: number;
+  /** The project's Claude account (spec 0016). */
+  auth: ClaudeAuth;
   signal?: AbortSignal;
   events?: SessionEvents;
 }): Promise<StructuredResult> {
   const ctx = Context.current();
   const abortController = new AbortController();
   args.signal?.addEventListener("abort", () => abortController.abort());
-  const sandboxed = await withApiKey(await sandboxFor(args.cwd));
+  const sandboxed = withClaudeAuth(await sandboxFor(args.cwd), args.auth);
   const session = query({
     prompt: args.prompt,
     options: {
@@ -83,7 +85,7 @@ export async function runStructuredSession(args: {
       await args.events?.onInit?.(message.session_id, message.model);
       await args.events?.log(
         "system",
-        `${args.label} ${message.session_id} · ${message.model}${args.effort ? ` · effort ${args.effort}` : ""}`,
+        `${args.label} ${message.session_id} · ${message.model}${args.effort ? ` · effort ${args.effort}` : ""}${accountNote(args.auth)}`,
       );
     } else if (message.type === "assistant" && args.events) {
       for (const block of message.message.content) {
@@ -160,6 +162,7 @@ export async function discoverRouteMap(
   try {
     const result = await runStructuredSession({
       label: "Route discovery",
+      auth: await claudeAuthFor({ projectId: args.projectId }),
       cwd: args.cwd,
       prompt: buildDiscoveryPrompt({
         baseUrlPath: project.preview?.baseUrlPath ?? "/",

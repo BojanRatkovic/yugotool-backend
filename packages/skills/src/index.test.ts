@@ -84,6 +84,15 @@ describe("project skills (spec 0015)", () => {
     mkdirSync(hub);
     writeFileSync(path.join(hub, "AGENTS.md"), "You must load the `/p-dev:code` skill.\n");
     expect(hubUserPlugins(hub, config)).toEqual([installed]);
+    // The `/` menu and sessions offer the plugin only on the account that installed it (spec 0016).
+    const other = path.join(root, "config-other");
+    mkdirSync(other);
+    const invocations = (dir: string) =>
+      projectSkills({ kind: "hub", repoPath: hub }, dir).map((s) => s.invocation);
+    expect(invocations(config)).toContain("p-dev:code");
+    expect(invocations(other)).not.toContain("p-dev:code");
+    expect(sessionSkills(hub, hub, config)).toContain("p-dev:code");
+    expect(sessionSkills(hub, hub, other)).not.toContain("p-dev:code");
     writeFileSync(path.join(hub, "AGENTS.md"), "No plugins here.\n");
     expect(hubUserPlugins(hub, config)).toEqual([]);
   });

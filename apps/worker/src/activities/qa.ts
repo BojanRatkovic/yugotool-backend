@@ -65,7 +65,7 @@ import {
 } from "../runner/qa-logic";
 import { needsDiscovery, routeSourceHash } from "../runner/route-map";
 import { discoverRouteMap, runStructuredSession } from "./routes";
-import { withApiKey } from "../claude-env";
+import { accountNote, claudeAuthFor, withClaudeAuth } from "../claude-env";
 import { sandboxFor } from "../runner/sandbox";
 
 const HEARTBEAT_MS = 10_000;
@@ -833,6 +833,7 @@ export function createQaActivities(db: Database, deps: QaDeps) {
       const diff = trimDiff(await localRunner.diffAgainst(args.worktreePath, args.baseSha));
       const result = await runStructuredSession({
         label: "QA planner",
+        auth: await claudeAuthFor({ projectId: args.projectId }),
         cwd: args.worktreePath,
         prompt: buildPlannerPrompt({
           title: args.title,
@@ -909,8 +910,10 @@ export function createQaActivities(db: Database, deps: QaDeps) {
     const ctx = Context.current();
     const abortController = new AbortController();
     args.signal.addEventListener("abort", () => abortController.abort());
-    const sandboxed = await withApiKey(
+    const auth = await claudeAuthFor({ runId });
+    const sandboxed = withClaudeAuth(
       await sandboxFor(args.worktreePath, { readRoots: [args.artifacts] }),
+      auth,
     );
     let initScriptFile: string | null = null;
     if (station.interactive && args.initScript) {
@@ -992,14 +995,14 @@ export function createQaActivities(db: Database, deps: QaDeps) {
       if (message.type === "system" && message.subtype === "init") {
         await db
           .update(stationRuns)
-          .set({ sessionId: message.session_id, model: message.model })
+          .set({ sessionId: message.session_id, model: message.model, accountLabel: auth.label })
           .where(eq(stationRuns.id, stationRunId));
         const browserState = message.mcp_servers.find((s) => s.name === "playwright");
         await appendEvent(
           runId,
           stationRunId,
           "system",
-          `QA judge ${message.session_id} · ${message.model}${args.effort ? ` · effort ${args.effort}` : ""}${browserState ? ` · browser ${browserState.status}` : ""}`,
+          `QA judge ${message.session_id} · ${message.model}${args.effort ? ` · effort ${args.effort}` : ""}${browserState ? ` · browser ${browserState.status}` : ""}${accountNote(auth)}`,
         );
       } else if (message.type === "assistant") {
         const usage = message.message.usage;
