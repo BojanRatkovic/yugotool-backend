@@ -18,7 +18,7 @@ import { sandboxFor } from "../runner/sandbox";
 
 const HEARTBEAT_MS = 10_000;
 /** Discovery is a short read-only session: a cheap model is enough. */
-export const ROUTE_DISCOVERY_MODEL = "claude-haiku-4-5-20251001";
+export const ROUTE_DISCOVERY_MODEL = "claude-haiku-5-5";
 const DISCOVERY_MAX_TURNS = 40;
 const READ_ONLY_TOOLS = ["Read", "Grep", "Glob"];
 

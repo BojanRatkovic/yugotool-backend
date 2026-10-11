@@ -1,12 +1,12 @@
 import { realpath } from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
+import { yugotoolHome } from "../config/home";
 
 /** Written by the worker (screenshots, preview tests); the API only reads. */
-export const ARTIFACTS_ROOT = path.join(os.homedir(), ".yugotool", "artifacts");
+export const ARTIFACTS_ROOT = path.join(yugotoolHome(), "artifacts");
 
 /** Run worktrees, created by the worker; removed with their project. */
-export const WORKTREES_ROOT = path.join(os.homedir(), ".yugotool", "worktrees");
+export const WORKTREES_ROOT = path.join(yugotoolHome(), "worktrees");
 
 export const runArtifactsDir = (runId: string): string => path.join(ARTIFACTS_ROOT, runId);
 export const previewTestDir = (projectId: string): string =>

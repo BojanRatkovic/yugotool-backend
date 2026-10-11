@@ -1,18 +1,18 @@
 import { execFile, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { access, constants, cp, mkdir, rename, rm, writeFile } from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 
 import { SIGNATURE } from "./pr-body";
 import { pinnedNodeEnv } from "./node-versions";
 import { hubWorktreePath } from "./work-hub";
+import { yugotoolHome } from "./home";
 
 const exec = promisify(execFile);
 
 /** Where worktrees live: outside the repo so the user's checkout is never touched. */
-const WORKTREES_ROOT = path.join(os.homedir(), ".yugotool", "worktrees");
+const WORKTREES_ROOT = path.join(yugotoolHome(), "worktrees");
 
 export interface Workspace {
   path: string;

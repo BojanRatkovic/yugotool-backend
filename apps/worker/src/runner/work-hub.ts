@@ -4,18 +4,18 @@ import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { lstat, mkdir, readFile, readdir, symlink, writeFile } from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { hubCandidateOf } from "@yugotool/contracts";
 import { bundledHubPlugins, hubUserPlugins, manifestName, pluginName } from "@yugotool/skills";
+import { yugotoolHome } from "./home";
 
 export { bundledHubPlugins, pluginName };
 
 const exec = promisify(execFile);
 
 /** Where generated hub plugins live (one per hub, its skills symlinked in). */
-const HUB_PLUGINS_ROOT = path.join(os.homedir(), ".yugotool", "hub-plugins");
+const HUB_PLUGINS_ROOT = path.join(yugotoolHome(), "hub-plugins");
 
 /** A hub root: instructions for agents at the top and a `repos/` folder. */
 export function isHubRoot(dir: string): boolean {

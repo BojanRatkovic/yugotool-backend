@@ -5,11 +5,12 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import type { KnowledgeMount, KnowledgeSourceKind } from "@yugotool/contracts";
+import { yugotoolHome } from "./home";
 
 const exec = promisify(execFile);
 
 /** Snapshots live outside every repo; agents get read access to one per source. */
-export const KNOWLEDGE_ROOT = path.join(os.homedir(), ".yugotool", "knowledge");
+export const KNOWLEDGE_ROOT = path.join(yugotoolHome(), "knowledge");
 
 /** Snapshots kept per source: the current one and a couple that runs may still read. */
 const KEEP_SNAPSHOTS = 3;

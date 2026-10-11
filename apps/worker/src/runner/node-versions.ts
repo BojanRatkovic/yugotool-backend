@@ -4,13 +4,13 @@ import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
+import { yugotoolHome } from "./home";
 
 const exec = promisify(execFile);
 
-const NODE_ROOT = path.join(os.homedir(), ".yugotool", "node");
+const NODE_ROOT = path.join(yugotoolHome(), "node");
 const DIST = "https://nodejs.org/dist";
 /** The release index changes a few times a month. */
 const INDEX_MAX_AGE_MS = 12 * 60 * 60 * 1000;
@@ -189,7 +189,7 @@ export function withBinFirst(env: NodeJS.ProcessEnv, binDir: string): NodeJS.Pro
  * `env` with the Node `dir` pins first on PATH; unchanged when it pins none or
  * the version can't be had. Best effort: a run never fails over this.
  */
-const PNPM_ROOT = path.join(os.homedir(), ".yugotool", "tools");
+const PNPM_ROOT = path.join(yugotoolHome(), "tools");
 
 /** The exact pnpm a checkout pins in package.json's packageManager ("pnpm@12.4.1+sha512…"). */
 export async function pinnedPnpm(dir: string): Promise<string | null> {

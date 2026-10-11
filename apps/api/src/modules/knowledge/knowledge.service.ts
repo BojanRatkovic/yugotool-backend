@@ -1,5 +1,4 @@
 import { rm } from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import {
@@ -22,9 +21,10 @@ import {
 } from "./knowledge.errors";
 import { locationProblem } from "./knowledge.location";
 import { KnowledgeRepository } from "./knowledge.repository";
+import { yugotoolHome } from "../../core/config/home";
 
 /** Where the worker keeps snapshots (runner/knowledge.ts). */
-const KNOWLEDGE_ROOT = path.join(os.homedir(), ".yugotool", "knowledge");
+const KNOWLEDGE_ROOT = path.join(yugotoolHome(), "knowledge");
 
 /** Settings → Knowledge (the library) and each project's choice from it. Spec 0007. */
 @Injectable()

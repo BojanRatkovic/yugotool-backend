@@ -454,6 +454,8 @@ function nodeEnv(config: SupervisorConfig): NodeJS.ProcessEnv {
   const claude = claudeBin(config);
   return {
     ...inherited,
+    // API and worker keep their files (worktrees, artifacts, logins…) in the same home.
+    YUGOTOOL_HOME: config.home,
     DATABASE_URL: databaseUrl(config),
     TEMPORAL_ADDRESS: `127.0.0.1:${config.ports.temporal}`,
     DESKTOP_NOTICES: config.desktopNotices,

@@ -1,9 +1,9 @@
 import { existsSync } from "node:fs";
-import os from "node:os";
 import path from "node:path";
+import { yugotoolHome } from "./home";
 
 /** Screenshots and other run outputs; never inside a worktree, never committed. */
-export const ARTIFACTS_ROOT = path.join(os.homedir(), ".yugotool", "artifacts");
+export const ARTIFACTS_ROOT = path.join(yugotoolHome(), "artifacts");
 
 export function runArtifactsDir(runId: string): string {
   return path.join(ARTIFACTS_ROOT, runId);

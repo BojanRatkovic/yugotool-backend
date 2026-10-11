@@ -26,6 +26,7 @@ import {
 } from "./claude-accounts.errors";
 import { type ClaudeAccountRow, ClaudeAccountsRepository } from "./claude-accounts.repository";
 import { type ClaudeAuthStatus, ClaudeCli } from "./claude-cli";
+import { yugotoolHome } from "../../core/config/home";
 
 /**
  * Who a project's sessions run as, as far as plan limits go (spec 0016). The
@@ -283,7 +284,7 @@ export class ClaudeAccountsService {
   }
 
   private accountsRoot(): string {
-    return path.join(this.cli.home(), ".yugotool", "accounts");
+    return path.join(yugotoolHome(this.cli.home()), "accounts");
   }
 
   private async one(id: string): Promise<ClaudeAccount> {
