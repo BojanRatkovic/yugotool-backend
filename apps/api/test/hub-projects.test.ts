@@ -89,6 +89,7 @@ class MemoryProjects {
       deliveryDefault: "local",
       hubPath: null,
       repos: [],
+      claudeAccountId: null,
       repoSettings: (values["repoSettings"] as RepoSettings | null | undefined) ?? null,
       createdAt: now,
       updatedAt: now,

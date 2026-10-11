@@ -390,6 +390,8 @@ export const projectSchema = z.object({
   hubPath: z.string().nullable(),
   /** Hub projects: the hub's repos with their settings; empty for repo projects. */
   repos: z.array(hubRepoSchema),
+  /** The Claude account its sessions run on (spec 0016); null = the default account. */
+  claudeAccountId: z.uuid().nullable(),
   createdAt: isoDate,
   updatedAt: isoDate,
 });
@@ -438,6 +440,7 @@ export const updateProjectSchema = z
     baseBranch: z.string().trim().min(1),
     preview: previewSchema.nullable(),
     deliveryDefault: deliveryModeSchema,
+    claudeAccountId: z.uuid().nullable(),
   })
   .partial();
 export type UpdateProject = z.infer<typeof updateProjectSchema>;
@@ -804,6 +807,101 @@ export const planUsageSchema = z.object({
 });
 export type PlanUsage = z.infer<typeof planUsageSchema>;
 
+// ── Claude accounts (spec 0016) ─────────────────────────────────────────────
+
+/** config_dir: a `claude` login in a config dir · api_key: an Anthropic API key. */
+export const claudeAccountKindSchema = z.enum(["config_dir", "api_key"]);
+export type ClaudeAccountKind = z.infer<typeof claudeAccountKindSchema>;
+
+export const claudeAccountStatusSchema = z.enum([
+  "signed_in",
+  "signed_out",
+  "key_rejected",
+  "unknown",
+]);
+export type ClaudeAccountStatus = z.infer<typeof claudeAccountStatusSchema>;
+
+export const claudeAccountSchema = z.object({
+  id: z.uuid(),
+  label: z.string(),
+  kind: claudeAccountKindSchema,
+  /** config_dir accounts: the dir (`~/.claude` runs with CLAUDE_CONFIG_DIR unset). */
+  configDir: z.string().nullable(),
+  /** api_key accounts: the masked key ("sk-ant-…x7Qd"); the key itself is never returned. */
+  apiKeyHint: z.string().nullable(),
+  /** From the last `claude auth status`; null for API keys or when never read. */
+  email: z.string().nullable(),
+  orgName: z.string().nullable(),
+  /** "team", "max", "pro"…; null for API keys. */
+  subscriptionType: z.string().nullable(),
+  /** ZASTAVA created the config dir, so removing the account deletes it. */
+  managed: z.boolean(),
+  isDefault: z.boolean(),
+  status: claudeAccountStatusSchema,
+  createdAt: isoDate,
+});
+export type ClaudeAccount = z.infer<typeof claudeAccountSchema>;
+
+export const createClaudeAccountSchema = z.discriminatedUnion("kind", [
+  /** Use a config dir already signed in on this machine (from discovery). */
+  z.object({
+    id: z.uuid().optional(),
+    kind: z.literal("config_dir"),
+    configDir: z.string().trim().min(1),
+    label: z.string().trim().min(1).max(120).optional(),
+  }),
+  /** Sign in to a new account in a dir ZASTAVA creates (`claude auth login`). */
+  z.object({
+    id: z.uuid().optional(),
+    kind: z.literal("login"),
+    label: z.string().trim().min(1).max(120),
+    email: z.email().optional(),
+  }),
+  z.object({
+    id: z.uuid().optional(),
+    kind: z.literal("api_key"),
+    label: z.string().trim().min(1).max(120),
+    apiKey: z.string().trim().min(1),
+  }),
+]);
+export type CreateClaudeAccount = z.infer<typeof createClaudeAccountSchema>;
+
+/**
+ * A `claude auth login` in progress (spec 0016 §4). `url` is the manual link for
+ * when the browser did not open; a code from it can be pasted back.
+ */
+export const claudeAccountLoginSchema = z.object({
+  id: z.string(),
+  accountId: z.uuid().nullable(),
+  state: z.enum(["pending", "done", "failed"]),
+  url: z.url().nullable(),
+  error: z.string().nullable(),
+});
+export type ClaudeAccountLogin = z.infer<typeof claudeAccountLoginSchema>;
+
+export const claudeAccountLoginCodeSchema = z.object({ code: z.string().trim().min(1) });
+export type ClaudeAccountLoginCode = z.infer<typeof claudeAccountLoginCodeSchema>;
+
+/** A `~/.claude*` dir found on this machine, read with `claude auth status --json`. */
+export const discoveredAccountSchema = z.object({
+  configDir: z.string(),
+  loggedIn: z.boolean(),
+  email: z.string().nullable(),
+  orgName: z.string().nullable(),
+  subscriptionType: z.string().nullable(),
+  /** The account already added for this dir, else null. */
+  accountId: z.uuid().nullable(),
+});
+export type DiscoveredAccount = z.infer<typeof discoveredAccountSchema>;
+
+/** Plan usage per account; `accountId` null = the worker's environment (no default set). */
+export const accountPlanUsageSchema = z.object({
+  accountId: z.uuid().nullable(),
+  label: z.string(),
+  usage: planUsageSchema,
+});
+export type AccountPlanUsage = z.infer<typeof accountPlanUsageSchema>;
+
 // ── Work order ──────────────────────────────────────────────────────────────
 
 export const workOrderStatusSchema = z.enum([
@@ -1068,6 +1166,8 @@ export const stationRunSchema = z.object({
   sessionId: z.string().nullable(),
   model: z.string().nullable(),
   authSource: authSourceSchema.nullable(),
+  /** Who the session ran as, e.g. "bojan@acme.io (team)" (spec 0016); null before 0016. */
+  accountLabel: z.string().nullable(),
   output: z.string().nullable(),
   verdict: verdictSchema.nullable(),
   error: z.string().nullable(),
@@ -1852,6 +1952,8 @@ export const settingsSchema = z.object({
   anthropicApiKeySource: z.enum(["settings", "env"]).nullable(),
   /** Per kind: also send outside the app (spec 0011). Every kind, defaults filled in. */
   notificationExternal: z.record(notificationKindSchema, z.boolean()),
+  /** Spec 0016: the account projects without their own use; null = the worker's environment. */
+  defaultClaudeAccountId: z.uuid().nullable(),
   updatedAt: isoDate,
 });
 export type Settings = z.infer<typeof settingsSchema>;

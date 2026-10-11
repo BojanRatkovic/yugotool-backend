@@ -22,6 +22,7 @@ describe("hub project contracts (spec 0014)", () => {
       preview: null,
       deliveryDefault: "local",
       hubPath: "/w/shop-work",
+      claudeAccountId: null,
       repos: [
         {
           name: "shop-backend",
