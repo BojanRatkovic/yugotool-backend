@@ -1076,6 +1076,19 @@ export const reviewPullRequestSchema = z.object({
 });
 export type ReviewPullRequest = z.infer<typeof reviewPullRequestSchema>;
 
+/** Where a work order came from when it was imported (spec 0019). */
+export const workOrderSourceSchema = z.object({
+  provider: z.literal("productive"),
+  /** The task's id in the provider. */
+  id: z.string(),
+  /** Human task number ("#123"); null when the provider has none. */
+  number: z.string().nullable(),
+  url: z.url(),
+  /** The provider-side project, for the chip's tooltip. */
+  projectName: z.string().nullable(),
+});
+export type WorkOrderSource = z.infer<typeof workOrderSourceSchema>;
+
 export const workOrderSchema = z.object({
   id: z.uuid(),
   projectId: z.uuid(),
@@ -1105,6 +1118,8 @@ export const workOrderSchema = z.object({
   ci: ciStatusSchema.nullable(),
   queueMode: queueModeSchema.nullable(),
   queuedAt: isoDate.nullable(),
+  /** Imported from an outside tracker (spec 0019); null when made here. */
+  source: workOrderSourceSchema.nullable(),
   createdAt: isoDate,
   updatedAt: isoDate,
 });
@@ -2203,6 +2218,8 @@ export const collectionNameSchema = z.enum([
   "notifications",
   /** Settings → Claude accounts (spec 0016). */
   "claude_accounts",
+  /** Settings → Integrations (spec 0019). */
+  "integrations",
 ]);
 export type CollectionName = z.infer<typeof collectionNameSchema>;
 
@@ -2393,3 +2410,95 @@ export const REVIEW_LINE_STATIONS: Station[] = [
     ].join("\n\n"),
   },
 ];
+
+// ── Integrations: Productive (spec 0019) ────────────────────────────────────
+
+export const productiveOrganizationSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+});
+export type ProductiveOrganization = z.infer<typeof productiveOrganizationSchema>;
+
+/** The saved connection. The token itself is never returned, only a hint. */
+export const productiveConnectionSchema = z.object({
+  organizationId: z.string(),
+  organizationName: z.string(),
+  /** The token owner, as Productive knows them in this organization. */
+  personName: z.string().nullable(),
+  /** "abc…wxyz" */
+  tokenHint: z.string(),
+  /** Every organization the token can reach; more than one offers a switch. */
+  organizations: z.array(productiveOrganizationSchema),
+  connectedAt: isoDate,
+});
+export type ProductiveConnection = z.infer<typeof productiveConnectionSchema>;
+
+/** `GET /integrations/productive`: null until a token is saved. */
+export const productiveStatusSchema = z.object({
+  connection: productiveConnectionSchema.nullable(),
+});
+export type ProductiveStatus = z.infer<typeof productiveStatusSchema>;
+
+/**
+ * Connect, or switch organization. Without `token` the saved one is reused
+ * (switching organization). Without `organizationId` a token with one
+ * organization connects to it; with several the API answers
+ * `productive_pick_organization` and lists them in `details.organizations`.
+ */
+export const connectProductiveSchema = z.object({
+  token: z.string().trim().min(1).max(500).optional(),
+  organizationId: z.string().trim().min(1).optional(),
+});
+export type ConnectProductive = z.infer<typeof connectProductiveSchema>;
+
+export const productiveProjectSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  number: z.string().nullable(),
+});
+export type ProductiveProject = z.infer<typeof productiveProjectSchema>;
+
+export const productiveProjectQuerySchema = z.object({
+  query: z.string().trim().max(200).optional(),
+});
+export type ProductiveProjectQuery = z.infer<typeof productiveProjectQuerySchema>;
+
+export const productiveTaskSchema = z.object({
+  id: z.string(),
+  number: z.string().nullable(),
+  title: z.string(),
+  url: z.url(),
+  projectName: z.string().nullable(),
+  /** Workflow status name ("In progress"); null when not included. */
+  status: z.string().nullable(),
+  assigneeName: z.string().nullable(),
+  dueDate: z.string().nullable(),
+  updatedAt: isoDate.nullable(),
+  /** Already in this YugoTool project's board: the work order's id. */
+  workOrderId: z.uuid().nullable(),
+});
+export type ProductiveTask = z.infer<typeof productiveTaskSchema>;
+
+export const productiveTaskQuerySchema = z.object({
+  /** The YugoTool project importing; marks tasks it already has. */
+  projectId: z.uuid(),
+  productiveProjectId: z.string().trim().min(1).optional(),
+  query: z.string().trim().max(200).optional(),
+  /** Only tasks assigned to the token's owner. */
+  mine: z.stringbool().default(true),
+  page: z.coerce.number().int().min(1).max(100).default(1),
+});
+export type ProductiveTaskQuery = z.infer<typeof productiveTaskQuerySchema>;
+
+export const productiveTaskPageSchema = z.object({
+  items: z.array(productiveTaskSchema),
+  /** The next page number, or null on the last page. */
+  nextPage: z.number().int().nullable(),
+});
+export type ProductiveTaskPage = z.infer<typeof productiveTaskPageSchema>;
+
+export const importProductiveTasksSchema = z.object({
+  projectId: z.uuid(),
+  taskIds: z.array(z.string().trim().min(1)).min(1).max(50),
+});
+export type ImportProductiveTasks = z.infer<typeof importProductiveTasksSchema>;

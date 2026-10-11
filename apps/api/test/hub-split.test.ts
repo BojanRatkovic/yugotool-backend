@@ -74,6 +74,7 @@ class MemoryWorkOrders {
       ci: null,
       queueMode: null,
       queuedAt: null,
+      source: null,
       createdAt: now,
       updatedAt: now,
     };

@@ -11,6 +11,7 @@ import {
   type OpenPullRequestResult,
   type SplitWorkOrder,
   type WorkOrder,
+  type WorkOrderSource,
 } from "@yugotool/contracts";
 import { runs } from "@yugotool/db";
 import { type Client, WorkflowExecutionAlreadyStartedError } from "@temporalio/client";
@@ -31,6 +32,7 @@ import {
   WorkOrderNotRunningError,
   WorkOrderNotStartableError,
 } from "./work-order.errors";
+import { ProjectNotFoundError } from "../projects/project.errors";
 import { hubRepos } from "../projects/work-hub";
 import { followerOf, type ProjectRepos, repoProblem, splitProblem } from "./hub-work";
 import { WorkOrdersRepository } from "./work-orders.repository";
@@ -144,6 +146,39 @@ export class WorkOrdersService {
     const workOrder = await this.repository.insert(this.database.db, { ...input, position });
     await this.notify();
     return workOrder;
+  }
+
+  /** Work orders a project already has from `provider`, by source id (spec 0019). */
+  async importedSources(
+    projectId: string,
+    provider: WorkOrderSource["provider"],
+    ids: string[],
+  ): Promise<Map<string, string>> {
+    const rows = await this.repository.findBySources(this.database.db, projectId, provider, ids);
+    return new Map(rows.flatMap((row) => (row.source ? [[row.source.id, row.id]] : [])));
+  }
+
+  /**
+   * Imports outside tasks into a project's backlog, in order, below what is
+   * there (spec 0019). A task the project already has keeps its work order.
+   * Hub projects leave the repo to Research, like a new work order.
+   */
+  async importIntoBacklog(
+    projectId: string,
+    items: { title: string; description: string; source: WorkOrderSource }[],
+  ): Promise<WorkOrder[]> {
+    const project = await this.repository.projectOf(this.database.db, projectId);
+    if (!project) throw new ProjectNotFoundError(`project ${projectId} not found`);
+    const imported = await this.database.transaction(async (tx) => {
+      const created: WorkOrder[] = [];
+      for (const item of items) {
+        const position = await this.repository.nextPosition(tx, projectId);
+        created.push(await this.repository.insertImported(tx, { projectId, position, ...item }));
+      }
+      return created;
+    });
+    await this.notify();
+    return imported;
   }
 
   /**
