@@ -94,6 +94,9 @@ export async function sandboxFor(
       npm_config_cache: path.join(cache, "npm"),
       YARN_CACHE_FOLDER: path.join(cache, "yarn"),
       PNPM_STORE_DIR: path.join(cache, "pnpm"),
+      // Tools that cache under ~/.cache (RuboCop, ESLint, Prettier…) cannot write there.
+      XDG_CACHE_HOME: path.join(cache, "xdg"),
+      RUBOCOP_CACHE_ROOT: path.join(cache, "rubocop"),
     },
   };
 }
