@@ -1,7 +1,13 @@
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
-import { type NeedsYouItem, needsYouItemSchema, type ServerEvent } from "@zastava/contracts";
-import { LogFile, loadConfig, Supervisor, type SupervisorStatus } from "@zastava/supervisor";
+import { type NeedsYouItem, needsYouItemSchema, type ServerEvent } from "@yugotool/contracts";
+import {
+  LogFile,
+  loadConfig,
+  moveLegacyHome,
+  Supervisor,
+  type SupervisorStatus,
+} from "@yugotool/supervisor";
 import {
   app,
   BrowserWindow,
@@ -19,12 +25,12 @@ import {
 import { followEvents } from "./events";
 import { quitWarning, readPrefs, themeSchema, WINDOW_BACKGROUND, writePrefs } from "./prefs";
 import { loginShellPath, withWellKnownDirs } from "./shell-env";
-import { flagBitmap, trayMenuTemplate, trayTitle } from "./tray-menu";
+import { markBitmap, trayMenuTemplate, trayTitle } from "./tray-menu";
 
 const STATIC = path.join(__dirname, "..", "static");
 const NEEDS_YOU_POLL_MS = 30_000;
 /** Dev/verification only: saves window screenshots (loading, app) into this folder. */
-const SHOT_DIR = process.env["ZASTAVA_SCREENSHOT_DIR"];
+const SHOT_DIR = process.env["YUGOTOOL_SCREENSHOT_DIR"];
 const needsYouListSchema = needsYouItemSchema.array();
 
 if (!app.requestSingleInstanceLock()) app.quit();
@@ -39,17 +45,17 @@ process.env["PATH"] = withWellKnownDirs(process.env["PATH"] ?? "");
  */
 const packagedPaths = app.isPackaged
   ? {
-      ZASTAVA_BACKEND_ROOT: app.getAppPath(),
-      ZASTAVA_WEB_DIST: path.join(process.resourcesPath, "web"),
-      ZASTAVA_RUNTIME_MANIFEST: path.join(app.getAppPath(), "runtime.json"),
+      YUGOTOOL_BACKEND_ROOT: app.getAppPath(),
+      YUGOTOOL_WEB_DIST: path.join(process.resourcesPath, "web"),
+      YUGOTOOL_RUNTIME_MANIFEST: path.join(app.getAppPath(), "runtime.json"),
     }
   : {};
 const config = {
   ...loadConfig({
     ...process.env,
     ...packagedPaths,
-    ZASTAVA_NODE: process.execPath,
-    ZASTAVA_DESKTOP_NOTICES: "app",
+    YUGOTOOL_NODE: process.execPath,
+    YUGOTOOL_DESKTOP_NOTICES: "app",
   }),
   // The Electron binary runs API and worker as plain Node.
   extraEnv: { ELECTRON_RUN_AS_NODE: "1" },
@@ -67,8 +73,19 @@ let forceQuit = false;
 /** A quit/restart prompt is open; repeated quit requests wait for it. */
 let asking = false;
 
-// Crash logs stay on this Mac: minidumps in ~/.zastava/crashes, the rest in logs/desktop.log.
+/** Moves the ZASTAVA-era ~/.zastava into place; must run before anything writes to the home. */
+function adoptLegacyHome(): { moved: string | null; error: string | null } {
+  try {
+    return { moved: moveLegacyHome(config.home), error: null };
+  } catch (error) {
+    return { moved: null, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+let legacyHome = adoptLegacyHome();
+
+// Crash logs stay on this Mac: minidumps in ~/.yugotool/crashes, the rest in logs/desktop.log.
 const log = new LogFile(config.logsDir, "desktop");
+if (legacyHome.moved) log.line(`moved ${legacyHome.moved} to ${config.home}`);
 
 /**
  * Takes the login shell's PATH so git, gh and nvm resolve for API, worker and
@@ -108,7 +125,7 @@ function createWindow(): BrowserWindow {
     height: 920,
     minWidth: 960,
     minHeight: 600,
-    title: "ZASTAVA",
+    title: "YugoTool",
     backgroundColor: WINDOW_BACKGROUND[prefs.theme],
     show: false,
     webPreferences: {
@@ -129,7 +146,7 @@ function createWindow(): BrowserWindow {
       void shell.openExternal(url);
     }
   });
-  // macOS: closing the window keeps ZASTAVA running in the tray.
+  // macOS: closing the window keeps YugoTool running in the tray.
   win.on("close", (event) => {
     if (!quitting) {
       event.preventDefault();
@@ -152,7 +169,7 @@ async function verifyBridge(): Promise<void> {
   await window.loadURL(`${status.appUrl}/settings`);
   await new Promise((r) => setTimeout(r, 3_000));
   const bridge: unknown = await window.webContents.executeJavaScript(
-    "typeof window.zastavaDesktop?.pickFolder + ' / Choose buttons: ' + [...document.querySelectorAll('button')].filter(b => b.textContent.trim().startsWith('Choose')).length",
+    "typeof window.yugotoolDesktop?.pickFolder + ' / Choose buttons: ' + [...document.querySelectorAll('button')].filter(b => b.textContent.trim().startsWith('Choose')).length",
   );
   console.log(`bridge: ${String(bridge)}`);
   await shot("settings");
@@ -184,20 +201,28 @@ function supervisorReady(): boolean {
 }
 
 async function startServices(): Promise<void> {
+  if (legacyHome.error) legacyHome = adoptLegacyHome();
+  if (legacyHome.error) {
+    window?.webContents.send("yugotool:failed", {
+      message: legacyHome.error,
+      logsDir: config.logsDir,
+    });
+    return;
+  }
   supervisor = new Supervisor(config, (name) => {
     if (name === "api") readShellPath();
   });
   supervisor.on("status", (next) => {
     status = next;
-    window?.webContents.send("zastava:status", next);
+    window?.webContents.send("yugotool:status", next);
     refreshTray();
   });
-  window?.webContents.send("zastava:status", supervisor.snapshot());
+  window?.webContents.send("yugotool:status", supervisor.snapshot());
   setTimeout(() => void shot("loading"), 1_500);
   try {
     await supervisor.start();
   } catch (error) {
-    window?.webContents.send("zastava:failed", {
+    window?.webContents.send("yugotool:failed", {
       message: error instanceof Error ? error.message : String(error),
       logsDir: config.logsDir,
     });
@@ -236,7 +261,7 @@ async function refreshNeedsYou(): Promise<void> {
 function refreshTray(): void {
   if (!tray) return;
   tray.setTitle(trayTitle(needsYou.length), { fontType: "monospacedDigit" });
-  tray.setToolTip(needsYou.length ? `ZASTAVA · ${needsYou.length} need you` : "ZASTAVA");
+  tray.setToolTip(needsYou.length ? `YugoTool · ${needsYou.length} need you` : "YugoTool");
   app.dock?.setBadge(needsYou.length ? String(needsYou.length) : "");
   tray.setContextMenu(
     Menu.buildFromTemplate(
@@ -259,13 +284,13 @@ async function restartServices(): Promise<void> {
 
 function createTray(): Tray {
   const icon = nativeImage.createEmpty();
-  icon.addRepresentation({ scaleFactor: 1, width: 16, height: 16, buffer: flagBitmap(16) });
-  icon.addRepresentation({ scaleFactor: 2, width: 32, height: 32, buffer: flagBitmap(32) });
+  icon.addRepresentation({ scaleFactor: 1, width: 16, height: 16, buffer: markBitmap(16) });
+  icon.addRepresentation({ scaleFactor: 2, width: 32, height: 32, buffer: markBitmap(32) });
   icon.setTemplateImage(true);
   return new Tray(icon);
 }
 
-ipcMain.handle("zastava:pick-folder", async (_event, current: unknown) => {
+ipcMain.handle("yugotool:pick-folder", async (_event, current: unknown) => {
   const options: Electron.OpenDialogOptions = {
     title: "Choose your repos folder",
     properties: ["openDirectory", "createDirectory"],
@@ -276,9 +301,9 @@ ipcMain.handle("zastava:pick-folder", async (_event, current: unknown) => {
     : await dialog.showOpenDialog(options);
   return result.canceled ? null : (result.filePaths[0] ?? null);
 });
-ipcMain.handle("zastava:retry", () => restartServices());
-ipcMain.handle("zastava:open-logs", () => shell.openPath(config.logsDir));
-ipcMain.on("zastava:theme", (_event, value: unknown) => {
+ipcMain.handle("yugotool:retry", () => restartServices());
+ipcMain.handle("yugotool:open-logs", () => shell.openPath(config.logsDir));
+ipcMain.on("yugotool:theme", (_event, value: unknown) => {
   const theme = themeSchema.safeParse(value);
   if (!theme.success || theme.data === prefs.theme) return;
   prefs = { ...prefs, theme: theme.data };
@@ -381,7 +406,7 @@ void (async () => {
   await app.whenReady();
   powerMonitor.on("shutdown", quitNow);
   app.setAboutPanelOptions({
-    applicationName: "ZASTAVA",
+    applicationName: "YugoTool",
     applicationVersion: app.getVersion(),
     copyright: "Copyright © 2026 Bojan Ratković",
     credits: "A software factory: work orders through a line of Claude Code agent stations.",

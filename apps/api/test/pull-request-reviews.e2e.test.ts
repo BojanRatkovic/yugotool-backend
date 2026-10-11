@@ -5,7 +5,7 @@ import type {
   ReviewFinding,
   ReviewPullRequest,
   ReviewVerdict,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 import { ZodValidationPipe } from "nestjs-zod";
 import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -27,7 +27,7 @@ import { GithubError } from "../src/modules/pull-requests/pull-requests.errors";
 import { FakeGithub } from "./pull-requests-fake-github";
 
 const PROJECT = "85156849-2497-47fa-a2bd-494c776f572b";
-const BASE = `/projects/${PROJECT}/pull-requests/42/zastava-review`;
+const BASE = `/projects/${PROJECT}/pull-requests/42/yugotool-review`;
 const HEAD = "a".repeat(40);
 const GITHUB: ProjectRemote = {
   origin: "git@github.com:acme/app.git",
@@ -214,7 +214,7 @@ afterEach(async () => {
   app = undefined;
 });
 
-describe("ZASTAVA review API", () => {
+describe("YugoTool review API", () => {
   it("has no review before the first one", async () => {
     const { http } = await start();
     expect((await http.get(BASE).expect(200)).body).toEqual({ review: null });
@@ -442,7 +442,7 @@ describe("review briefs", () => {
     const { http, reviews } = await start();
     const res = await http.post(BASE).send({}).expect(201);
     reviews.finish(res.body.workOrderId, VERDICT);
-    const list = await http.get(`/projects/${PROJECT}/pull-requests/zastava-reviews`).expect(200);
+    const list = await http.get(`/projects/${PROJECT}/pull-requests/yugotool-reviews`).expect(200);
     expect(list.body).toEqual({
       items: [{ number: 42, status: "succeeded", headOid: HEAD, findings: 2, posted: 0 }],
     });

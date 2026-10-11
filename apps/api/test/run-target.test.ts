@@ -2,11 +2,11 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { runTarget } from "@zastava/contracts";
+import { runTarget } from "@yugotool/contracts";
 import { afterAll, describe, expect, it } from "vitest";
 import { removeProjectFiles } from "../src/modules/projects/project-cleanup";
 
-const root = mkdtempSync(path.join(os.tmpdir(), "zastava-run-target-"));
+const root = mkdtempSync(path.join(os.tmpdir(), "yugotool-run-target-"));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 
 const git = (cwd: string, ...args: string[]) =>
@@ -76,8 +76,8 @@ describe("removeProjectFiles for a hub project", () => {
     writeFileSync(path.join(hub, "CLAUDE.md"), "# hub\n");
     git(api, "init", "-q", "-b", "main");
     git(api, "commit", "-q", "--allow-empty", "-m", "init");
-    const wt = path.join(hub, "worktrees", "api-zastava-x-12345678");
-    git(api, "worktree", "add", "-q", "-b", "zastava/x", wt);
+    const wt = path.join(hub, "worktrees", "api-yugotool-x-12345678");
+    git(api, "worktree", "add", "-q", "-b", "yugotool/x", wt);
     const outside = path.join(root, "elsewhere");
     mkdirSync(outside);
 
@@ -94,7 +94,7 @@ describe("removeProjectFiles for a hub project", () => {
     expect(failed).toEqual([]);
     expect(existsSync(wt)).toBe(false);
     expect(existsSync(outside)).toBe(true);
-    expect(git(api, "worktree", "list")).not.toContain("api-zastava-x");
-    expect(git(api, "branch", "--list", "zastava/x")).toContain("zastava/x");
+    expect(git(api, "worktree", "list")).not.toContain("api-yugotool-x");
+    expect(git(api, "branch", "--list", "yugotool/x")).toContain("yugotool/x");
   });
 });

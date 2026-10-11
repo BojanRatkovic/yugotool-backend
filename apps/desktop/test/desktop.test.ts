@@ -1,20 +1,20 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { SupervisorStatus } from "@zastava/supervisor";
+import type { SupervisorStatus } from "@yugotool/supervisor";
 import { describe, expect, it, vi } from "vitest";
 import { parseSse } from "../src/events";
 import { quitWarning, readPrefs } from "../src/prefs";
 import { loginShellPath, parseShellPath, withWellKnownDirs } from "../src/shell-env";
-import { flagBitmap, trayMenuTemplate, trayTitle } from "../src/tray-menu";
+import { markBitmap, trayMenuTemplate, trayTitle } from "../src/tray-menu";
 
 describe("parseShellPath", () => {
   it("ignores what rc files print around the marker", () => {
-    const out = "Welcome!\n__ZASTAVA_PATH__/opt/homebrew/bin:/usr/bin__ZASTAVA_PATH__\nbye";
+    const out = "Welcome!\n__YUGOTOOL_PATH__/opt/homebrew/bin:/usr/bin__YUGOTOOL_PATH__\nbye";
     expect(parseShellPath(out)).toBe("/opt/homebrew/bin:/usr/bin");
   });
   it("returns null without both markers", () => {
-    expect(parseShellPath("__ZASTAVA_PATH__/usr/bin")).toBeNull();
+    expect(parseShellPath("__YUGOTOOL_PATH__/usr/bin")).toBeNull();
   });
 });
 
@@ -106,7 +106,7 @@ describe("tray", () => {
   });
 
   it("draws a template bitmap of the right size", () => {
-    const bitmap = flagBitmap(32);
+    const bitmap = markBitmap(32);
     expect(bitmap).toHaveLength(32 * 32 * 4);
     expect(bitmap.some((byte) => byte === 255)).toBe(true);
   });

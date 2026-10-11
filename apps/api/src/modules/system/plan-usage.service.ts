@@ -2,7 +2,7 @@ import { once } from "node:events";
 import { Injectable, Logger } from "@nestjs/common";
 import { query, type SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import os from "node:os";
-import { claudeAccountEnv, type PlanUsage, type UsageWindow } from "@zastava/contracts";
+import { claudeAccountEnv, type PlanUsage, type UsageWindow } from "@yugotool/contracts";
 import { childProcessEnv, claudeExecutable } from "../../core/config/env.schema";
 import type { AccountAuth } from "../claude-accounts/claude-accounts.service";
 

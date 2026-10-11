@@ -1,8 +1,8 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { promisify } from "node:util";
-import type { RouteDiscoveryOutput, RouteEntry, RouteMap } from "@zastava/contracts";
-import { routeEntrySchema } from "@zastava/contracts";
+import type { RouteDiscoveryOutput, RouteEntry, RouteMap } from "@yugotool/contracts";
+import { routeEntrySchema } from "@yugotool/contracts";
 
 const exec = promisify(execFile);
 

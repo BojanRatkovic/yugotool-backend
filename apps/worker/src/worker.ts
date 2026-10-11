@@ -1,8 +1,8 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { NativeConnection, Worker } from "@temporalio/worker";
-import { TASK_QUEUE } from "@zastava/contracts";
-import { createDbClient } from "@zastava/db";
+import { TASK_QUEUE } from "@yugotool/contracts";
+import { createDbClient } from "@yugotool/db";
 import { z } from "zod";
 import { createActivities } from "./activities";
 import { readApiKeyFrom } from "./claude-env";
@@ -11,7 +11,7 @@ import { readApiKeyFrom } from "./claude-env";
 const envSchema = z.object({
   TEMPORAL_ADDRESS: z.string().default("localhost:7233"),
   TEMPORAL_NAMESPACE: z.string().default("default"),
-  DATABASE_URL: z.string().default("postgres://localhost:5432/zastava"),
+  DATABASE_URL: z.string().default("postgres://localhost:5432/yugotool"),
 });
 
 const PREBUILT_BUNDLE = path.join(__dirname, "workflow-bundle.js");

@@ -15,7 +15,7 @@ import type {
   Verdict,
   ReviewPullRequest,
   ReviewVerdict,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 import { sql } from "drizzle-orm";
 import {
   type AnyPgColumn,
@@ -53,7 +53,7 @@ export const knowledgeSourceKind = pgEnum("knowledge_source_kind", [
   "path",
 ]);
 
-/** How approved work leaves ZASTAVA (see contracts `deliveryModeSchema`). */
+/** How approved work leaves YugoTool (see contracts `deliveryModeSchema`). */
 export const deliveryMode = pgEnum("delivery_mode", ["local", "draft_pr", "pr"]);
 
 export const workOrderStatus = pgEnum("work_order_status", [
@@ -417,7 +417,7 @@ export const claudeAccounts = pgTable(
     email: text("email"),
     orgName: text("org_name"),
     subscriptionType: text("subscription_type"),
-    /** ZASTAVA created `config_dir`; removing the account deletes it. */
+    /** YugoTool created `config_dir`; removing the account deletes it. */
     managed: boolean("managed").notNull().default(false),
     createdAt: createdAt(),
   },

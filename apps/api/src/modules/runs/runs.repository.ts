@@ -9,7 +9,7 @@ import {
   type ShiftStatus,
   type StationRun,
   runTarget,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 import {
   type Executor,
   projects,
@@ -20,7 +20,7 @@ import {
   shifts,
   stationRuns,
   workOrders,
-} from "@zastava/db";
+} from "@yugotool/db";
 import { and, asc, desc, eq, gt, inArray, isNotNull } from "drizzle-orm";
 import { iso } from "../../common/mappers";
 

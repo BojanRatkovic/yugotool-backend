@@ -5,7 +5,7 @@ import {
   projects,
   settings,
   type Transaction as Tx,
-} from "@zastava/db";
+} from "@yugotool/db";
 import { eq, sql } from "drizzle-orm";
 import { ProjectsRepository } from "../../src/modules/projects/projects.repository";
 import { readFile } from "node:fs/promises";

@@ -9,7 +9,7 @@ import {
   runSchema,
   shiftReviewSchema,
   shiftSchema,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 import { createZodDto } from "nestjs-zod";
 
 export class ListRunsQueryDto extends createZodDto(listRunsQuerySchema) {}

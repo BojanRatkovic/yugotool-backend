@@ -53,16 +53,16 @@ importers:
       '@temporalio/client':
         specifier: ^1.22.0
         version: 1.24.0
-      '@zastava/contracts':
+      '@yugotool/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@zastava/db':
+      '@yugotool/db':
         specifier: workspace:*
         version: link:../../packages/db
-      '@zastava/notify':
+      '@yugotool/notify':
         specifier: workspace:*
         version: link:../../packages/notify
-      '@zastava/skills':
+      '@yugotool/skills':
         specifier: workspace:*
         version: link:../../packages/skills
       drizzle-orm:
@@ -108,10 +108,10 @@ importers:
 
   apps/desktop:
     dependencies:
-      '@zastava/contracts':
+      '@yugotool/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@zastava/supervisor':
+      '@yugotool/supervisor':
         specifier: workspace:*
         version: link:../supervisor
       zod:
@@ -159,16 +159,16 @@ importers:
       '@temporalio/workflow':
         specifier: ^1.22.0
         version: 1.24.0
-      '@zastava/contracts':
+      '@yugotool/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@zastava/db':
+      '@yugotool/db':
         specifier: workspace:*
         version: link:../../packages/db
-      '@zastava/notify':
+      '@yugotool/notify':
         specifier: workspace:*
         version: link:../../packages/notify
-      '@zastava/skills':
+      '@yugotool/skills':
         specifier: workspace:*
         version: link:../../packages/skills
       drizzle-orm:
@@ -205,7 +205,7 @@ importers:
 
   packages/db:
     dependencies:
-      '@zastava/contracts':
+      '@yugotool/contracts':
         specifier: workspace:*
         version: link:../contracts
       drizzle-orm:
@@ -224,10 +224,10 @@ importers:
 
   packages/notify:
     dependencies:
-      '@zastava/contracts':
+      '@yugotool/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@zastava/db':
+      '@yugotool/db':
         specifier: workspace:*
         version: link:../db
       drizzle-orm:
@@ -240,7 +240,7 @@ importers:
 
   packages/skills:
     dependencies:
-      '@zastava/contracts':
+      '@yugotool/contracts':
         specifier: workspace:*
         version: link:../contracts
     devDependencies:

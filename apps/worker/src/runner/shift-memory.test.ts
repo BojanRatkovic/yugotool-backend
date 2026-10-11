@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseShiftTasks as parseTasks } from "@zastava/contracts";
+import { parseShiftTasks as parseTasks } from "@yugotool/contracts";
 
 describe("parseTasks", () => {
   it("reads a bare array and a { tasks } object", () => {

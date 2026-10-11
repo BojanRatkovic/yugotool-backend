@@ -8,7 +8,7 @@ import {
   type ReviewFinding,
   type ReviewVerdict,
   type Station,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { AgentStationResult, ReviewRunContext } from "../activities";
 import { reviewRun } from "./review-run.workflow";

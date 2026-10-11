@@ -4,7 +4,7 @@ import type {
   PrLineCommentInput,
   ReviewFinding,
   ReviewPullRequest,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 
 /** The findings a human kept, as GitHub writes: line comments and a summary addition. */
 export interface PendingReviewPlan {

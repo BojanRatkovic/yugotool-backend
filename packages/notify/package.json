@@ -1,5 +1,5 @@
 {
-  "name": "@zastava/notify",
+  "name": "@yugotool/notify",
   "version": "0.0.0",
   "private": true,
   "type": "commonjs",
@@ -12,8 +12,8 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@zastava/contracts": "workspace:*",
-    "@zastava/db": "workspace:*",
+    "@yugotool/contracts": "workspace:*",
+    "@yugotool/db": "workspace:*",
     "drizzle-orm": "^0.45.2"
   },
   "devDependencies": {

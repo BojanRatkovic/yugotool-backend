@@ -607,7 +607,7 @@ export const MERGE_PR = /* GraphQL */ `
 `;
 
 /**
- * What a ZASTAVA review freezes at start (spec 0009): the raw markdown body,
+ * What a YugoTool review freezes at start (spec 0009): the raw markdown body,
  * both commits and the unresolved threads (first comment each). ~1 point.
  */
 export const PR_REVIEW_SNAPSHOT = /* GraphQL */ `
@@ -644,7 +644,7 @@ export const PR_REVIEW_SNAPSHOT = /* GraphQL */ `
   }
 `;
 
-/** Rewrites my pending review's summary (ZASTAVA findings without a line go there). */
+/** Rewrites my pending review's summary (YugoTool findings without a line go there). */
 export const UPDATE_REVIEW_BODY = /* GraphQL */ `
   mutation UpdateReviewBody($reviewId: ID!, $body: String!) {
     updatePullRequestReview(input: { pullRequestReviewId: $reviewId, body: $body }) {

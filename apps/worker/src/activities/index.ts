@@ -28,7 +28,7 @@ import {
   verdictSchema,
   type WorkOrderStatus,
   type NotificationJob,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 import {
   type Database,
   lines,
@@ -38,8 +38,8 @@ import {
   shifts,
   stationRuns,
   workOrders,
-} from "@zastava/db";
-import { enqueueNotification } from "@zastava/notify";
+} from "@yugotool/db";
+import { enqueueNotification } from "@yugotool/notify";
 import { and, eq, sql } from "drizzle-orm";
 import { runArtifactsDir } from "../runner/artifacts";
 import { hookMissingDependencies, localRunner } from "../runner/local-runner";
@@ -65,7 +65,7 @@ import {
 import { installStepsFor } from "../runner/dependencies";
 import { ensurePinnedPnpm, pinnedNodeEnv } from "../runner/node-versions";
 import { skillPlan, skillSection } from "../runner/station-skills";
-import { sessionSkills } from "@zastava/skills";
+import { sessionSkills } from "@yugotool/skills";
 import { createCiActivities } from "./ci";
 import { createKnowledgeActivities } from "./knowledge";
 import { createPrBodyComposer } from "./pr-body";
@@ -231,7 +231,7 @@ export function createActivities(db: Database) {
    * often with `--no-verify`, which would leave the preflight hook an empty
    * stage and ship their message instead of the work order title. Commits made
    * during the session become working-tree changes again. (Shift checkpoints
-   * are ZASTAVA's own and stay.)
+   * are YugoTool's own and stay.)
    */
   async function uncommitAfter<T>(
     input: { runId: string; stationRunId: string; worktreePath: string },
@@ -580,7 +580,7 @@ export function createActivities(db: Database) {
           repoPath: runTarget(row.project, row.runRepo).repoPath,
           worktreePath: row.worktreePath,
           memoryDir: path.join(runArtifactsDir(input.runId), "memory"),
-          message: `wip: unfinished changes of ZASTAVA run ${input.runId.slice(0, 8)} (${row.status})`,
+          message: `wip: unfinished changes of YugoTool run ${input.runId.slice(0, 8)} (${row.status})`,
         });
         await appendEvent(
           input.runId,

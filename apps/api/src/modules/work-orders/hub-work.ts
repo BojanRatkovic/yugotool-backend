@@ -1,6 +1,6 @@
 // Hub projects (spec 0014): which repo a work order may name, and splitting
 // one work order into a chain across repos. Pure.
-import type { SplitItem, WorkOrder } from "@zastava/contracts";
+import type { SplitItem, WorkOrder } from "@yugotool/contracts";
 
 export interface ProjectRepos {
   kind: "repo" | "hub";

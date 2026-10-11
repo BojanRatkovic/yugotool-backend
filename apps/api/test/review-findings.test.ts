@@ -1,4 +1,4 @@
-import type { ReviewFinding, ReviewPullRequest } from "@zastava/contracts";
+import type { ReviewFinding, ReviewPullRequest } from "@yugotool/contracts";
 import { describe, expect, it } from "vitest";
 import { freezePrevious, planPendingReview } from "../src/modules/pull-requests/review-findings";
 

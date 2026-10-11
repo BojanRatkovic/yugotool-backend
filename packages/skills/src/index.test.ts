@@ -11,7 +11,7 @@ import {
   skillDescription,
 } from "./index";
 
-const root = mkdtempSync(path.join(os.tmpdir(), "zastava-skills-"));
+const root = mkdtempSync(path.join(os.tmpdir(), "yugotool-skills-"));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 
 function skill(dir: string, name: string, description: string): void {

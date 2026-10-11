@@ -9,8 +9,8 @@ import type {
   PrTimelineItem,
   PullRequestDetail,
   PullRequestSummary,
-} from "@zastava/contracts";
-import { prFileSchema, prReviewStateSchema } from "@zastava/contracts";
+} from "@yugotool/contracts";
+import { prFileSchema, prReviewStateSchema } from "@yugotool/contracts";
 import { z } from "zod";
 
 // ── GitHub shapes (what PR_FIELDS returns) ──────────────────────────────────

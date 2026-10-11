@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
-import type { NeedsYouItem, UpdateWorkOrder, WorkOrder } from "@zastava/contracts";
-import { type Executor, projects, runs, workOrders } from "@zastava/db";
+import type { NeedsYouItem, UpdateWorkOrder, WorkOrder } from "@yugotool/contracts";
+import { type Executor, projects, runs, workOrders } from "@yugotool/db";
 import { and, asc, eq, inArray, isNull, max, sql } from "drizzle-orm";
 import { iso } from "../../common/mappers";
 

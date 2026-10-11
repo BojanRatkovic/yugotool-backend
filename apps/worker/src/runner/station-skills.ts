@@ -1,5 +1,5 @@
 // Pure: which skills a station session loads first (spec 0015).
-import { skillMentions } from "@zastava/contracts";
+import { skillMentions } from "@yugotool/contracts";
 
 export interface SkillPlan {
   /** Skills to load, in order: the station's own, then those the text names. */

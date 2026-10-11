@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import type { ProjectRemote } from "@zastava/contracts";
+import type { ProjectRemote } from "@yugotool/contracts";
 
 const exec = promisify(execFile);
 
@@ -15,7 +15,7 @@ export function remoteVerdict(input: {
     input.origin === null
       ? "This repo has no origin remote, so there is nowhere to push."
       : !github
-        ? "origin is not on GitHub, so ZASTAVA can push but not open the pull request."
+        ? "origin is not on GitHub, so YugoTool can push but not open the pull request."
         : !input.ghInstalled
           ? "The GitHub CLI (gh) isn't installed."
           : !input.ghLoggedIn

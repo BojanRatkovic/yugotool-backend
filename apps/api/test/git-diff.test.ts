@@ -12,7 +12,7 @@ describe("worktreeDiff", () => {
   let repo: string;
 
   beforeAll(() => {
-    repo = mkdtempSync(path.join(tmpdir(), "zastava-diff-"));
+    repo = mkdtempSync(path.join(tmpdir(), "yugotool-diff-"));
     git(repo, "init", "-q", "-b", "main");
     git(repo, "config", "user.email", "test@example.com");
     git(repo, "config", "user.name", "test");
@@ -60,14 +60,14 @@ describe("worktreeDiff base", () => {
   let clone: string;
 
   beforeAll(() => {
-    upstream = mkdtempSync(path.join(tmpdir(), "zastava-upstream-"));
+    upstream = mkdtempSync(path.join(tmpdir(), "yugotool-upstream-"));
     git(upstream, "init", "-q", "-b", "main");
     git(upstream, "config", "user.email", "test@example.com");
     git(upstream, "config", "user.name", "test");
     writeFileSync(path.join(upstream, "a.txt"), "a\n");
     git(upstream, "add", ".");
     git(upstream, "commit", "-q", "-m", "init");
-    clone = mkdtempSync(path.join(tmpdir(), "zastava-clone-"));
+    clone = mkdtempSync(path.join(tmpdir(), "yugotool-clone-"));
     execFileSync("git", ["clone", "-q", upstream, clone], { stdio: "pipe" });
     git(clone, "config", "user.email", "test@example.com");
     git(clone, "config", "user.name", "test");
@@ -98,24 +98,24 @@ describe("worktreeDiff base", () => {
 
 describe("branchDiff", () => {
   it("reads a finished run's changes from its branch, without a worktree", async () => {
-    const repo = mkdtempSync(path.join(tmpdir(), "zastava-branchdiff-"));
+    const repo = mkdtempSync(path.join(tmpdir(), "yugotool-branchdiff-"));
     git(repo, "init", "-q", "-b", "main");
     git(repo, "config", "user.email", "test@example.com");
     git(repo, "config", "user.name", "test");
     writeFileSync(path.join(repo, "a.txt"), "base\n");
     git(repo, "add", ".");
     git(repo, "commit", "-q", "-m", "init");
-    git(repo, "branch", "zastava/run");
+    git(repo, "branch", "yugotool/run");
     // The base moves on after the run branched off; that is not the run's change.
     writeFileSync(path.join(repo, "later.txt"), "later\n");
     git(repo, "add", ".");
     git(repo, "commit", "-q", "-m", "later on main");
-    git(repo, "checkout", "-q", "zastava/run");
+    git(repo, "checkout", "-q", "yugotool/run");
     writeFileSync(path.join(repo, "a.txt"), "run change\n");
     git(repo, "commit", "-q", "-am", "wip");
     git(repo, "checkout", "-q", "main");
 
-    const diff = await branchDiff(repo, "zastava/run", "main", {
+    const diff = await branchDiff(repo, "yugotool/run", "main", {
       patchChars: 100_000,
       statChars: 10_000,
     });

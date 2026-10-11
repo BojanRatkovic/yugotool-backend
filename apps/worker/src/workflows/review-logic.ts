@@ -6,7 +6,7 @@ import type {
   PreviousFinding,
   ReviewFinding,
   ReviewVerdict,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 import { knowledgeSection, type StationNote } from "./line-logic";
 
 /** Check output in a finding: the tail is what explains a failure. */
@@ -45,7 +45,7 @@ export function buildReviewPrompt(
   return [
     `# Pull request review: #${run.pullRequest.number} ${run.title}`,
     run.pullRequest.url,
-    "Read `.zastava/review-brief.md` first: the diff range, the changed files, the description and the threads already open. `.zastava/` is ZASTAVA's, not part of the PR.",
+    "Read `.yugotool/review-brief.md` first: the diff range, the changed files, the description and the threads already open. `.yugotool/` is YugoTool's, not part of the PR.",
     "The working tree is the PR's head commit, detached. Never modify, commit or push anything.",
     history ? `## Earlier stations\n\n${history}` : "",
     knowledgeSection(knowledge),

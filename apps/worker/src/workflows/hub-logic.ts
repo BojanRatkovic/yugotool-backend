@@ -1,5 +1,5 @@
 // Pure helpers for hub runs (spec 0014) — deterministic, no I/O.
-import type { Station } from "@zastava/contracts";
+import type { Station } from "@yugotool/contracts";
 
 /** The first station that edits code; the worktree must exist before it. */
 export function firstEditIndex(stations: Station[]): number {

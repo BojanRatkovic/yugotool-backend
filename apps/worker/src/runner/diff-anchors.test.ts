@@ -1,4 +1,4 @@
-import type { ReviewFinding } from "@zastava/contracts";
+import type { ReviewFinding } from "@yugotool/contracts";
 import { describe, expect, it } from "vitest";
 import { anchorFindings, parseHunks } from "./diff-anchors";
 

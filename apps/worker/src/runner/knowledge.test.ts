@@ -7,7 +7,7 @@ import { isExcluded, syncKnowledgeSource } from "./knowledge";
 
 const temps: string[] = [];
 const temp = (): string => {
-  const dir = mkdtempSync(path.join(os.tmpdir(), "zastava-knowledge-"));
+  const dir = mkdtempSync(path.join(os.tmpdir(), "yugotool-knowledge-"));
   temps.push(dir);
   return dir;
 };

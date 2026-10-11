@@ -1,4 +1,4 @@
-import type { NotificationJob, Station } from "@zastava/contracts";
+import type { NotificationJob, Station } from "@yugotool/contracts";
 
 /** What a work-order notification is rendered from; loaded once per job. */
 export interface WorkOrderContext {

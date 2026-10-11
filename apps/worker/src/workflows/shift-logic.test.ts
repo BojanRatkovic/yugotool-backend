@@ -5,7 +5,7 @@ import {
   type Handoff,
   handoffSchema,
   type ShiftStation,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 import { describe, expect, it } from "vitest";
 import {
   asShiftStation,
@@ -113,7 +113,7 @@ describe("prompt builder", () => {
       gitLog: "",
     });
     expect(prompt).toContain("Shift 1 of at most 8");
-    expect(prompt).toContain("Create `.zastava/tasks.json`");
+    expect(prompt).toContain("Create `.yugotool/tasks.json`");
     expect(prompt).toContain("Start by running `npm test`");
   });
 
@@ -124,14 +124,14 @@ describe("prompt builder", () => {
       goal: "# Goal",
       previousHandoff: handoff,
       recentProgress: "## Shift 1 · threshold · 51% context",
-      gitLog: "a1b2c3d zastava: shift 1",
+      gitLog: "a1b2c3d yugotool: shift 1",
     });
     expect(prompt).toContain("Handoff from the previous shift");
     expect(prompt).toContain("1. test mul\n2. implement div");
     expect(prompt).toContain("div by zero must throw");
     expect(prompt).toContain("## Shift 1 · threshold");
-    expect(prompt).toContain("a1b2c3d zastava: shift 1");
-    expect(prompt).not.toContain("Create `.zastava/tasks.json`");
+    expect(prompt).toContain("a1b2c3d yugotool: shift 1");
+    expect(prompt).not.toContain("Create `.yugotool/tasks.json`");
   });
 
   it("states why a handoff is asked for", () => {

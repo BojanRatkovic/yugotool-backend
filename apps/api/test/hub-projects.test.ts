@@ -2,14 +2,14 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type { Project, RepoSettings, UpdateHubRepo } from "@zastava/contracts";
+import type { Project, RepoSettings, UpdateHubRepo } from "@yugotool/contracts";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { HubRepoNotFoundError } from "../src/modules/projects/project.errors";
 import { ProjectsService } from "../src/modules/projects/projects.service";
 import { detectBaseBranch } from "../src/modules/projects/work-hub";
 import { ReposService } from "../src/modules/repos/repos.service";
 
-const root = mkdtempSync(path.join(os.tmpdir(), "zastava-api-hub-projects-"));
+const root = mkdtempSync(path.join(os.tmpdir(), "yugotool-api-hub-projects-"));
 const hub = path.join(root, "work");
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 

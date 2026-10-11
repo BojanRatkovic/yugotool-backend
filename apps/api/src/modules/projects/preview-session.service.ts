@@ -10,7 +10,7 @@ import {
   storageStateSchema,
   summarizeStorageState,
   TASK_QUEUE,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 import {
   previewSessionFile,
   previewSignInFile,

@@ -5,8 +5,8 @@ import {
   type ReviewVerdict,
   type Station,
   reviewPullRequestSchema,
-} from "@zastava/contracts";
-import { type Database, lines, projects, runs, stationRuns, workOrders } from "@zastava/db";
+} from "@yugotool/contracts";
+import { type Database, lines, projects, runs, stationRuns, workOrders } from "@yugotool/db";
 import { and, eq } from "drizzle-orm";
 import { localRunner } from "../runner/local-runner";
 import {

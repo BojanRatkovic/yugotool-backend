@@ -33,7 +33,7 @@ import type {
   Project,
   ProjectStats,
   RouteMapStatus,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 import {
   CreateProjectDto,
   LineDto,

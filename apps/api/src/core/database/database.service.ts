@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import type { Database, DbClient, Executor } from "@zastava/db";
+import type { Database, DbClient, Executor } from "@yugotool/db";
 import { DB_CLIENT } from "./database.tokens";
 
 /**

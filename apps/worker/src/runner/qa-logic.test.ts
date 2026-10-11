@@ -1,4 +1,4 @@
-import { QA_STATION_TEMPLATE, type QaVerdict } from "@zastava/contracts";
+import { QA_STATION_TEMPLATE, type QaVerdict } from "@yugotool/contracts";
 import { describe, expect, it } from "vitest";
 import {
   browserActionLabel,

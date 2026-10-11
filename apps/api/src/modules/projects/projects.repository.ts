@@ -11,7 +11,7 @@ import type {
   Station,
   UpdateHubRepo,
   UpdateProject,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 import {
   claudeAccounts,
   type Executor,
@@ -21,7 +21,7 @@ import {
   runs,
   stationRuns,
   workOrders,
-} from "@zastava/db";
+} from "@yugotool/db";
 import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { iso } from "../../common/mappers";
 import { hubOfRepo } from "./work-hub";

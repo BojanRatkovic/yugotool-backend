@@ -1,13 +1,13 @@
-# zastava-backend
+# yugotool-backend
 
-NestJS API + Temporal worker for ZASTAVA (software factory) — pnpm workspace.
+NestJS API + Temporal worker for YugoTool (software factory) — pnpm workspace.
 
 - `apps/api` — NestJS HTTP API + SSE (`GET /events`), port 4810, Swagger at `/docs`
 - `apps/worker` — Temporal worker (plain TS, **not** Nest): `workOrderRun` workflow, Agent SDK activities, local git-worktree runner
 - `packages/contracts` — Zod schemas + types shared api↔worker (frontend mirrors them)
 - `packages/db` — Drizzle schema, migrations, pg client
 
-Spec: `../zastava-work/specs/0001-mvp.md`.
+Spec: `../yugotool-work/specs/0001-mvp.md`.
 
 ## Before coding
 
@@ -20,7 +20,7 @@ follow Temporal determinism rules: no I/O, Date, Math.random or Node APIs in
 ```bash
 pnpm install
 pnpm dev:temporal             # Temporal dev server (no Docker), UI on :8233
-pnpm db:migrate               # Postgres: local Homebrew, DB `zastava`
+pnpm db:migrate               # Postgres: local Homebrew, DB `yugotool`
 pnpm build && pnpm dev        # api + worker + packages in watch mode
 
 # quality gate — before every commit:

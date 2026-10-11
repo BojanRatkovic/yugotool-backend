@@ -9,7 +9,7 @@ import type {
   QaTheme,
   QaVerdict,
   QaViewport,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 
 /** Visual checks per QA run are capped: each costs two screenshots per viewport×theme. */
 export const MAX_ROUTES = 8;

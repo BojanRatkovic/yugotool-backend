@@ -1,5 +1,5 @@
 // Deterministic workflow code ONLY — no Node APIs, no I/O, no Date/Math.random.
-import type { CiState } from "@zastava/contracts";
+import type { CiState } from "@yugotool/contracts";
 import { ParentClosePolicy, proxyActivities, sleep, startChild } from "@temporalio/workflow";
 import type { Activities } from "../activities";
 import { CI_POLL_MS, type CiMode, ciSummary, evaluateCi, isSettled } from "./ci-logic";

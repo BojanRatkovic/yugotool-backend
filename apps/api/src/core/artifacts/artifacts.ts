@@ -3,10 +3,10 @@ import os from "node:os";
 import path from "node:path";
 
 /** Written by the worker (screenshots, preview tests); the API only reads. */
-export const ARTIFACTS_ROOT = path.join(os.homedir(), ".zastava", "artifacts");
+export const ARTIFACTS_ROOT = path.join(os.homedir(), ".yugotool", "artifacts");
 
 /** Run worktrees, created by the worker; removed with their project. */
-export const WORKTREES_ROOT = path.join(os.homedir(), ".zastava", "worktrees");
+export const WORKTREES_ROOT = path.join(os.homedir(), ".yugotool", "worktrees");
 
 export const runArtifactsDir = (runId: string): string => path.join(ARTIFACTS_ROOT, runId);
 export const previewTestDir = (projectId: string): string =>

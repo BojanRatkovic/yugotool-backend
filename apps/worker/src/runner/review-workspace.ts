@@ -2,12 +2,12 @@ import { execFile } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
-import type { ReviewPullRequest } from "@zastava/contracts";
+import type { ReviewPullRequest } from "@yugotool/contracts";
 
 const exec = promisify(execFile);
 
-/** Where the review brief goes in the worktree (`.zastava/` is never committed). */
-export const REVIEW_BRIEF_PATH = ".zastava/review-brief.md";
+/** Where the review brief goes in the worktree (`.yugotool/` is never committed). */
+export const REVIEW_BRIEF_PATH = ".yugotool/review-brief.md";
 /** Briefs list at most this many files per section; the agent can ask git for the rest. */
 const MAX_FILES = 300;
 /** Long thread comments are cut; the point is "this was said", not the full text. */
@@ -41,7 +41,7 @@ export async function fetchPullRequest(
     "--quiet",
     "--no-tags",
     "origin",
-    `+refs/pull/${pr.number}/head:refs/zastava/pull/${pr.number}`,
+    `+refs/pull/${pr.number}/head:refs/yugotool/pull/${pr.number}`,
     `+refs/heads/${pr.baseRefName}:refs/remotes/origin/${pr.baseRefName}`,
   );
   for (const sha of [pr.headOid, pr.baseOid, pr.sinceOid]) {
@@ -144,7 +144,7 @@ export function buildReviewBrief(input: ReviewBriefInput): string {
   if (input.sinceFiles && pr.sinceOid) {
     sections.push(
       "## Re-review",
-      `ZASTAVA reviewed this PR before at \`${pr.sinceOid}\`. Focus on what changed since: \`git diff ${pr.sinceOid}...${pr.headOid}\`. Older code only matters where the new commits touch it.`,
+      `YugoTool reviewed this PR before at \`${pr.sinceOid}\`. Focus on what changed since: \`git diff ${pr.sinceOid}...${pr.headOid}\`. Older code only matters where the new commits touch it.`,
       `### Changed since the last review (${input.sinceFiles.length})`,
       fileList(input.sinceFiles),
     );
@@ -154,7 +154,7 @@ export function buildReviewBrief(input: ReviewBriefInput): string {
     const at = (pr.sinceOid ?? pr.headOid).slice(0, 7);
     sections.push(
       "## Previous findings (check each one)",
-      `ZASTAVA's last review (at \`${at}\`) raised these. Give each one a status in \`previous\`; lines are at \`${at}\` and may have moved.`,
+      `YugoTool's last review (at \`${at}\`) raised these. Give each one a status in \`previous\`; lines are at \`${at}\` and may have moved.`,
       pr.previousFindings.map(previousFinding).join("\n\n"),
     );
   }

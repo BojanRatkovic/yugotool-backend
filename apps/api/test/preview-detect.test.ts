@@ -1,4 +1,4 @@
-import { QA_STATION_TEMPLATE, DEFAULT_STATIONS, withQaStation } from "@zastava/contracts";
+import { QA_STATION_TEMPLATE, DEFAULT_STATIONS, withQaStation } from "@yugotool/contracts";
 import { describe, expect, it } from "vitest";
 import { detectPreview, type RepoFacts } from "../src/modules/projects/preview-detect";
 

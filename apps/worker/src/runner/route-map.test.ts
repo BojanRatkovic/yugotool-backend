@@ -1,4 +1,4 @@
-import type { RouteMap } from "@zastava/contracts";
+import type { RouteMap } from "@yugotool/contracts";
 import { describe, expect, it } from "vitest";
 import { withPorts } from "./preview";
 import { needsDiscovery, normalizeDiscovery } from "./route-map";

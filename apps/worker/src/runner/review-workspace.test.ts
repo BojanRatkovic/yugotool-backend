@@ -25,12 +25,12 @@ function commit(dir: string, file: string, content: string, message: string): st
 
 /** An "origin" with main and a PR head published as refs/pull/7/head, plus a clone of it. */
 function github() {
-  const upstream = mkdtempSync(path.join(tmpdir(), "zastava-review-up-"));
+  const upstream = mkdtempSync(path.join(tmpdir(), "yugotool-review-up-"));
   git(upstream, "init", "-q", "-b", "main");
-  git(upstream, "config", "user.email", "t@zastava.local");
+  git(upstream, "config", "user.email", "t@yugotool.local");
   git(upstream, "config", "user.name", "t");
   commit(upstream, "a.txt", "base\n", "base");
-  const clone = mkdtempSync(path.join(tmpdir(), "zastava-review-clone-"));
+  const clone = mkdtempSync(path.join(tmpdir(), "yugotool-review-clone-"));
   execFileSync("git", ["clone", "-q", upstream, clone]);
   git(upstream, "checkout", "-q", "-b", "feature");
   const first = commit(upstream, "b.txt", "one\n", "feature 1");
@@ -51,7 +51,7 @@ describe("fetchPullRequest", () => {
       baseOid: gh.baseOid,
       sinceOid: null,
     });
-    expect(git(gh.clone, "rev-parse", "refs/zastava/pull/7")).toBe(gh.head);
+    expect(git(gh.clone, "rev-parse", "refs/yugotool/pull/7")).toBe(gh.head);
     expect(git(gh.clone, "rev-parse", "origin/main")).toBe(gh.baseOid);
     // GitHub's view: merge-base to head, the base's own new commit left out.
     const base = await mergeBase(gh.clone, gh.baseOid, gh.head);
@@ -181,8 +181,8 @@ describe("buildReviewBrief", () => {
     expect(brief).not.toContain("## Previous findings");
   });
 
-  it("is written under .zastava in the worktree", async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), "zastava-brief-"));
+  it("is written under .yugotool in the worktree", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "yugotool-brief-"));
     const file = await writeReviewBrief(dir, "# brief\n");
     expect(file).toBe(path.join(dir, REVIEW_BRIEF_PATH));
     expect(readFileSync(file, "utf8")).toBe("# brief\n");

@@ -10,7 +10,7 @@ import {
   Put,
 } from "@nestjs/common";
 import { ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
-import type { ClaudeAccount, ClaudeAccountLogin, DiscoveredAccount } from "@zastava/contracts";
+import type { ClaudeAccount, ClaudeAccountLogin, DiscoveredAccount } from "@yugotool/contracts";
 import {
   ClaudeAccountDto,
   ClaudeAccountLoginCodeDto,
@@ -58,7 +58,7 @@ export class ClaudeAccountsController {
     return this.accounts.setDefault(body.accountId);
   }
 
-  /** A dir ZASTAVA created is deleted with it; any other dir is never touched. */
+  /** A dir YugoTool created is deleted with it; any other dir is never touched. */
   @Delete(":id")
   @HttpCode(204)
   @ApiNoContentResponse()

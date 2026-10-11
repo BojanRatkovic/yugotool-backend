@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { pinnedPnpm } from "./node-versions";
 
-const dir = mkdtempSync(path.join(os.tmpdir(), "zastava-pnpm-"));
+const dir = mkdtempSync(path.join(os.tmpdir(), "yugotool-pnpm-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
 describe("pinned pnpm", () => {

@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 
-const MARK = "__ZASTAVA_PATH__";
+const MARK = "__YUGOTOOL_PATH__";
 const SHELL_TIMEOUT_MS = 10_000;
 /** Where Homebrew (Apple silicon, then Intel) puts gh, git, node… */
 const WELL_KNOWN_DIRS = ["/opt/homebrew/bin", "/opt/homebrew/sbin", "/usr/local/bin"];
@@ -25,7 +25,7 @@ export function loginShellPath(
   shell = process.env["SHELL"] ?? "/bin/zsh",
   timeout = SHELL_TIMEOUT_MS,
 ): ShellPath {
-  // PATH as printf's argument: in "…$PATH__ZASTAVA_PATH__" the shell would read one longer variable name.
+  // PATH as printf's argument: in "…$PATH__YUGOTOOL_PATH__" the shell would read one longer variable name.
   const result = spawnSync(shell, ["-ilc", `printf '${MARK}%s${MARK}' "$PATH"`], {
     encoding: "utf8",
     timeout,

@@ -3,7 +3,7 @@ import {
   knowledgeSourceSchema,
   projectKnowledgeSchema,
   updateKnowledgeSourceSchema,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 import { createZodDto } from "nestjs-zod";
 
 export class KnowledgeSourceDto extends createZodDto(knowledgeSourceSchema) {}

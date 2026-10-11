@@ -31,7 +31,7 @@ describe("protectedFolders", () => {
 describe("checkFolderAccess", () => {
   it("grants a readable folder without saying it waits", async () => {
     let waited = false;
-    const dir = mkdtempSync(path.join(tmpdir(), "zastava-folder-"));
+    const dir = mkdtempSync(path.join(tmpdir(), "yugotool-folder-"));
     await expect(
       checkFolderAccess(dir, { onWaiting: () => (waited = true), waitingAfterMs: 5_000 }),
     ).resolves.toBe("granted");
@@ -39,7 +39,7 @@ describe("checkFolderAccess", () => {
   });
 
   it("does not report a missing folder as refused", async () => {
-    await expect(checkFolderAccess("/nonexistent/zastava")).resolves.toBe("granted");
+    await expect(checkFolderAccess("/nonexistent/yugotool")).resolves.toBe("granted");
   });
 });
 

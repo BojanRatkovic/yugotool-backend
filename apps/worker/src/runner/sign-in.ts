@@ -21,7 +21,7 @@ const LOOP_NAVIGATIONS = 10;
 /**
  * What happened in the sign-in window (navigations, failed requests, console
  * errors), so a sign-in that goes wrong — e.g. app ↔ login redirect loops —
- * can be diagnosed from ZASTAVA. URLs are redacted.
+ * can be diagnosed from YugoTool. URLs are redacted.
  */
 export class BrowserTrace {
   private readonly lines: string[] = [];

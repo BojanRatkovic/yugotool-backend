@@ -8,7 +8,7 @@ import {
   splitWorkOrderSchema,
   updateWorkOrderSchema,
   workOrderSchema,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 import { createZodDto } from "nestjs-zod";
 
 export class CreateWorkOrderDto extends createZodDto(createWorkOrderSchema) {}

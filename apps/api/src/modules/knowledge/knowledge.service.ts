@@ -9,7 +9,7 @@ import {
   type ProjectKnowledge,
   TASK_QUEUE,
   type UpdateKnowledgeSource,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 import type { Client } from "@temporalio/client";
 import { DatabaseService } from "../../core/database/database.service";
 import { EventsService } from "../../core/events/events.service";
@@ -24,7 +24,7 @@ import { locationProblem } from "./knowledge.location";
 import { KnowledgeRepository } from "./knowledge.repository";
 
 /** Where the worker keeps snapshots (runner/knowledge.ts). */
-const KNOWLEDGE_ROOT = path.join(os.homedir(), ".zastava", "knowledge");
+const KNOWLEDGE_ROOT = path.join(os.homedir(), ".yugotool", "knowledge");
 
 /** Settings → Knowledge (the library) and each project's choice from it. Spec 0007. */
 @Injectable()

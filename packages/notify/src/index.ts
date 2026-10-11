@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import type { Settings } from "@zastava/contracts";
+import type { Settings } from "@yugotool/contracts";
 
 const exec = promisify(execFile);
 const TIMEOUT_MS = 10_000;
@@ -63,7 +63,7 @@ export async function send(
     case "slack":
       if (!settings.slackWebhookUrl) throw new ChannelNotConfiguredError(channel);
       return postJson(settings.slackWebhookUrl, {
-        text: `*${notice.title}*\n${notice.body}\n<${notice.url}|Open in ZASTAVA>`,
+        text: `*${notice.title}*\n${notice.body}\n<${notice.url}|Open in YugoTool>`,
       });
     case "telegram":
       if (!settings.telegramBotToken || !settings.telegramChatId) {
@@ -99,7 +99,7 @@ export async function broadcast(
 async function sendDesktop(notice: Notice): Promise<void> {
   if (process.platform !== "darwin") return;
   const script = `display notification ${appleString(notice.body)} with title ${appleString(
-    "ZASTAVA",
+    "YugoTool",
   )} subtitle ${appleString(notice.title)}`;
   await exec("osascript", ["-e", script], { timeout: TIMEOUT_MS });
 }

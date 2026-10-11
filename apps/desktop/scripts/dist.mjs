@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Builds ad-hoc signed ZASTAVA.app + dmg per architecture into release/.
+ * Builds ad-hoc signed YugoTool.app + dmg per architecture into release/.
  * Usage: node scripts/dist.mjs [--arch arm64] [--arch x64] [--dir]
  *   --dir  app folder only (no dmg), quicker for local testing
  *
@@ -22,7 +22,7 @@ const { values } = parseArgs({
   },
 });
 const desktop = path.resolve(import.meta.dirname, "..");
-const frontendDist = path.resolve(desktop, "..", "..", "..", "zastava-frontend", "dist");
+const frontendDist = path.resolve(desktop, "..", "..", "..", "yugotool-frontend", "dist");
 const electronVersion = JSON.parse(
   readFileSync(path.join(desktop, "node_modules", "electron", "package.json"), "utf8"),
 ).version;
@@ -46,8 +46,8 @@ for (const arch of values.arch) {
     ),
     projectDir: desktop,
     config: {
-      appId: "dev.zastava.desktop",
-      productName: "ZASTAVA",
+      appId: "dev.yugotool.desktop",
+      productName: "YugoTool",
       copyright: "Copyright © 2026 Bojan Ratković",
       electronVersion,
       directories: {
@@ -86,8 +86,8 @@ for (const arch of values.arch) {
         },
       },
       dmg: {
-        title: "ZASTAVA ${version}",
-        artifactName: "ZASTAVA-${version}-${arch}.dmg",
+        title: "YugoTool ${version}",
+        artifactName: "YugoTool-${version}-${arch}.dmg",
         contents: [
           { x: 150, y: 190, type: "file" },
           { x: 390, y: 190, type: "link", path: "/Applications" },

@@ -1,5 +1,5 @@
 {
-  "name": "@zastava/skills",
+  "name": "@yugotool/skills",
   "version": "0.0.0",
   "private": true,
   "type": "commonjs",
@@ -12,7 +12,7 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@zastava/contracts": "workspace:*"
+    "@yugotool/contracts": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.19.1"

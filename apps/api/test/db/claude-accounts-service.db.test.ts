@@ -2,8 +2,8 @@ import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { type ClaudeAccountLogin } from "@zastava/contracts";
-import { createDbClient, type DbClient } from "@zastava/db";
+import { type ClaudeAccountLogin } from "@yugotool/contracts";
+import { createDbClient, type DbClient } from "@yugotool/db";
 import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
@@ -50,7 +50,7 @@ async function settled(id: string): Promise<ClaudeAccountLogin> {
 
 beforeAll(async () => {
   client = createDbClient(testDatabaseUrl());
-  home = await mkdtemp(path.join(os.tmpdir(), "zastava-home-"));
+  home = await mkdtemp(path.join(os.tmpdir(), "yugotool-home-"));
   process.env["HOME"] = home;
   await signedInDir(".claude", "work@acme.io");
   await signedInDir(".claude-personal", "me@example.com");
@@ -152,7 +152,7 @@ describe("Claude accounts on a tmp HOME (spec 0016)", () => {
       )
     ).rows;
     expect(row?.id).toBeNull();
-    // Not ZASTAVA's dir: never touched.
+    // Not YugoTool's dir: never touched.
     expect(existsSync(path.join(home, ".claude-personal", "stub-auth.json"))).toBe(true);
   });
 
@@ -174,7 +174,7 @@ describe("Claude accounts on a tmp HOME (spec 0016)", () => {
       managed: true,
       status: "signed_in",
     });
-    expect(account?.configDir?.startsWith(path.join(home, ".zastava", "accounts"))).toBe(true);
+    expect(account?.configDir?.startsWith(path.join(home, ".yugotool", "accounts"))).toBe(true);
     await accounts.remove(account!.id);
     expect(existsSync(account!.configDir!)).toBe(false);
   });
@@ -191,7 +191,7 @@ describe("Claude accounts on a tmp HOME (spec 0016)", () => {
     expect(logins.get(cancelled.id)).toMatchObject({ state: "failed", error: "Cancelled." });
     await new Promise((r) => setTimeout(r, 100));
     const { readdir } = await import("node:fs/promises");
-    const left = await readdir(path.join(home, ".zastava", "accounts")).catch(() => []);
+    const left = await readdir(path.join(home, ".yugotool", "accounts")).catch(() => []);
     expect(left).toEqual([]);
     expect(await accounts.list()).toEqual([]);
   });
@@ -199,7 +199,7 @@ describe("Claude accounts on a tmp HOME (spec 0016)", () => {
   it("shutdown mid sign-in removes the dir it made", async () => {
     const pending = await logins.start({ label: "Cut off" });
     expect(pending.state).toBe("pending");
-    const root = path.join(home, ".zastava", "accounts");
+    const root = path.join(home, ".yugotool", "accounts");
     const { readdir } = await import("node:fs/promises");
     expect(await readdir(root)).toHaveLength(1);
     logins.onModuleDestroy();

@@ -1,5 +1,5 @@
-import type { NeedsYouItem } from "@zastava/contracts";
-import type { SupervisorStatus } from "@zastava/supervisor";
+import type { NeedsYouItem } from "@yugotool/contracts";
+import type { SupervisorStatus } from "@yugotool/supervisor";
 import type { MenuItemConstructorOptions } from "electron";
 
 export interface TrayActions {
@@ -50,7 +50,7 @@ export function trayMenuTemplate(
 
   const failed = status?.services.some((s) => s.state === "failed") ?? false;
   return [
-    { label: "Open ZASTAVA", click: () => actions.open() },
+    { label: "Open YugoTool", click: () => actions.open() },
     { type: "separator" },
     ...waiting,
     { type: "separator" },
@@ -67,7 +67,7 @@ export function trayMenuTemplate(
       ],
     },
     { type: "separator" },
-    { label: "Quit ZASTAVA", accelerator: "Command+Q", click: actions.quit },
+    { label: "Quit YugoTool", accelerator: "Command+Q", click: actions.quit },
   ];
 }
 
@@ -81,26 +81,54 @@ function truncate(text: string, max: number): string {
 }
 
 /**
- * A small flag mark as a macOS template image (black + alpha, BGRA): a pole
- * and a pennant. `size` is the pixel size (16 at 1x, 32 at 2x).
+ * The mark as a macOS template image (black + alpha, BGRA): the milling
+ * cutter's toothed ring and the Y, the bore left clear. `size` is the pixel
+ * size (16 at 1x, 32 at 2x); 4×4 samples per pixel smooth the edges.
  */
-export function flagBitmap(size: number): Buffer {
+export function markBitmap(size: number): Buffer {
   const buf = Buffer.alloc(size * size * 4);
-  const s = size / 16;
-  const paint = (x: number, y: number) => {
-    const i = (y * size + x) * 4;
-    buf[i + 3] = 255;
+  const teeth = 12;
+  const first = (-84 * Math.PI) / 180;
+  const y: [number, number, number, number][] = [
+    [11.22, 10.48, 16, 16.18],
+    [20.78, 10.48, 16, 16.18],
+    [16, 16.18, 16, 22.44],
+  ];
+  const inside = (ux: number, uy: number): boolean => {
+    const r = Math.hypot(ux - 16, uy - 16);
+    const turn = (Math.atan2(uy - 16, ux - 16) - first) / ((2 * Math.PI) / teeth);
+    const phase = turn - Math.floor(turn);
+    // Cutting face, a short land at the tip, then the back slopes to the next face.
+    const outer = phase < 0.28 ? 15 : 15 - ((phase - 0.28) / 0.72) * 3.6;
+    if (r > 9.6 && r <= outer) return true;
+    return y.some(([x1, y1, x2, y2]) => segmentDistance(ux, uy, x1, y1, x2, y2) <= 1.4);
   };
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const ux = x / s;
-      const uy = y / s;
-      const pole = ux >= 3 && ux < 4.5 && uy >= 1.5 && uy < 15;
-      // Pennant: from the pole to the right, 2..9 high, notched at the fly end.
-      const inFlag = ux >= 4.5 && ux < 13.5 && uy >= 2 && uy < 9;
-      const notch = ux >= 10.5 && Math.abs(uy - 5.5) < (ux - 10.5) * 0.9;
-      if (pole || (inFlag && !notch)) paint(x, y);
+  for (let py = 0; py < size; py++) {
+    for (let px = 0; px < size; px++) {
+      let hits = 0;
+      for (let sy = 0; sy < 4; sy++) {
+        for (let sx = 0; sx < 4; sx++) {
+          const ux = ((px + (sx + 0.5) / 4) / size) * 32;
+          const uy = ((py + (sy + 0.5) / 4) / size) * 32;
+          if (inside(ux, uy)) hits += 1;
+        }
+      }
+      buf[(py * size + px) * 4 + 3] = Math.round((hits / 16) * 255);
     }
   }
   return buf;
+}
+
+function segmentDistance(
+  x: number,
+  y: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+): number {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const t = Math.max(0, Math.min(1, ((x - x1) * dx + (y - y1) * dy) / (dx * dx + dy * dy)));
+  return Math.hypot(x - (x1 + t * dx), y - (y1 + t * dy));
 }

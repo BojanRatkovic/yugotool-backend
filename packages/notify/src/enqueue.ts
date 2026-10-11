@@ -2,8 +2,8 @@ import {
   NOTIFICATION_JOBS_CHANNEL,
   type NotificationJob,
   notificationJobSchema,
-} from "@zastava/contracts";
-import { type Executor, notificationJobs } from "@zastava/db";
+} from "@yugotool/contracts";
+import { type Executor, notificationJobs } from "@yugotool/db";
 import { like, sql } from "drizzle-orm";
 
 /**

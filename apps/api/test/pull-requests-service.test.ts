@@ -1,4 +1,4 @@
-import type { ProjectRemote } from "@zastava/contracts";
+import type { ProjectRemote } from "@yugotool/contracts";
 import { describe, expect, it, vi } from "vitest";
 import type { ProjectsService } from "../src/modules/projects/projects.service";
 import type { GithubClient } from "../src/modules/pull-requests/github/gh-client";

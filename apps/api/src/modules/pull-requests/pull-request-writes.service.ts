@@ -4,7 +4,7 @@ import type {
   PrMergeMethod,
   PrSubmitReviewInput,
   PrViewedInput,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 import { z } from "zod";
 import { GithubClient } from "./github/gh-client";
 import {

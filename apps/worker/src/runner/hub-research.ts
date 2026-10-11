@@ -3,7 +3,7 @@
 import { execFile } from "node:child_process";
 import path from "node:path";
 import { promisify } from "node:util";
-import type { ResearchPlan, SplitItem, StationResearch } from "@zastava/contracts";
+import type { ResearchPlan, SplitItem, StationResearch } from "@yugotool/contracts";
 
 const exec = promisify(execFile);
 
@@ -147,8 +147,8 @@ export function hubResearchPrompt(input: {
   return [
     "## Work hub",
     `You are in the work hub at \`${input.hub}\` (your working directory). Its CLAUDE.md/AGENTS.md (already loaded), knowledge, specs and skills apply: read what is relevant. The code lives in clean, freshly updated checkouts: ${list}.`,
-    "Do not modify anything and do not create worktrees, branches or pull requests: ZASTAVA prepares a worktree for the chosen repo after the plan is approved.",
-    "Plan only the change and how to verify it locally. Leave committing, pushing and opening a pull request out of the plan (no `/p-dev:open-pr`-style steps): ZASTAVA delivers the work after the final review.",
+    "Do not modify anything and do not create worktrees, branches or pull requests: YugoTool prepares a worktree for the chosen repo after the plan is approved.",
+    "Plan only the change and how to verify it locally. Leave committing, pushing and opening a pull request out of the plan (no `/p-dev:open-pr`-style steps): YugoTool delivers the work after the final review.",
     input.plans
       ? input.presetRepo
         ? `This work order is set to \`${input.presetRepo}\`: set \`repo\` to it and plan the work there. Propose a \`split\` only if other repos must change too.`

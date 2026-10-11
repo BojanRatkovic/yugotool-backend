@@ -33,7 +33,7 @@ describe("restartDelay", () => {
 });
 
 describe("migrations", () => {
-  const dir = mkdtempSync(path.join(tmpdir(), "zastava-migrations-"));
+  const dir = mkdtempSync(path.join(tmpdir(), "yugotool-migrations-"));
   mkdirSync(path.join(dir, "meta"));
   writeFileSync(
     path.join(dir, "meta", "_journal.json"),

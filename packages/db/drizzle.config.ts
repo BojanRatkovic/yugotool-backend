@@ -8,6 +8,6 @@ export default defineConfig({
   out: "./migrations",
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env["DATABASE_URL"] ?? "postgres://localhost:5432/zastava",
+    url: process.env["DATABASE_URL"] ?? "postgres://localhost:5432/yugotool",
   },
 });

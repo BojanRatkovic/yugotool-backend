@@ -1,6 +1,6 @@
 import { Body, Controller, Get, HttpCode, Post, Query } from "@nestjs/common";
 import { ApiOkResponse, ApiTags } from "@nestjs/swagger";
-import type { NotificationPage, UnreadCount } from "@zastava/contracts";
+import type { NotificationPage, UnreadCount } from "@yugotool/contracts";
 import {
   MarkNotificationsReadDto,
   NotificationListQueryDto,

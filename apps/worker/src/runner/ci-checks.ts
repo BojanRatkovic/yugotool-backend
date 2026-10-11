@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { type CiCheck, ciBucketSchema } from "@zastava/contracts";
+import { type CiCheck, ciBucketSchema } from "@yugotool/contracts";
 import { z } from "zod";
 
 const exec = promisify(execFile);

@@ -1,5 +1,5 @@
-import { createDbClient, type DbClient, notificationJobs, notifications } from "@zastava/db";
-import { enqueueNotification, hasNotificationJobs } from "@zastava/notify";
+import { createDbClient, type DbClient, notificationJobs, notifications } from "@yugotool/db";
+import { enqueueNotification, hasNotificationJobs } from "@yugotool/notify";
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { NotificationsRepository } from "../../src/modules/notifications/notifications.repository";

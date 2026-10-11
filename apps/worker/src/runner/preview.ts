@@ -1,6 +1,6 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import net from "node:net";
-import type { Preview } from "@zastava/contracts";
+import type { Preview } from "@yugotool/contracts";
 import { pinnedNodeEnv } from "./node-versions";
 
 /** Log kept per preview; enough for a tail in the UI and the failure report. */
@@ -150,7 +150,7 @@ export async function startPreview(options: PreviewOptions): Promise<RunningPrev
     CI: "1",
   };
 
-  // The Node the repo pins (.nvmrc / .node-version), downloaded once by ZASTAVA (spec 0013).
+  // The Node the repo pins (.nvmrc / .node-version), downloaded once by YugoTool (spec 0013).
   const nodeEnv = await pinnedNodeEnv(cwd, env, (message) => append(`${message}\n`));
 
   if (preview.install) {

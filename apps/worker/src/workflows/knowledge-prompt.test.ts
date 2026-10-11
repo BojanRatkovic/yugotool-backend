@@ -1,5 +1,5 @@
-import type { AgentStation } from "@zastava/contracts";
-import { updateLineSchema } from "@zastava/contracts";
+import type { AgentStation } from "@yugotool/contracts";
+import { updateLineSchema } from "@yugotool/contracts";
 import { describe, expect, it } from "vitest";
 import { buildPrompt, knowledgeSection } from "./line-logic";
 

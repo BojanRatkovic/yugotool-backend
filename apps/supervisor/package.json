@@ -1,9 +1,9 @@
 {
-  "name": "@zastava/supervisor",
+  "name": "@yugotool/supervisor",
   "version": "0.0.0",
   "private": true,
   "bin": {
-    "zastava": "./dist/cli.js"
+    "yugotool": "./dist/cli.js"
   },
   "type": "commonjs",
   "main": "./dist/index.js",

@@ -15,7 +15,7 @@ import {
   type Shift,
   type ShiftControl,
   type ShiftReview,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 import type { Client } from "@temporalio/client";
 import { resolveInside, runArtifactsDir } from "../../core/artifacts/artifacts";
 import { DatabaseService } from "../../core/database/database.service";
@@ -38,7 +38,7 @@ import { gateRepoProblem } from "./hub-gate";
 import { RunsRepository } from "./runs.repository";
 
 /** Shift station memory inside the worktree (written by the worker). */
-const MEMORY_DIR = ".zastava";
+const MEMORY_DIR = ".yugotool";
 /** A diff bigger than this is unreadable in a sheet anyway. */
 const MAX_PATCH_CHARS = 200_000;
 /** A `--stat` past this is cut and closed with the `--shortstat` totals. */

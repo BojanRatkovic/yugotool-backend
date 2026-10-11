@@ -4,11 +4,11 @@ import {
   type ReviewPullRequest,
   type ReviewVerdict,
   type RunStatus,
-  type ZastavaReviewBrief,
+  type YugoToolReviewBrief,
   reviewPullRequestSchema,
   reviewVerdictSchema,
-} from "@zastava/contracts";
-import { type Executor, runEvents, runs, stationRuns, workOrders } from "@zastava/db";
+} from "@yugotool/contracts";
+import { type Executor, runEvents, runs, stationRuns, workOrders } from "@yugotool/db";
 import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 
 /** A review work order with what its latest run produced so far. */
@@ -31,7 +31,7 @@ const forPr = (projectId: string, number: number) =>
     sql`(${workOrders.pullRequest}->>'number')::int = ${number}`,
   );
 
-/** Review work orders (spec 0009): all SQL for ZASTAVA reviews of pull requests. */
+/** Review work orders (spec 0009): all SQL for YugoTool reviews of pull requests. */
 @Injectable()
 export class PullRequestReviewsRepository {
   /** The newest review of a PR, with its run's cost, verdict and failure reason. */
@@ -125,7 +125,7 @@ export class PullRequestReviewsRepository {
   }
 
   /** Every PR's latest review in the project, with its finding counts. */
-  async briefs(db: Executor, projectId: string): Promise<ZastavaReviewBrief[]> {
+  async briefs(db: Executor, projectId: string): Promise<YugoToolReviewBrief[]> {
     const latest = await db
       .selectDistinctOn([sql`(${workOrders.pullRequest}->>'number')::int`], {
         pullRequest: workOrders.pullRequest,

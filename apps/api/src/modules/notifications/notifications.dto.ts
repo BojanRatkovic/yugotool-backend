@@ -3,7 +3,7 @@ import {
   notificationListQuerySchema,
   notificationPageSchema,
   unreadCountSchema,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 import { createZodDto } from "nestjs-zod";
 
 export class NotificationListQueryDto extends createZodDto(notificationListQuerySchema) {}

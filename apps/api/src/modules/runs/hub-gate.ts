@@ -1,5 +1,5 @@
 // Which repo a hub run's plan gate approves (spec 0014). Pure.
-import type { GateDecision } from "@zastava/contracts";
+import type { GateDecision } from "@yugotool/contracts";
 
 export interface HubGateContext {
   kind: "repo" | "hub";
