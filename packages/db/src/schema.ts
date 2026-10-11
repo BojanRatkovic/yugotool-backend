@@ -14,6 +14,7 @@ import type {
   Station,
   Verdict,
   ReviewPullRequest,
+  WorkOrderSource,
   ReviewVerdict,
 } from "@yugotool/contracts";
 import { sql } from "drizzle-orm";
@@ -207,11 +208,17 @@ export const workOrders = pgTable(
     ci: jsonb("ci").$type<CiStatus>(),
     queueMode: queueMode("queue_mode"),
     queuedAt: timestamp("queued_at", { withTimezone: true }),
+    /** Imported from an outside tracker (spec 0019); null when made here. */
+    source: jsonb("source").$type<WorkOrderSource>(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     index("work_orders_project_id_idx").on(t.projectId),
+    // A task is imported into a project at most once.
+    uniqueIndex("work_orders_source_idx")
+      .on(t.projectId, sql`(${t.source}->>'provider')`, sql`(${t.source}->>'id')`)
+      .where(sql`${t.source} is not null`),
     index("work_orders_follows_id_idx").on(t.followsId),
     // The dispatcher's hot query: oldest queued orders first.
     index("work_orders_queued_idx")
@@ -400,6 +407,22 @@ export const settings = pgTable("settings", {
     .notNull()
     .default({}),
   updatedAt: updatedAt(),
+});
+
+/**
+ * Single-row table (id = 'default'): the Productive connection (spec 0019).
+ * The token is never returned by the API.
+ */
+export const productiveConnection = pgTable("productive_connection", {
+  id: text("id").primaryKey().default("default"),
+  token: text("token").notNull(),
+  organizationId: text("organization_id").notNull(),
+  organizationName: text("organization_name").notNull(),
+  personId: text("person_id"),
+  personName: text("person_name"),
+  /** Every organization the token reached when connected: id + name. */
+  organizations: jsonb("organizations").$type<{ id: string; name: string }[]>().notNull(),
+  connectedAt: timestamp("connected_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 /** Claude logins and API keys sessions can run on (spec 0016). */

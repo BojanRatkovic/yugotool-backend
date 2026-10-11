@@ -1,5 +1,10 @@
 import { Injectable } from "@nestjs/common";
-import type { NeedsYouItem, UpdateWorkOrder, WorkOrder } from "@yugotool/contracts";
+import type {
+  NeedsYouItem,
+  UpdateWorkOrder,
+  WorkOrder,
+  WorkOrderSource,
+} from "@yugotool/contracts";
 import { type Executor, projects, runs, workOrders } from "@yugotool/db";
 import { and, asc, eq, inArray, isNull, max, sql } from "drizzle-orm";
 import { iso } from "../../common/mappers";
@@ -193,6 +198,50 @@ export class WorkOrdersRepository {
     const existing = id ? await this.find(db, id) : null;
     if (!existing) throw new Error("work order insert returned nothing");
     return existing;
+  }
+
+  /**
+   * Inserts an imported task (spec 0019). Idempotent on (project, source):
+   * a task already imported into the project returns its work order.
+   */
+  async insertImported(
+    db: Executor,
+    values: {
+      projectId: string;
+      title: string;
+      description: string;
+      position: number;
+      source: WorkOrderSource;
+    },
+  ): Promise<WorkOrder> {
+    const [row] = await db.insert(workOrders).values(values).onConflictDoNothing().returning();
+    if (row) return toWorkOrder(row);
+    const [existing] = await this.findBySources(db, values.projectId, values.source.provider, [
+      values.source.id,
+    ]);
+    if (!existing) throw new Error("imported work order insert returned nothing");
+    return existing;
+  }
+
+  /** Work orders of a project imported from these source ids. */
+  async findBySources(
+    db: Executor,
+    projectId: string,
+    provider: WorkOrderSource["provider"],
+    ids: string[],
+  ): Promise<WorkOrder[]> {
+    if (ids.length === 0) return [];
+    const rows = await db
+      .select()
+      .from(workOrders)
+      .where(
+        and(
+          eq(workOrders.projectId, projectId),
+          sql`${workOrders.source}->>'provider' = ${provider}`,
+          inArray(sql<string>`${workOrders.source}->>'id'`, ids),
+        ),
+      );
+    return rows.map(toWorkOrder);
   }
 
   async update(
