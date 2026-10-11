@@ -196,6 +196,16 @@ describe("Claude accounts on a tmp HOME (spec 0016)", () => {
     expect(await accounts.list()).toEqual([]);
   });
 
+  it("shutdown mid sign-in removes the dir it made", async () => {
+    const pending = await logins.start({ label: "Cut off" });
+    expect(pending.state).toBe("pending");
+    const root = path.join(home, ".zastava", "accounts");
+    const { readdir } = await import("node:fs/promises");
+    expect(await readdir(root)).toHaveLength(1);
+    logins.onModuleDestroy();
+    expect(await readdir(root)).toEqual([]);
+  });
+
   it("signs an existing account in again without adding one", async () => {
     const account = await accounts.create({ kind: "config_dir", configDir: "~/.claude-personal" });
     const again = await logins.start({ accountId: account.id, email: "me2@example.com" });

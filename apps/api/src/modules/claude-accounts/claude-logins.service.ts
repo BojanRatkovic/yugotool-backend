@@ -1,3 +1,4 @@
+import { rmSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import { Injectable, Logger, type OnModuleDestroy } from "@nestjs/common";
@@ -103,10 +104,13 @@ export class ClaudeLoginsService implements OnModuleDestroy {
     if (login.view.state === "pending") this.fail(login, "Cancelled.");
   }
 
+  /** A sign-in cut off by shutdown leaves no half-made dir behind (sync: the process is ending). */
   onModuleDestroy(): void {
     for (const login of this.logins.values()) {
       login.child?.kill();
       if (login.timer) clearTimeout(login.timer);
+      if (login.view.state === "pending" && login.createdDir)
+        rmSync(login.createdDir, { recursive: true, force: true });
     }
   }
 
