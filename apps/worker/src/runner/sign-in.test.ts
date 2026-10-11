@@ -1,6 +1,14 @@
 import { summarizeStorageState, storageStateSchema } from "@yugotool/contracts";
 import { describe, expect, it } from "vitest";
-import { BrowserTrace, hasState, redactUrl, type StorageState } from "./sign-in";
+import {
+  BrowserTrace,
+  hasState,
+  parseSavedSession,
+  redactUrl,
+  retargetSession,
+  type SavedSession,
+  type StorageState,
+} from "./sign-in";
 
 const empty: StorageState = { cookies: [], origins: [] };
 const cookie = (domain: string) =>
@@ -46,8 +54,125 @@ describe("summarizeStorageState", () => {
     });
     expect(summarizeStorageState(state)).toEqual({
       cookieCount: 3,
-      domains: ["app.example.localhost:5100", "example.localhost", "id.example.localhost"],
+      storageKeys: 1,
+      domains: ["app.example.localhost", "example.localhost", "id.example.localhost"],
     });
+  });
+});
+
+const item = (name: string, value: string) => ({ name, value });
+
+describe("parseSavedSession", () => {
+  it("reads a session file and refuses anything else", () => {
+    const file = {
+      cookies: [cookie("localhost")],
+      origins: [{ origin: "http://localhost:1", localStorage: [item("t", "1")] }],
+      signedInOn: { host: "localhost", port: 1, port2: 2 },
+    };
+    expect(parseSavedSession(JSON.stringify(file))).toEqual(file);
+    expect(parseSavedSession("{")).toBeNull();
+    expect(parseSavedSession('{"cookies":[]}')).toBeNull();
+  });
+});
+
+describe("retargetSession", () => {
+  const saved: SavedSession = {
+    cookies: [cookie("localhost")],
+    origins: [
+      {
+        origin: "http://localhost:54432",
+        localStorage: [
+          item("ptm:auth@localhost-54433", '{"token":"t","api":"http://localhost:54433/api/v2"}'),
+          item("visits", "54432"),
+        ],
+      },
+      { origin: "https://other.example.com", localStorage: [item("k", "localhost:54432")] },
+    ],
+    signedInOn: { host: "localhost", port: 54432, port2: 54433 },
+  };
+
+  it("moves the app origin and its API mentions to the new ports", () => {
+    const moved = retargetSession(saved, { host: "localhost", port: 52245, port2: 52246 });
+    expect(moved).not.toHaveProperty("signedInOn");
+    expect(moved.cookies).toEqual(saved.cookies);
+    expect(moved.origins[0]).toEqual({
+      origin: "http://localhost:52245",
+      localStorage: [
+        item("ptm:auth@localhost-52246", '{"token":"t","api":"http://localhost:52246/api/v2"}'),
+        item("visits", "54432"),
+      ],
+    });
+    // Other sites' origins stay; text inside them is only rewritten for this Mac's hosts.
+    expect(moved.origins[1]).toEqual({
+      origin: "https://other.example.com",
+      localStorage: [item("k", "localhost:52245")],
+    });
+  });
+
+  it("does not move a port twice when the ports swap", () => {
+    const moved = retargetSession(saved, { host: "localhost", port: 54433, port2: 54432 });
+    expect(moved.origins[0]?.origin).toBe("http://localhost:54433");
+    expect(moved.origins[0]?.localStorage[0]?.name).toBe("ptm:auth@localhost-54432");
+  });
+
+  it("follows a changed preview host", () => {
+    const moved = retargetSession(
+      {
+        ...saved,
+        signedInOn: { host: "app.localhost", port: 5100, port2: -1 },
+        origins: [
+          {
+            origin: "http://app.localhost:5100",
+            localStorage: [item("u", "http://app.localhost:5100/x")],
+          },
+        ],
+      },
+      { host: "app.localhost", port: 6200, port2: 6201 },
+    );
+    expect(moved.origins).toEqual([
+      {
+        origin: "http://app.localhost:6200",
+        localStorage: [item("u", "http://app.localhost:6200/x")],
+      },
+    ]);
+  });
+
+  it("infers where an older session was signed in", () => {
+    const { signedInOn: _, ...legacy } = saved;
+    const moved = retargetSession(legacy, { host: "localhost", port: 52245, port2: 52246 });
+    expect(moved.origins[0]?.origin).toBe("http://localhost:52245");
+    // The one other local port its storage mentions is the API's.
+    expect(moved.origins[0]?.localStorage[0]).toEqual(
+      item("ptm:auth@localhost-52246", '{"token":"t","api":"http://localhost:52246/api/v2"}'),
+    );
+    // Two candidates: the API port stays unknown.
+    const ambiguous = {
+      ...legacy,
+      origins: [
+        {
+          origin: "http://localhost:54432",
+          localStorage: [item("a@localhost-54433", "1"), item("b", "localhost:6000")],
+        },
+      ],
+    };
+    const kept = retargetSession(ambiguous, { host: "localhost", port: 52245, port2: 52246 });
+    expect(kept.origins[0]).toEqual({ ...ambiguous.origins[0], origin: "http://localhost:52245" });
+  });
+
+  it("leaves the session alone when the ports match or the origin is ambiguous", () => {
+    const same = retargetSession(saved, { host: "localhost", port: 54432, port2: 54433 });
+    expect(same.origins).toEqual(saved.origins);
+    const { signedInOn: _, ...legacy } = saved;
+    const two = {
+      ...legacy,
+      origins: [
+        ...legacy.origins,
+        { origin: "http://localhost:6000", localStorage: [item("a", "1")] },
+      ],
+    };
+    expect(retargetSession(two, { host: "localhost", port: 1, port2: 2 }).origins).toEqual(
+      two.origins,
+    );
   });
 });
 

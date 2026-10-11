@@ -14,6 +14,9 @@ export const previewTestDir = (projectId: string): string =>
 /** Same files as the worker's runner/artifacts.ts: saved session, sign-in progress, Done/Cancel. */
 export const previewSessionFile = (projectId: string): string =>
   path.join(previewTestDir(projectId), "session.json");
+/** Copies of the session moved to one preview's ports (worker: sessionFileFor). */
+export const previewSessionCopiesDir = (projectId: string): string =>
+  path.join(previewTestDir(projectId), "sessions");
 export const previewSignInFile = (projectId: string): string =>
   path.join(previewTestDir(projectId), "sign-in.json");
 export const previewSignInFinishFile = (projectId: string): string =>

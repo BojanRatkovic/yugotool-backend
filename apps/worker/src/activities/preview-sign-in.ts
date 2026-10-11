@@ -5,16 +5,24 @@ import { type Database, projects } from "@yugotool/db";
 import { eq } from "drizzle-orm";
 import type { Browser, BrowserContext, Page } from "playwright";
 import {
-  existingSession,
+  previewSessionCopiesDir,
   previewSessionFile,
   previewSignInFile,
   previewSignInFinishFile,
   previewTestDir,
+  sessionFor,
 } from "../runner/artifacts";
 import { localRunner } from "../runner/local-runner";
 import { PreviewError, previewUrl, type RunningPreview, startPreview } from "../runner/preview";
 import { launchVisibleBrowser } from "../runner/qa-capture";
-import { BrowserTrace, hasState, redactUrl, type StorageState } from "../runner/sign-in";
+import {
+  BrowserTrace,
+  hasState,
+  placeOf,
+  redactUrl,
+  type SavedSession,
+  type StorageState,
+} from "../runner/sign-in";
 
 const HEARTBEAT_MS = 10_000;
 const POLL_MS = 1_000;
@@ -84,7 +92,7 @@ export function createPreviewSignInActivities(db: Database, deps: PreviewSignInD
         });
         browser = await launchVisibleBrowser();
         // Start from the saved session, so "Sign in again" can refresh it.
-        const existing = existingSession(projectId);
+        const existing = await sessionFor(projectId, placeOf(running));
         const context = await browser.newContext({
           viewport: null,
           ...(existing ? { storageState: existing } : {}),
@@ -119,9 +127,10 @@ export function createPreviewSignInActivities(db: Database, deps: PreviewSignInD
             error: "The browser held no cookies or storage, so there was nothing to save.",
             logs: logs(),
           });
-        await writeFile(previewSessionFile(projectId), JSON.stringify(outcome.state), {
-          mode: 0o600,
-        });
+        // Where it ran, so later previews on other ports can move it (retargetSession).
+        const saved: SavedSession = { ...outcome.state, signedInOn: placeOf(running) };
+        await writeFile(previewSessionFile(projectId), JSON.stringify(saved), { mode: 0o600 });
+        await rm(previewSessionCopiesDir(projectId), { recursive: true, force: true });
         return await end({
           status: "saved",
           logs: logs(),

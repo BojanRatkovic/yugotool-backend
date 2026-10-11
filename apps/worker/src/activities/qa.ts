@@ -35,9 +35,21 @@ import {
 import { and, asc, eq, ne } from "drizzle-orm";
 import type { Browser } from "playwright";
 import { z } from "zod";
-import { existingSession, previewTestDir, runArtifactsDir } from "../runner/artifacts";
+import {
+  dropSessionFile,
+  previewTestDir,
+  runArtifactsDir,
+  sessionFileFor,
+  sessionFor,
+} from "../runner/artifacts";
 import { localRunner } from "../runner/local-runner";
-import { PreviewError, portInUse, type RunningPreview, startPreview } from "../runner/preview";
+import {
+  PreviewError,
+  portInUse,
+  previewOrigin,
+  type RunningPreview,
+  startPreview,
+} from "../runner/preview";
 import {
   capturePage,
   chromiumPath,
@@ -67,6 +79,7 @@ import { needsDiscovery, routeSourceHash } from "../runner/route-map";
 import { discoverRouteMap, runStructuredSession } from "./routes";
 import { accountNote, claudeAuthFor, withClaudeAuth } from "../claude-env";
 import { sandboxFor } from "../runner/sandbox";
+import { placeOf } from "../runner/sign-in";
 
 const HEARTBEAT_MS = 10_000;
 /** Sidecar of a cached base screenshot. */
@@ -211,7 +224,7 @@ export function createQaActivities(db: Database, deps: QaDeps) {
           })),
         );
       const preview = row?.preview ?? null;
-      const session = row ? existingSession(row.projectId) : null;
+      const projectId = row?.projectId ?? null;
 
       const [qaRun] = await db
         .insert(qaRuns)
@@ -244,6 +257,7 @@ export function createQaActivities(db: Database, deps: QaDeps) {
       const previews: RunningPreview[] = [];
       let browser: Browser | null = null;
       let baseWorktree: string | null = null;
+      let judgeSession: string | null = null;
       let costUsd = 0;
 
       try {
@@ -393,6 +407,11 @@ export function createQaActivities(db: Database, deps: QaDeps) {
           .set({ baseSha, prSha, baseUrl: basePreview?.url ?? null, prUrl: prPreview.url })
           .where(eq(qaRuns.id, qaRun.id));
 
+        // The saved sign-in, moved to each preview's ports (localStorage is per origin).
+        const baseSession =
+          basePreview && projectId ? await sessionFor(projectId, placeOf(basePreview)) : null;
+        const prSession = projectId ? await sessionFor(projectId, placeOf(prPreview)) : null;
+
         // ── Capture + diff (deterministic) ──
         browser = await launchBrowser((message) => void log("system", message));
         const consoleByPath = new Map<string, { base: string[]; pr: string[] }>();
@@ -415,7 +434,7 @@ export function createQaActivities(db: Database, deps: QaDeps) {
               viewport: combo.viewport,
               theme: combo.theme,
               file: baseFile,
-              session,
+              session: baseSession,
             });
             baseErrors = shot.consoleErrors;
             baseError = shot.error;
@@ -439,7 +458,7 @@ export function createQaActivities(db: Database, deps: QaDeps) {
             viewport: combo.viewport,
             theme: combo.theme,
             file: path.join(artifacts, prRel),
-            session,
+            session: prSession,
           });
           const consoleEntry = consoleByPath.get(combo.path) ?? { base: [], pr: [] };
           consoleEntry.base.push(...baseErrors);
@@ -563,12 +582,14 @@ export function createQaActivities(db: Database, deps: QaDeps) {
           previousReport: input.previousReport,
           scenarios,
           planned: usedPlan,
+          signedIn: prSession !== null,
         });
         const agentDir = path.join(artifacts, attemptRel, "agent");
         await mkdir(agentDir, { recursive: true });
         // The judge only reads, but Playwright MCP saves a screenshot given a
         // filename into its cwd — the worktree — where delivery would commit it.
         const untrackedBefore = await localRunner.untrackedFiles(input.worktreePath);
+        judgeSession = projectId ? await sessionFileFor(projectId, placeOf(prPreview)) : null;
         const judged = await runJudge({
           runId,
           stationRunId,
@@ -576,8 +597,14 @@ export function createQaActivities(db: Database, deps: QaDeps) {
           worktreePath: input.worktreePath,
           prompt,
           prOrigin: prPreview.url,
+          // $PORT2 is where a project runs its mock API next to the app.
+          allowedOrigins: [
+            prPreview.url,
+            previewOrigin(preview, prPreview.port2),
+            `http://localhost:${prPreview.port2}`,
+          ],
           initScript: initScript(preview, station.themes[0] ?? "light", prPreview),
-          session,
+          session: judgeSession,
           artifacts,
           agentDir,
           model: input.modelOverride ?? station.model,
@@ -669,6 +696,7 @@ export function createQaActivities(db: Database, deps: QaDeps) {
         clearInterval(heartbeat);
         await browser?.close().catch(() => undefined);
         await Promise.all(previews.map((p) => p.stop().catch(() => undefined)));
+        await dropSessionFile(judgeSession);
         if (baseWorktree) await localRunner.removeWorktree(input.worktreePath, baseWorktree);
         const leaked = (
           await Promise.all(previews.map(async (p) => ((await portInUse(p.port)) ? p.port : null)))
@@ -733,7 +761,7 @@ export function createQaActivities(db: Database, deps: QaDeps) {
           viewport: "desktop",
           theme: "light",
           file: path.join(dir, "screenshot.png"),
-          session: existingSession(input.projectId),
+          session: await sessionFor(input.projectId, placeOf(running)),
         });
         const logs = tail(running.logs(), 200);
         return await finish({
@@ -887,7 +915,8 @@ export function createQaActivities(db: Database, deps: QaDeps) {
   /**
    * The QA judge: a sandboxed Claude session in the PR worktree with read-only
    * tools, the artifact dir readable, and (when interactive) a Playwright MCP
-   * browser confined to the PR preview's origin. Its screenshots become image events.
+   * browser confined to the PR preview's origin and its `$PORT2`. Its
+   * screenshots become image events.
    */
   async function runJudge(args: {
     runId: string;
@@ -896,9 +925,11 @@ export function createQaActivities(db: Database, deps: QaDeps) {
     worktreePath: string;
     prompt: string;
     prOrigin: string;
+    /** Origins the judge's browser may request: the PR preview and its `$PORT2`. */
+    allowedOrigins: string[];
     /** The project's init snippet for the judge's browser; null when none. */
     initScript: string | null;
-    /** Saved sign-in the judge's browser starts with; null when none. */
+    /** Saved sign-in file (sessionFileFor) the judge's browser starts with; null when none. */
     session: string | null;
     artifacts: string;
     agentDir: string;
@@ -954,7 +985,7 @@ export function createQaActivities(db: Database, deps: QaDeps) {
                     "--executable-path",
                     chromiumPath(),
                     "--allowed-origins",
-                    args.prOrigin,
+                    [...new Set(args.allowedOrigins)].join(";"),
                     "--output-dir",
                     args.agentDir,
                     "--viewport-size",
