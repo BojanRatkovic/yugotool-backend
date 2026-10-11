@@ -19,7 +19,7 @@ Drop a work order on a board. An assembly line of agents researches, builds, tes
 [![Electron](https://img.shields.io/badge/Electron-44-47848F?style=flat-square&logo=electron&logoColor=white)](https://www.electronjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 
-[Features](#features) · [How it works](#how-it-works) · [Install](#install) · [Development](#development) · [Frontend repo](https://github.com/cherry-it/yugotool-frontend)
+[Features](#features) · [How it works](#how-it-works) · [Install](#install) · [Development](#development) · [Frontend repo](https://github.com/BojanRatkovic/yugotool-frontend)
 
 <br />
 
@@ -109,8 +109,8 @@ YugoTool runs on macOS (Apple silicon or Intel) and needs a Claude subscription 
 Build the app:
 
 ```bash
-git clone https://github.com/cherry-it/yugotool-backend.git
-git clone https://github.com/cherry-it/yugotool-frontend.git
+git clone https://github.com/BojanRatkovic/yugotool-backend.git
+git clone https://github.com/BojanRatkovic/yugotool-frontend.git
 (cd yugotool-frontend && pnpm install && pnpm build)
 cd yugotool-backend && pnpm install && pnpm build
 cd apps/desktop && pnpm dist          # → release/YugoTool-<version>-<arch>.dmg
