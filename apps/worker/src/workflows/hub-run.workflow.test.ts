@@ -92,6 +92,7 @@ function activities(ctx: RunContext, researchRepo: string | null) {
       deliver: track("deliver", () => ({ ok: true, error: null })),
       finishRun: track("finishRun", () => undefined),
       archiveRun: track("archiveRun", () => undefined),
+      installDependencies: track("installDependencies", () => undefined),
     },
   };
 }
@@ -146,6 +147,7 @@ describe("workOrderRun in a hub project (spec 0014)", () => {
       "beginStation",
       "finishStation",
       "prepareRepoWorkspace",
+      "installDependencies",
       "beginStation",
       "runChecks",
       "finishStation",
@@ -204,6 +206,7 @@ describe("workOrderRun in a hub project (spec 0014)", () => {
     await run(acts, [approve]);
     expect(acts.calls).toEqual([
       "prepareRun",
+      "installDependencies",
       "beginStation",
       "runAgentStation",
       "finishStation",

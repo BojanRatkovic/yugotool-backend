@@ -16,6 +16,8 @@ const ALLOWED_DOMAINS = [
   "github.com",
   "*.githubusercontent.com",
   "pypi.org",
+  "rubygems.org",
+  "*.rubygems.org",
   "files.pythonhosted.org",
 ];
 

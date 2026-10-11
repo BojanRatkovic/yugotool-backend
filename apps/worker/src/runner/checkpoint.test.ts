@@ -3,7 +3,7 @@ import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { localRunner } from "./local-runner";
+import { hookMissingDependencies, localRunner } from "./local-runner";
 
 const dir = mkdtempSync(path.join(os.tmpdir(), "zastava-checkpoint-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -19,5 +19,17 @@ describe("checkpoint", () => {
     chmodSync(hook, 0o755);
     writeFileSync(path.join(dir, "a.rb"), "# doc\n");
     expect(await localRunner.checkpoint(dir, "zastava: shift 1")).toMatch(/^[0-9a-f]+$/);
+  });
+});
+
+describe("hook failures from missing dependencies", () => {
+  it("tells them apart from real hook failures", () => {
+    expect(
+      hookMissingDependencies(
+        "Could not find yard-0.9.45 in locally installed gems (Bundler::GemNotFound)",
+      ),
+    ).toBe(true);
+    expect(hookMissingDependencies("Error: Cannot find module 'eslint'")).toBe(true);
+    expect(hookMissingDependencies("app/a.rb:3:1: C: Layout/IndentationWidth")).toBe(false);
   });
 });

@@ -472,6 +472,18 @@ export const localRunner = {
   },
 };
 
+const MISSING_DEPENDENCIES =
+  /Bundler::GemNotFound|in locally installed gems|bundler: failed to load command|Cannot find module|ERR_MODULE_NOT_FOUND|command not found/;
+
+/**
+ * A hook that could not run because the checkout's dependencies are not
+ * installed (gems, node_modules): not a problem with the change, and nothing a
+ * builder can fix, so it must not be sent back as one. Pure.
+ */
+export function hookMissingDependencies(output: string): boolean {
+  return MISSING_DEPENDENCIES.test(output);
+}
+
 /**
  * Overcommit signs each hook plugin by its path, so a fresh worktree fails
  * every commit with "plugins … changed, run overcommit --sign" (it failed a

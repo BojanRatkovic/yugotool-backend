@@ -42,7 +42,7 @@ import {
 import { enqueueNotification } from "@zastava/notify";
 import { and, eq, sql } from "drizzle-orm";
 import { runArtifactsDir } from "../runner/artifacts";
-import { localRunner } from "../runner/local-runner";
+import { hookMissingDependencies, localRunner } from "../runner/local-runner";
 import { runRoots, strayListeners, tcpListeners } from "../runner/orphans";
 import { authRejection, withApiKey } from "../claude-env";
 import { sandboxFor } from "../runner/sandbox";
@@ -62,6 +62,7 @@ import {
   hubSession,
   linkIgnoredFiles,
 } from "../runner/work-hub";
+import { installStepsFor } from "../runner/dependencies";
 import { skillPlan, skillSection } from "../runner/station-skills";
 import { sessionSkills } from "@zastava/skills";
 import { createCiActivities } from "./ci";
@@ -911,6 +912,39 @@ export function createActivities(db: Database) {
     },
 
     /**
+     * A fresh worktree's dependencies (gems, node_modules), installed by the
+     * worker outside the agent sandbox under the repo's pinned Node, so tests,
+     * lint and the repo's hooks can run. A failed install is reported, not
+     * fatal: the agents then say what they could not check.
+     */
+    async installDependencies(input: { runId: string; worktreePath: string }): Promise<void> {
+      for (const step of installStepsFor(input.worktreePath)) {
+        await appendEvent(input.runId, null, "tool_use", `$ ${step.command}`);
+        const started = Date.now();
+        const result = await localRunner.runCommand(input.worktreePath, step.command, () =>
+          Context.current().heartbeat(),
+        );
+        const took = `${Math.round((Date.now() - started) / 1000)}s`;
+        if (result.passed) {
+          await appendEvent(
+            input.runId,
+            null,
+            "system",
+            `Dependencies ready: ${step.label} (${took})`,
+          );
+        } else {
+          const tail = result.output.replace(ANSI_COLOR, "").trim().slice(-MAX_EVENT_CHARS);
+          await appendEvent(
+            input.runId,
+            null,
+            "error",
+            `${step.label} failed after ${took}; agents may not be able to run tests or lint.\n\n${tail}`,
+          );
+        }
+      }
+    },
+
+    /**
      * Delivery preflight, before the final gate: the repo's pre-commit hook over
      * the run's changes, so a hook that would block the commit sends the work
      * back to the builder instead of failing after approval.
@@ -919,7 +953,7 @@ export function createActivities(db: Database) {
       runId: string;
       worktreePath: string;
       attempt: number;
-    }): Promise<{ ran: boolean; passed: boolean; output: string }> {
+    }): Promise<{ ran: boolean; passed: boolean; output: string; environment?: boolean }> {
       let stationRunId: string | null = null;
       const result = await localRunner.runPreCommitHook(
         input.worktreePath,
@@ -949,9 +983,12 @@ export function createActivities(db: Database) {
           result.passed ? "tool_result" : "error",
           output.trim(),
         );
+      const environment = !result.passed && hookMissingDependencies(output);
       const summary = result.passed
         ? "Repo pre-commit hook passed: delivery will commit cleanly."
-        : "Repo pre-commit hook failed: the commit would be blocked. Sent back to the builder.";
+        : environment
+          ? "Repo pre-commit hook could not run: this checkout's dependencies are not installed (see above). That is not a problem with the change, so it was not sent back; install them in the repo, or the commit at delivery fails the same way."
+          : "Repo pre-commit hook failed: the commit would be blocked. Sent back to the builder.";
       await appendEvent(input.runId, stationRunId, result.passed ? "system" : "error", summary);
       if (stationRunId) {
         await db
@@ -964,7 +1001,7 @@ export function createActivities(db: Database) {
           .where(eq(stationRuns.id, stationRunId));
       }
       await invalidateBoard();
-      return { ran: true, passed: result.passed, output };
+      return { ran: true, passed: result.passed, output, ...(environment ? { environment } : {}) };
     },
 
     /**

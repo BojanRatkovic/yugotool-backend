@@ -155,6 +155,13 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
     const planIndex = hub ? hubPlanIndex(run.stations) : -1;
     /** Hub runs get their worktree once the repo is chosen; repo runs have it from the start. */
     let workspaceReady = hub === null;
+    // A fresh worktree has no gems or node_modules: install them before any agent works there.
+    const installDependencies = async (): Promise<void> => {
+      if (patched("install-dependencies")) {
+        await work.installDependencies({ runId: input.runId, worktreePath: run.worktreePath });
+      }
+    };
+    if (workspaceReady) await installDependencies();
     /** The repo a hub run will work in: preset, then Research's pick, then the plan gate's. */
     let chosenRepo: string | null = run.repo ?? null;
     /** A hub run's pre-commit check skipped at a final gate that came before its worktree. */
@@ -178,6 +185,7 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
       run.branch = workspace.branch;
       run.baseBranch = workspace.baseBranch;
       workspaceReady = true;
+      await installDependencies();
       return true;
     };
 
@@ -218,7 +226,8 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
             worktreePath: run.worktreePath,
             attempt: nextHooksAttempt(),
           });
-          if (!hooks.passed) {
+          // Missing dependencies are not the builder's to fix: the final gate shows it instead.
+          if (!hooks.passed && !hooks.environment) {
             const report = `The repository's pre-commit hook rejects these changes, so they cannot be committed. Fix what it reports (follow the repo's own conventions):\n\n${hooks.output}`;
             if (loopBack("Repo pre-commit hook (failed)", report)) continue;
             await finish(
