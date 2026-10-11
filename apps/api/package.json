@@ -21,6 +21,7 @@
     "@zastava/contracts": "workspace:*",
     "@zastava/db": "workspace:*",
     "@zastava/notify": "workspace:*",
+    "@zastava/skills": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "nestjs-zod": "^5.5.0",
     "pg": "^8.23.0",

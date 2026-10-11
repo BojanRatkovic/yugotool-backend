@@ -26,6 +26,7 @@ import type {
   Line,
   PreviewDetection,
   ProjectRemote,
+  ProjectSkill,
   PreviewSessionStatus,
   PreviewStatus,
   PreviewTestResult,
@@ -40,6 +41,7 @@ import {
   PreviewDetectionDto,
   PreviewSessionStatusDto,
   ProjectRemoteDto,
+  ProjectSkillDto,
   ProjectRemoteQueryDto,
   PreviewStatusDto,
   PreviewTestResultDto,
@@ -137,6 +139,13 @@ export class ProjectsController {
   @ApiOkResponse({ type: PreviewTestResultDto })
   testPreview(@Param("id", ParseUUIDPipe) id: string): Promise<PreviewTestResult> {
     return this.service.testPreview(id);
+  }
+
+  /** Skills its agents can load, for `/` autocomplete; read from disk on every call. */
+  @Get(":id/skills")
+  @ApiOkResponse({ type: [ProjectSkillDto] })
+  skills(@Param("id", ParseUUIDPipe) id: string): Promise<ProjectSkill[]> {
+    return this.service.skills(id);
   }
 
   /** Where approved work can go (origin, GitHub, gh login); checked live. */

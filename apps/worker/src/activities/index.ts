@@ -62,6 +62,8 @@ import {
   hubSession,
   linkIgnoredFiles,
 } from "../runner/work-hub";
+import { skillPlan, skillSection } from "../runner/station-skills";
+import { sessionSkills } from "@zastava/skills";
 import { createCiActivities } from "./ci";
 import { createKnowledgeActivities } from "./knowledge";
 import { createPrBodyComposer } from "./pr-body";
@@ -697,6 +699,7 @@ export function createActivities(db: Database) {
       // In the hub its CLAUDE.md loads as the project's; its plugins load in both places.
       const hub = research
         ? {
+            hub: input.worktreePath,
             readRoots: [],
             plugins: await hubPlugins(input.worktreePath),
             tools: ["Skill"],
@@ -704,7 +707,18 @@ export function createActivities(db: Database) {
           }
         : await hubSession(input.worktreePath);
       const readRoots = [...(input.knowledge ?? []).map((k) => k.dir), ...(hub?.readRoots ?? [])];
-      const tools = [...input.station.allowedTools, ...(hub?.tools ?? [])];
+      const skills = skillPlan(
+        input.station.skills ?? [],
+        `${input.prompt}\n${input.station.prompt}`,
+        sessionSkills(input.worktreePath, hub?.hub ?? null),
+      );
+      const tools = [
+        ...new Set([
+          ...input.station.allowedTools,
+          ...(hub?.tools ?? []),
+          ...(skills.load.length ? ["Skill"] : []),
+        ]),
+      ];
       const sandboxed = await withApiKey(
         await sandboxFor(input.worktreePath, { readRoots, readOnly: research !== null }),
       );
@@ -736,7 +750,9 @@ export function createActivities(db: Database) {
           systemPrompt: {
             type: "preset",
             preset: "claude_code",
-            append: hub ? `${input.station.prompt}\n\n${hub.prompt}` : input.station.prompt,
+            append: [input.station.prompt, hub?.prompt, skillSection(skills.load)]
+              .filter(Boolean)
+              .join("\n\n"),
           },
           abortController,
           ...(input.resumeSessionId ? { resume: input.resumeSessionId } : {}),
@@ -781,6 +797,13 @@ export function createActivities(db: Database) {
             "system",
             `${input.resumeSessionId ? "Resumed session" : "Session"} ${message.session_id} · ${message.model}${effort ? ` · effort ${effort}` : ""} · ${AUTH_LABEL[toAuthSource(message.apiKeySource)]}`,
           );
+          const skillNote = [
+            skills.load.length ? `Skills to load: ${skills.load.join(", ")}` : null,
+            skills.missing.length ? `not available here: ${skills.missing.join(", ")}` : null,
+          ]
+            .filter(Boolean)
+            .join(" · ");
+          if (skillNote) await appendEvent(input.runId, input.stationRunId, "system", skillNote);
         } else if (message.type === "assistant") {
           const usage = message.message.usage;
           if (message.parent_tool_use_id === null && usage) {

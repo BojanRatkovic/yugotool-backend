@@ -8,6 +8,9 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { hubCandidateOf } from "@zastava/contracts";
+import { bundledHubPlugins, manifestName, pluginName } from "@zastava/skills";
+
+export { bundledHubPlugins, pluginName };
 
 const exec = promisify(execFile);
 
@@ -122,17 +125,6 @@ export async function hubPlugin(hub: string): Promise<{ path: string; skills: st
   return { path: dir, skills };
 }
 
-/** Plugin names are kebab-case; the hub folder's name is what people call it ("work"). */
-export function pluginName(hub: string): string {
-  return (
-    path
-      .basename(hub)
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "") || "hub"
-  );
-}
-
 /** Appended to every session's system prompt in a hub worktree. Pure. */
 export function hubPromptSection(hub: string, worktreePath: string): string {
   return [
@@ -168,32 +160,11 @@ export async function hubInstructions(hub: string): Promise<string | null> {
   return text ? text.slice(0, MAX_INSTRUCTIONS) : null;
 }
 
-/**
- * Plugins the hub ships itself (`<hub>/plugins/<name>/.claude-plugin/plugin.json`,
- * how a hub serves its skills to sessions whose cwd is a worktree). The Agent
- * SDK only loads the project's settings, so a marketplace the person enabled
- * in their own settings never reaches an agent.
- */
-export function bundledHubPlugins(hub: string): string[] {
-  const root = path.join(hub, "plugins");
-  try {
-    return readdirSync(root, { withFileTypes: true })
-      .filter(
-        (e) =>
-          e.isDirectory() && existsSync(path.join(root, e.name, ".claude-plugin", "plugin.json")),
-      )
-      .map((e) => path.join(root, e.name))
-      .toSorted((a, b) => a.localeCompare(b));
-  } catch {
-    return [];
-  }
-}
-
 /** What Activity names: the hub's bundled plugins and, when it has `.claude/skills`, those skills. */
 export async function hubPluginNames(hub: string): Promise<string[]> {
   const plugins = await hubPlugins(hub);
   const bundled = new Set(bundledHubPlugins(hub));
-  return plugins.map((p) => (bundled.has(p.path) ? path.basename(p.path) : pluginName(hub)));
+  return plugins.map((p) => (bundled.has(p.path) ? manifestName(p.path) : pluginName(hub)));
 }
 
 /** Every plugin a session on this hub loads: the bundled ones, plus `.claude/skills` as one. */
@@ -201,7 +172,7 @@ export async function hubPlugins(hub: string): Promise<{ type: "local"; path: st
   const bundled = bundledHubPlugins(hub);
   const generated = await hubPlugin(hub).catch(() => null);
   // A bundled plugin named like the hub already is "the hub's skills"; two would clash.
-  const clash = bundled.some((dir) => path.basename(dir) === pluginName(hub));
+  const clash = bundled.some((dir) => manifestName(dir) === pluginName(hub));
   const paths = generated && !clash ? [...bundled, generated.path] : bundled;
   return paths.map((p) => ({ type: "local" as const, path: p }));
 }

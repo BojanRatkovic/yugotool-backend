@@ -10,6 +10,7 @@ import {
   type Line,
   type PreviewDetection,
   type ProjectRemote,
+  type ProjectSkill,
   type PreviewStatus,
   type PreviewTestResult,
   previewTestResultSchema,
@@ -25,6 +26,7 @@ import {
   type UpdateRoutes,
 } from "@zastava/contracts";
 import { previewTestDir } from "../../core/artifacts/artifacts";
+import { projectSkills } from "@zastava/skills";
 import { DatabaseService } from "../../core/database/database.service";
 import { EventsService } from "../../core/events/events.service";
 import { TEMPORAL_CLIENT } from "../../core/temporal/temporal.module";
@@ -174,6 +176,12 @@ export class ProjectsService {
     }
     const present = new Set(onDisk.map((r) => r.name));
     return { ...project, repos: project.repos.filter((r) => present.has(r.name)) };
+  }
+
+  async skills(projectId: string): Promise<ProjectSkill[]> {
+    const project = await this.repository.find(this.database.db, projectId);
+    if (!project) throw new ProjectNotFoundError(`project ${projectId} not found`);
+    return projectSkills(project);
   }
 
   async update(projectId: string, input: UpdateProject): Promise<Project> {

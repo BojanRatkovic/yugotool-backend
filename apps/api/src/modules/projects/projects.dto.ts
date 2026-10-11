@@ -4,6 +4,7 @@ import {
   projectSchema,
   previewDetectionSchema,
   projectRemoteSchema,
+  projectSkillSchema,
   projectRemoteQuerySchema,
   previewStatusSchema,
   previewSessionStatusSchema,
@@ -31,6 +32,7 @@ export class PreviewTestResultDto extends createZodDto(previewTestResultSchema) 
 export class PreviewStatusDto extends createZodDto(previewStatusSchema) {}
 export class RouteMapStatusDto extends createZodDto(routeMapStatusSchema) {}
 export class UpdateRoutesDto extends createZodDto(updateRoutesSchema) {}
+export class ProjectSkillDto extends createZodDto(projectSkillSchema) {}
 export class ProjectRemoteDto extends createZodDto(projectRemoteSchema) {}
 export class ProjectRemoteQueryDto extends createZodDto(projectRemoteQuerySchema) {}
 export class PreviewDetectionDto extends createZodDto(previewDetectionSchema) {}
