@@ -7,7 +7,7 @@
  *     apps/{api,worker,supervisor,desktop}/dist   built JS
  *     packages/db/migrations  SQL the supervisor applies on start
  *     node_modules/          flat npm install for <arch> + @zastava/* copies
- *   .stage/<arch>/temporal   the `temporal` CLI for <arch> (extraResources → bin/)
+ *     runtime.json           Claude Code + temporal CLI to fetch on first start (spec 0017)
  *
  * pnpm's symlinked store does not survive packing, so production deps are
  * reinstalled flat with npm, pinned to the versions pnpm resolved.
@@ -15,6 +15,7 @@
  * Usage: node scripts/stage.mjs --arch arm64|x64   (after `pnpm build` in both repos)
  */
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   cpSync,
   existsSync,
@@ -232,18 +233,58 @@ execFileSync(
   { cwd: path.join(backend, "apps", "worker"), stdio: "inherit" },
 );
 
-// ── temporal CLI ──────────────────────────────────────────────────────────────
-const temporal = path.join(stage, "temporal");
-const cache = path.join(desktop, ".cache", `temporal-${TEMPORAL_CLI_VERSION}-${arch}`);
-if (!existsSync(path.join(cache, "temporal"))) {
-  step(`download temporal ${TEMPORAL_CLI_VERSION}`);
-  mkdirSync(cache, { recursive: true });
-  const url = `https://temporal.download/cli/archive/v${TEMPORAL_CLI_VERSION}?platform=darwin&arch=${arch === "x64" ? "amd64" : "arm64"}`;
-  execFileSync("sh", ["-c", `curl -fsSL "${url}" | tar xz -C "${cache}" temporal`], {
-    stdio: "inherit",
-  });
+// ── Runtime fetched on first start (spec 0017) ───────────────────────────────
+// The two biggest binaries stay out of the app (−345 MB): runtime.json names
+// them, the supervisor downloads and checks them into ~/.zastava/runtime.
+step("runtime manifest");
+const claudePackage = `@anthropic-ai/claude-agent-sdk-darwin-${arch}`;
+const claudeDir = path.join(app, "node_modules", ...claudePackage.split("/"));
+const claudeVersion = readJson(path.join(claudeDir, "package.json")).version;
+const claudeDist = JSON.parse(
+  execFileSync("npm", ["view", `${claudePackage}@${claudeVersion}`, "dist", "--json"], {
+    encoding: "utf8",
+  }),
+);
+if (!String(claudeDist.integrity).startsWith("sha512-"))
+  throw new Error(`no sha512 integrity for ${claudePackage}@${claudeVersion}`);
+rmSync(claudeDir, { recursive: true, force: true });
+
+const temporalArchive = `temporal_cli_${TEMPORAL_CLI_VERSION}_darwin_${arch === "x64" ? "amd64" : "arm64"}.tar.gz`;
+const temporalUrl = `https://github.com/temporalio/cli/releases/download/v${TEMPORAL_CLI_VERSION}/${temporalArchive}`;
+const temporalCache = path.join(desktop, ".cache", temporalArchive);
+if (!existsSync(temporalCache)) {
+  step(`download ${temporalArchive}`);
+  mkdirSync(path.dirname(temporalCache), { recursive: true });
+  execFileSync("curl", ["-fsSL", "-o", temporalCache, temporalUrl], { stdio: "inherit" });
 }
-mkdirSync(temporal, { recursive: true });
-cpSync(path.join(cache, "temporal"), path.join(temporal, "temporal"));
+const temporalSha = createHash("sha256").update(readFileSync(temporalCache)).digest("base64");
+
+writeFileSync(
+  path.join(app, "runtime.json"),
+  `${JSON.stringify(
+    {
+      tools: [
+        {
+          name: "claude",
+          label: "Claude Code",
+          version: claudeVersion,
+          url: claudeDist.tarball,
+          integrity: claudeDist.integrity,
+          entry: "package/claude",
+        },
+        {
+          name: "temporal",
+          label: "the workflow engine",
+          version: TEMPORAL_CLI_VERSION,
+          url: temporalUrl,
+          integrity: `sha256-${temporalSha}`,
+          entry: "temporal",
+        },
+      ],
+    },
+    null,
+    2,
+  )}\n`,
+);
 
 step(`done → ${path.relative(desktop, stage)}`);

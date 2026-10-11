@@ -1,6 +1,7 @@
 import os from "node:os";
 import path from "node:path";
 import { z } from "zod";
+import { readRuntimeManifest, type RuntimeManifest } from "./runtime";
 
 /** apps/supervisor/dist → the zastava-backend checkout. */
 const BACKEND_ROOT = path.resolve(__dirname, "..", "..", "..");
@@ -19,6 +20,11 @@ const envSchema = z.object({
   ZASTAVA_TEMPORAL_HTTP_PORT: z.coerce.number().int().positive().default(4835),
   /** `temporal` CLI; default: ~/.zastava/bin/temporal, else the one on PATH. */
   ZASTAVA_TEMPORAL_BIN: z.string().optional(),
+  /**
+   * runtime.json of a packaged app (spec 0017): Claude Code and Temporal are
+   * fetched into ~/.zastava/runtime on first start. Unset in a checkout.
+   */
+  ZASTAVA_RUNTIME_MANIFEST: z.string().optional(),
   ZASTAVA_BACKEND_ROOT: z.string().default(BACKEND_ROOT),
   ZASTAVA_WEB_DIST: z.string().default(path.join(BACKEND_ROOT, "..", "zastava-frontend", "dist")),
   /** Node used for the API and worker; default: the one running the supervisor. */
@@ -26,6 +32,8 @@ const envSchema = z.object({
   /** Passed through to the worker (API-key auth instead of the Claude login). */
   ANTHROPIC_API_KEY: z.string().optional(),
   PATH: z.string().default("/usr/bin:/bin"),
+  /** The API's default repos folder (same default); Settings may override it. */
+  REPOS_ROOT: z.string().default(path.join(os.homedir(), "Desktop", "Developer")),
   /** "app" when the desktop app shows notifications itself. */
   ZASTAVA_DESKTOP_NOTICES: z.enum(["osascript", "app"]).default("osascript"),
 });
@@ -38,6 +46,8 @@ export interface SupervisorConfig {
   stateFile: string;
   ports: { api: number; pg: number; temporal: number; temporalUi: number; temporalHttp: number };
   temporalBin: string | null;
+  /** Binaries to fetch on start; null = use what is installed (a checkout). */
+  runtime: RuntimeManifest | null;
   backendRoot: string;
   migrationsDir: string;
   apiEntry: string;
@@ -46,6 +56,8 @@ export interface SupervisorConfig {
   node: string;
   anthropicApiKey: string | undefined;
   path: string;
+  /** Default repos folder; the folders step asks macOS for its guarded parent. */
+  reposRoot: string;
   desktopNotices: "osascript" | "app";
   /** Added to the API's and worker's env (the desktop app sets ELECTRON_RUN_AS_NODE). */
   extraEnv?: Record<string, string>;
@@ -69,6 +81,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): SupervisorConf
       temporalHttp: e.ZASTAVA_TEMPORAL_HTTP_PORT,
     },
     temporalBin: e.ZASTAVA_TEMPORAL_BIN ?? null,
+    runtime: e.ZASTAVA_RUNTIME_MANIFEST ? readRuntimeManifest(e.ZASTAVA_RUNTIME_MANIFEST) : null,
     backendRoot: backend,
     migrationsDir: path.join(backend, "packages", "db", "migrations"),
     apiEntry: path.join(backend, "apps", "api", "dist", "main.js"),
@@ -77,6 +90,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): SupervisorConf
     node: e.ZASTAVA_NODE,
     anthropicApiKey: e.ANTHROPIC_API_KEY,
     path: e.PATH,
+    reposRoot: e.REPOS_ROOT,
     desktopNotices: e.ZASTAVA_DESKTOP_NOTICES,
   };
 }

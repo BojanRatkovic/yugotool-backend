@@ -58,8 +58,8 @@ for (const arch of values.arch) {
       // Prebuilt, arch-correct node_modules come from stage.mjs; nothing to rebuild.
       npmRebuild: false,
       nodeGypRebuild: false,
-      // Plain folder for now: postgres, temporal-bridge and the Claude binary
-      // spawn from disk, and the worker reads its workflow bundle by path.
+      // Plain folder for now: postgres and the temporal bridge load from disk,
+      // and the worker reads its workflow bundle by path.
       asar: false,
       electronLanguages: ["en"],
       files: [
@@ -71,10 +71,7 @@ for (const arch of values.arch) {
         "!**/{README,CHANGELOG,HISTORY}{,.md}",
         "!**/test{,s}/**",
       ],
-      extraResources: [
-        { from: frontendDist, to: "web" },
-        { from: path.join(stage, "temporal", "temporal"), to: "bin/temporal" },
-      ],
+      extraResources: [{ from: frontendDist, to: "web" }],
       mac: {
         category: "public.app-category.developer-tools",
         icon: "build/icon.icns",

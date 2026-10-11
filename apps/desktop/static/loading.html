@@ -118,9 +118,43 @@
       }
       @media (prefers-reduced-motion: reduce) {
         .starting .dot,
-        .restarting .dot {
+        .restarting .dot,
+        .bar.indeterminate span {
           animation: none;
         }
+      }
+      .bar {
+        grid-column: 2 / 4;
+        height: 4px;
+        margin: -6px 0 8px;
+        border-radius: 2px;
+        background: var(--border);
+        overflow: hidden;
+      }
+      .bar span {
+        display: block;
+        height: 100%;
+        width: 0;
+        border-radius: 2px;
+        background: var(--running);
+        transition: width 0.2s linear;
+      }
+      .bar.indeterminate span {
+        width: 30%;
+        animation: slide 1.2s ease-in-out infinite;
+      }
+      @keyframes slide {
+        from {
+          transform: translateX(-100%);
+        }
+        to {
+          transform: translateX(340%);
+        }
+      }
+      .row.has-progress {
+        height: auto;
+        min-height: 34px;
+        grid-template-rows: 34px auto;
       }
       .hint {
         color: var(--muted);
@@ -183,8 +217,10 @@
     </main>
     <script>
       const LABELS = {
+        runtime: "Claude Code + workflow engine",
         postgres: "Database",
         migrations: "Migrations",
+        folders: "Folder access",
         temporal: "Workflow engine",
         api: "API",
         worker: "Worker",
@@ -197,12 +233,19 @@
         restarting: "Restarting…",
         failed: "Failed",
       };
-      const order = ["postgres", "migrations", "temporal", "api", "worker"];
+      const order = ["runtime", "postgres", "migrations", "folders", "temporal", "api", "worker"];
       const services = document.getElementById("services");
+      const hint = document.getElementById("hint");
+      const HINT = "Starting the factory…";
       const render = (status) => {
         const byName = Object.fromEntries((status?.services ?? []).map((s) => [s.name, s]));
+        // Nothing to fetch (a checkout) or no guarded folder in use: no row.
+        const shown = order.filter(
+          (name) =>
+            !((name === "runtime" || name === "folders") && byName[name]?.detail === "not needed"),
+        );
         services.replaceChildren(
-          ...order.map((name) => {
+          ...shown.map((name) => {
             const s = byName[name] ?? { state: "stopped" };
             const row = document.createElement("div");
             row.className = `row ${s.state}`;
@@ -210,9 +253,34 @@
               '<span class="dot"></span><span class="name"></span><span class="state"></span>';
             row.querySelector(".name").textContent = LABELS[name];
             row.querySelector(".state").textContent = STATES[s.state];
+            if (name === "folders" && s.state === "starting" && s.progress) {
+              row.querySelector(".state").textContent = "Waiting for you";
+            } else if (s.state === "starting" && s.progress) {
+              const { done, total } = s.progress;
+              const pct = total ? Math.min(100, Math.round((done / total) * 100)) : null;
+              row.classList.add("has-progress");
+              row.querySelector(".state").textContent = pct === null ? "Downloading…" : `${pct}%`;
+              const bar = document.createElement("div");
+              bar.className = pct === null ? "bar indeterminate" : "bar";
+              bar.setAttribute("role", "progressbar");
+              bar.setAttribute("aria-label", "Download");
+              if (pct !== null) bar.setAttribute("aria-valuenow", String(pct));
+              const fill = document.createElement("span");
+              if (pct !== null) fill.style.width = `${pct}%`;
+              bar.append(fill);
+              row.append(bar);
+            }
             return row;
           }),
         );
+        if (document.getElementById("error").style.display === "block") return;
+        const fetching = byName.runtime?.state === "starting" ? byName.runtime : null;
+        const asking = byName.folders?.state === "starting" ? byName.folders : null;
+        hint.textContent = asking?.progress
+          ? `macOS is asking: click Allow to ${asking.detail}. Don't see the dialog? System Settings → Privacy & Security → Files and Folders → ZASTAVA.`
+          : fetching?.progress
+            ? `First start: ${fetching.detail}. This happens once.`
+            : HINT;
       };
       render(null);
       const desktop = window.zastavaDesktop;
@@ -225,7 +293,7 @@
       });
       document.getElementById("retry").addEventListener("click", () => {
         document.getElementById("error").style.display = "none";
-        document.getElementById("hint").textContent = "Starting the factory…";
+        hint.textContent = HINT;
         void desktop?.retry();
       });
       document.getElementById("logs").addEventListener("click", () => void desktop?.openLogs());

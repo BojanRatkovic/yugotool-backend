@@ -36,7 +36,7 @@ export async function sandboxFor(
   worktreePath: string,
   /** `readOnly`: nothing but the temp dir is writable (Research in a hub, spec 0014). */
   options: { readRoots?: string[]; readOnly?: boolean } = {},
-): Promise<Pick<Options, "sandbox" | "env" | "hooks">> {
+): Promise<Pick<Options, "sandbox" | "env" | "hooks" | "pathToClaudeCodeExecutable">> {
   const writable = options.readOnly
     ? [os.tmpdir()]
     : [
@@ -86,9 +86,12 @@ export async function sandboxFor(
   };
   // The agent's `npm test` runs under the Node the repo pins (spec 0013).
   const env = await pinnedNodeEnv(worktreePath, process.env);
+  // The packaged app's Claude Code, fetched on first start (spec 0017); unset = the SDK's own.
+  const claude = process.env["ZASTAVA_CLAUDE_BIN"];
   return {
     sandbox,
     hooks: { PreToolUse: [{ hooks: [confine] }] },
+    ...(claude ? { pathToClaudeCodeExecutable: claude } : {}),
     env: {
       ...env,
       npm_config_cache: path.join(cache, "npm"),
