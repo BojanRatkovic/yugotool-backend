@@ -21,11 +21,17 @@ export function parseShellPath(output: string): string | null {
  * Homebrew, nvm or the user's tools. The login shell knows the real one; git,
  * gh, nvm, temporal and the agents' Bash all depend on it.
  */
-export function loginShellPath(shell = process.env["SHELL"] ?? "/bin/zsh"): ShellPath {
+export function loginShellPath(
+  shell = process.env["SHELL"] ?? "/bin/zsh",
+  timeout = SHELL_TIMEOUT_MS,
+): ShellPath {
   // PATH as printf's argument: in "…$PATH__ZASTAVA_PATH__" the shell would read one longer variable name.
   const result = spawnSync(shell, ["-ilc", `printf '${MARK}%s${MARK}' "$PATH"`], {
     encoding: "utf8",
-    timeout: SHELL_TIMEOUT_MS,
+    timeout,
+    // An interactive zsh ignores SIGTERM, so the timeout would never fire while an
+    // rc file hangs (e.g. on macOS's "access your Desktop folder?" prompt).
+    killSignal: "SIGKILL",
     // No stdin: an rc file that prompts would otherwise wait for the timeout.
     stdio: ["ignore", "pipe", "pipe"],
     env: { ...process.env, TERM: "dumb" },

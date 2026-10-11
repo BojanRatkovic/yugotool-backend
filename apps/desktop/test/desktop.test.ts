@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import type { SupervisorStatus } from "@zastava/supervisor";
 import { describe, expect, it, vi } from "vitest";
 import { parseSse } from "../src/events";
@@ -130,5 +133,17 @@ describe("loginShellPath", () => {
     const result = loginShellPath("/bin/sh");
     expect(result.error).toBeNull();
     expect(result.path).toContain("/usr/bin");
+  });
+
+  it("gives up on a shell that hangs and ignores SIGTERM", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "shell-env-"));
+    const shell = path.join(dir, "stuck-shell");
+    writeFileSync(shell, "#!/bin/sh\ntrap '' TERM\nsleep 30\n", { mode: 0o755 });
+    const started = Date.now();
+    const result = loginShellPath(shell, 300);
+    expect(Date.now() - started).toBeLessThan(5_000);
+    expect(result.path).toBeNull();
+    expect(result.error).toContain("ETIMEDOUT");
+    rmSync(dir, { recursive: true, force: true });
   });
 });
