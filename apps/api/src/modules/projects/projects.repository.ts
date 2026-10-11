@@ -12,7 +12,16 @@ import type {
   UpdateHubRepo,
   UpdateProject,
 } from "@zastava/contracts";
-import { type Executor, lines, projects, runs, stationRuns, workOrders } from "@zastava/db";
+import {
+  claudeAccounts,
+  type Executor,
+  lines,
+  projects,
+  settings as settingsTable,
+  runs,
+  stationRuns,
+  workOrders,
+} from "@zastava/db";
 import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { iso } from "../../common/mappers";
 import { hubOfRepo } from "./work-hub";
@@ -189,6 +198,34 @@ export class ProjectsRepository {
       .where(eq(projects.id, id))
       .returning();
     return row ? toProject(row) : null;
+  }
+
+  /**
+   * The config dir of the account the project's sessions run on (its own, else
+   * the default), whose plugins a hub may invoke. Null: the environment's dir.
+   */
+  async accountConfigDir(db: Executor, projectId: string): Promise<string | null> {
+    const [own] = await db
+      .select({ kind: claudeAccounts.kind, configDir: claudeAccounts.configDir })
+      .from(projects)
+      .innerJoin(claudeAccounts, eq(claudeAccounts.id, projects.claudeAccountId))
+      .where(eq(projects.id, projectId));
+    const [fallback] = own
+      ? [own]
+      : await db
+          .select({ kind: claudeAccounts.kind, configDir: claudeAccounts.configDir })
+          .from(settingsTable)
+          .innerJoin(claudeAccounts, eq(claudeAccounts.id, settingsTable.defaultClaudeAccountId))
+          .where(eq(settingsTable.id, "default"));
+    return fallback?.kind === "config_dir" ? fallback.configDir : null;
+  }
+
+  async claudeAccountExists(db: Executor, id: string): Promise<boolean> {
+    const [row] = await db
+      .select({ id: claudeAccounts.id })
+      .from(claudeAccounts)
+      .where(eq(claudeAccounts.id, id));
+    return row !== undefined;
   }
 
   async update(db: Executor, id: string, patch: UpdateProject): Promise<Project | null> {

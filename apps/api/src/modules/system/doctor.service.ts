@@ -4,6 +4,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { Client } from "@temporalio/client";
 import {
+  type ClaudeAccount,
   type DoctorCheck,
   type DoctorCheckKey,
   type DoctorReport,
@@ -13,6 +14,7 @@ import { sql } from "drizzle-orm";
 import type { Env } from "../../core/config/env.schema";
 import { DatabaseService } from "../../core/database/database.service";
 import { TEMPORAL_CLIENT } from "../../core/temporal/temporal.module";
+import { ClaudeAccountsService } from "../claude-accounts/claude-accounts.service";
 import { SettingsService } from "../settings/settings.service";
 import { PlanUsageService } from "./plan-usage.service";
 
@@ -22,7 +24,7 @@ const TEMPORAL_DEADLINE_MS = 3_000;
 /** `git hook run` (repo-hooks preflight) needs 2.36. */
 const GIT_HOOK_RUN = [2, 36] as const;
 
-type Result = Omit<DoctorCheck, "key" | "label" | "group" | "required" | "neededFor">;
+type Result = Omit<DoctorCheck, "key" | "label" | "group" | "required" | "neededFor" | "accountId">;
 const ok = (detail: string): Result => ({ status: "ok", detail, fix: null, fixCommand: null });
 const problem = (
   status: "warn" | "fail",
@@ -37,6 +39,7 @@ interface Check {
   group: DoctorCheck["group"];
   required: boolean;
   neededFor: string | null;
+  accountId?: string;
   run: () => Promise<Result>;
 }
 
@@ -51,13 +54,15 @@ export class DoctorService {
     private readonly database: DatabaseService,
     private readonly planUsage: PlanUsageService,
     private readonly settings: SettingsService,
+    private readonly accounts: ClaudeAccountsService,
     @Inject(TEMPORAL_CLIENT) private readonly temporal: Client,
   ) {}
 
   async report(): Promise<DoctorReport> {
     // The worker check means nothing without Temporal; it reuses that result.
     const temporal = this.temporalServer();
-    const checks = await Promise.all(this.checks(temporal).map((c) => this.runCheck(c)));
+    const accounts = await this.accounts.list();
+    const checks = await Promise.all(this.checks(temporal, accounts).map((c) => this.runCheck(c)));
     return {
       ready: checks.every((c) => !c.required || c.status !== "fail"),
       checks,
@@ -66,7 +71,7 @@ export class DoctorService {
   }
 
   private async runCheck(check: Check): Promise<DoctorCheck> {
-    const { run, ...meta } = check;
+    const { run, accountId, ...meta } = check;
     const timeout = new Promise<Result>((resolve) =>
       setTimeout(
         () =>
@@ -87,10 +92,16 @@ export class DoctorService {
       ),
       timeout,
     ]);
-    return { ...meta, ...result };
+    return { ...meta, accountId: accountId ?? null, ...result };
   }
 
-  private checks(temporal: Promise<Result>): Check[] {
+  /**
+   * "Claude" is what projects get by default: the default account, else this
+   * machine's login as before accounts (spec 0016). Every other account gets an
+   * optional check of its own: it only stops the projects that use it.
+   */
+  private checks(temporal: Promise<Result>, accounts: ClaudeAccount[]): Check[] {
+    const fallback = accounts.find((a) => a.isDefault);
     return [
       {
         key: "claude",
@@ -98,8 +109,20 @@ export class DoctorService {
         group: "machine",
         required: true,
         neededFor: null,
-        run: () => this.claude(),
+        ...(fallback ? { accountId: fallback.id } : {}),
+        run: () => (fallback ? Promise.resolve(accountResult(fallback, true)) : this.claude()),
       },
+      ...accounts
+        .filter((a) => !a.isDefault)
+        .map((account): Check => ({
+          key: "claude",
+          label: `Claude · ${account.label}`,
+          group: "machine",
+          required: false,
+          neededFor: "Needed for the projects on this account",
+          accountId: account.id,
+          run: () => Promise.resolve(accountResult(account, false)),
+        })),
       {
         key: "git",
         label: "Git",
@@ -247,6 +270,40 @@ async function gh(): Promise<Result> {
   return loggedIn
     ? ok(`gh ${installed} · logged in`)
     : problem("warn", `gh ${installed} · not logged in`, "Log in to GitHub.", "gh auth login");
+}
+
+/** An account's status from `claude auth status` (or the key check), as a check result. */
+function accountResult(account: ClaudeAccount, required: boolean): Result {
+  const failing = required ? "fail" : "warn";
+  switch (account.status) {
+    case "signed_in":
+      if (account.kind === "api_key") return ok(`API key · ${account.apiKeyHint ?? account.label}`);
+      return ok(
+        [
+          "Signed in",
+          account.email,
+          account.subscriptionType ? `${capitalize(account.subscriptionType)} plan` : null,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+      );
+    case "signed_out":
+      return problem(failing, "Signed out", "Sign in again in Settings → Claude accounts.");
+    case "key_rejected":
+      return problem(
+        failing,
+        "Anthropic rejected the API key",
+        "Replace the key in Settings → Claude accounts.",
+      );
+    case "unknown":
+      break;
+  }
+  return problem(
+    failing,
+    "Could not read the login (claude auth status failed)",
+    "Check that Claude Code is installed, then run the check again.",
+    "claude --version",
+  );
 }
 
 function capitalize(s: string): string {

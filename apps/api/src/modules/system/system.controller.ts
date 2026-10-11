@@ -1,6 +1,8 @@
 import { Controller, Get } from "@nestjs/common";
 import { ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import {
+  type AccountPlanUsage,
+  accountPlanUsageSchema,
   type DoctorReport,
   doctorReportSchema,
   type PlanUsage,
@@ -9,14 +11,15 @@ import {
   systemInfoSchema,
 } from "@zastava/contracts";
 import { createZodDto } from "nestjs-zod";
+import { ClaudeAccountsService } from "../claude-accounts/claude-accounts.service";
 import { ReposService } from "../repos/repos.service";
-import { SettingsService } from "../settings/settings.service";
 import { DoctorService } from "./doctor.service";
 import { PlanUsageService } from "./plan-usage.service";
 
 class DoctorReportDto extends createZodDto(doctorReportSchema) {}
 class SystemInfoDto extends createZodDto(systemInfoSchema) {}
 class PlanUsageDto extends createZodDto(planUsageSchema) {}
+class AccountPlanUsageDto extends createZodDto(accountPlanUsageSchema) {}
 
 @ApiTags("system")
 @Controller("system")
@@ -25,7 +28,7 @@ export class SystemController {
     private readonly planUsage: PlanUsageService,
     private readonly doctor: DoctorService,
     private readonly repos: ReposService,
-    private readonly settings: SettingsService,
+    private readonly accounts: ClaudeAccountsService,
   ) {}
 
   /** First-run checks; each runs fresh (the Claude probe is cached for a minute). */
@@ -35,15 +38,31 @@ export class SystemController {
     return this.doctor.report();
   }
 
+  /** The plan of the account projects get by default (spec 0016). */
   @Get("usage")
   @ApiOkResponse({ type: PlanUsageDto })
-  usage(): Promise<PlanUsage> {
-    return this.planUsage.get();
+  async usage(): Promise<PlanUsage> {
+    return this.planUsage.get(await this.accounts.authFor(null));
+  }
+
+  /** Every account's plan, for the meter's popover; API keys come back unavailable. */
+  @Get("usage/accounts")
+  @ApiOkResponse({ type: [AccountPlanUsageDto] })
+  async usageByAccount(): Promise<AccountPlanUsage[]> {
+    const targets = await this.accounts.usageTargets();
+    return Promise.all(
+      targets.map(async (auth) => ({
+        accountId: auth.accountId,
+        label: auth.label,
+        usage: await this.planUsage.get(auth),
+      })),
+    );
   }
 
   /**
-   * The worker reads the same key (Settings, else its ANTHROPIC_API_KEY). Each
-   * station run also records the source the SDK reported.
+   * What projects without their own account run on: the default account, else
+   * the worker's environment (Settings key, else ANTHROPIC_API_KEY, else its
+   * login). Each station run also records the source the SDK reported.
    */
   @Get()
   @ApiOkResponse({ type: SystemInfoDto })
@@ -51,7 +70,8 @@ export class SystemController {
     return {
       reposRoot: await this.repos.root(),
       reposRootDefault: this.repos.defaultRoot,
-      authSource: (await this.settings.apiKey()) ? "api_key" : "subscription",
+      authSource: (await this.accounts.authFor(null)).billsPlan ? "subscription" : "api_key",
+      claudeLogin: await this.accounts.machineLogin(),
     };
   }
 }

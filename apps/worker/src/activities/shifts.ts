@@ -14,7 +14,7 @@ import {
 import { type Database, runs, shifts, stationRuns, workOrders } from "@zastava/db";
 import { eq, sql } from "drizzle-orm";
 import { localRunner } from "../runner/local-runner";
-import { withApiKey } from "../claude-env";
+import { accountNote, claudeAuthFor, withClaudeAuth } from "../claude-env";
 import { sandboxFor } from "../runner/sandbox";
 import { shiftMemory } from "../runner/shift-memory";
 import { skillPlan, skillSection } from "../runner/station-skills";
@@ -339,12 +339,13 @@ export function createShiftActivities(db: Database, deps: ShiftDeps) {
           gitLog: await localRunner.recentLog(input.worktreePath),
         });
 
-      const hub = await hubSession(input.worktreePath);
+      const auth = await claudeAuthFor({ runId: input.runId });
+      const hub = await hubSession(input.worktreePath, auth.configDir);
       const readRoots = hub?.readRoots ?? [];
       const skills = skillPlan(
         input.skills ?? [],
         `${input.skillText ?? ""}\n${station.prompt}`,
-        sessionSkills(input.worktreePath, hub?.hub ?? null),
+        sessionSkills(input.worktreePath, hub?.hub ?? null, auth.configDir),
       );
       const skillNote = [
         skills.load.length ? `Skills to load: ${skills.load.join(", ")}` : null,
@@ -360,7 +361,7 @@ export function createShiftActivities(db: Database, deps: ShiftDeps) {
           ...(skills.load.length ? ["Skill"] : []),
         ]),
       ];
-      const sandboxed = await withApiKey(await sandboxFor(input.worktreePath, { readRoots }));
+      const sandboxed = withClaudeAuth(await sandboxFor(input.worktreePath, { readRoots }), auth);
       const baseOptions = {
         cwd: input.worktreePath,
         model,
@@ -480,13 +481,13 @@ export function createShiftActivities(db: Database, deps: ShiftDeps) {
             await db.update(shifts).set({ sessionId }).where(eq(shifts.id, shiftId));
             await db
               .update(stationRuns)
-              .set({ sessionId, model: message.model })
+              .set({ sessionId, model: message.model, accountLabel: auth.label })
               .where(eq(stationRuns.id, input.stationRunId));
             await deps.appendEvent(
               input.runId,
               input.stationRunId,
               "system",
-              `Shift ${input.number} ${input.resume ? "resumed session" : "session"} ${message.session_id} · ${message.model}${effort ? ` · effort ${effort}` : ""}`,
+              `Shift ${input.number} ${input.resume ? "resumed session" : "session"} ${message.session_id} · ${message.model}${effort ? ` · effort ${effort}` : ""}${accountNote(auth)}`,
             );
             readContextWindow().catch(() => undefined);
           } else if (message.type === "assistant" && message.parent_tool_use_id === null) {

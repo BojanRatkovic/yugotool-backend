@@ -1,5 +1,6 @@
 import type {
   CiStatus,
+  ClaudeAccountKind,
   Handoff,
   NotificationJob,
   NotificationKind,
@@ -146,10 +147,17 @@ export const projects = pgTable(
     routeDiscovery: jsonb("route_discovery").$type<RouteDiscovery>(),
     /** Hub projects: base branch and preview per repo name; null for repo projects. */
     repoSettings: jsonb("repo_settings").$type<RepoSettings>(),
+    /** The Claude account its sessions run on (spec 0016); null = the default account. */
+    claudeAccountId: uuid("claude_account_id").references(() => claudeAccounts.id, {
+      onDelete: "set null",
+    }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (t) => [check("projects_kind_check", sql`${t.kind} in ('repo', 'hub')`)],
+  (t) => [
+    check("projects_kind_check", sql`${t.kind} in ('repo', 'hub')`),
+    index("projects_claude_account_id_idx").on(t.claudeAccountId),
+  ],
 );
 
 export const lines = pgTable(
@@ -243,6 +251,8 @@ export const stationRuns = pgTable(
     sessionId: text("session_id"),
     model: text("model"),
     authSource: authSource("auth_source"),
+    /** Who the session ran as, e.g. "bojan@acme.io (team)" (spec 0016). */
+    accountLabel: text("account_label"),
     output: text("output"),
     verdict: jsonb("verdict").$type<Verdict>(),
     /** Review stations (structuredVerdict "review"): the PR review verdict. */
@@ -374,8 +384,16 @@ export const settings = pgTable("settings", {
   telegramChatId: text("telegram_chat_id"),
   /** Folder the repo picker scans; null falls back to the REPOS_ROOT env default. */
   reposRoot: text("repos_root"),
-  /** Anthropic API key saved in Settings; wins over ANTHROPIC_API_KEY. Never returned by the API. */
+  /**
+   * Anthropic API key saved in Settings; wins over ANTHROPIC_API_KEY. Never returned by the API.
+   * Spec 0016 copied it into an `api_key` Claude account; dropped in a later migration.
+   */
   anthropicApiKey: text("anthropic_api_key"),
+  /** Spec 0016: the account projects without their own use; null = the worker's environment. */
+  defaultClaudeAccountId: uuid("default_claude_account_id").references(
+    (): AnyPgColumn => claudeAccounts.id,
+    { onDelete: "set null" },
+  ),
   /** Overrides of NOTIFICATION_EXTERNAL_DEFAULTS, kind → also send outside the app. */
   notificationExternal: jsonb("notification_external")
     .$type<Partial<Record<NotificationKind, boolean>>>()
@@ -383,6 +401,35 @@ export const settings = pgTable("settings", {
     .default({}),
   updatedAt: updatedAt(),
 });
+
+/** Claude logins and API keys sessions can run on (spec 0016). */
+export const claudeAccounts = pgTable(
+  "claude_accounts",
+  {
+    id: id(),
+    label: text("label").notNull(),
+    /** Text, not a pg enum: no same-transaction enum trap. */
+    kind: text("kind").$type<ClaudeAccountKind>().notNull(),
+    configDir: text("config_dir"),
+    /** Stored like the old Settings key; never returned by the API. */
+    apiKey: text("api_key"),
+    /** From the last `claude auth status --json`. */
+    email: text("email"),
+    orgName: text("org_name"),
+    subscriptionType: text("subscription_type"),
+    /** ZASTAVA created `config_dir`; removing the account deletes it. */
+    managed: boolean("managed").notNull().default(false),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check("claude_accounts_kind_check", sql`${t.kind} in ('config_dir', 'api_key')`),
+    check(
+      "claude_accounts_kind_fields_check",
+      sql`(${t.kind} = 'config_dir' and ${t.configDir} is not null) or (${t.kind} = 'api_key' and ${t.apiKey} is not null)`,
+    ),
+    uniqueIndex("claude_accounts_config_dir_key").on(t.configDir),
+  ],
+);
 
 /** Team knowledge planning stations may read (spec 0007). Global library. */
 export const knowledgeSources = pgTable("knowledge_sources", {

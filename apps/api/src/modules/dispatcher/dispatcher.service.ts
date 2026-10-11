@@ -3,6 +3,10 @@ import type { DispatcherState, PlanUsage, Settings } from "@zastava/contracts";
 import { enqueueNotification } from "@zastava/notify";
 import { DatabaseService } from "../../core/database/database.service";
 import { EventsService } from "../../core/events/events.service";
+import {
+  type AccountAuth,
+  ClaudeAccountsService,
+} from "../claude-accounts/claude-accounts.service";
 import { SettingsService } from "../settings/settings.service";
 import { PlanUsageService } from "../system/plan-usage.service";
 import { WorkOrdersRepository } from "../work-orders/work-orders.repository";
@@ -34,6 +38,7 @@ export class DispatcherService implements OnModuleInit, OnModuleDestroy {
     private readonly repository: WorkOrdersRepository,
     private readonly settings: SettingsService,
     private readonly planUsage: PlanUsageService,
+    private readonly accounts: ClaudeAccountsService,
     private readonly events: EventsService,
   ) {}
 
@@ -113,22 +118,38 @@ export class DispatcherService implements OnModuleInit, OnModuleDestroy {
       };
     }
 
-    // Probe the plan only when there is work to start: the probe spawns a process.
-    // On an API key, agents do not draw from the plan, so its limits do not apply.
-    const block = (await this.settings.apiKey())
-      ? null
-      : usageBlock(await this.planUsage.get(), settings);
-    if (block)
-      return { ...base, status: "paused_usage", reason: block.reason, resumesAt: block.resumesAt };
+    // Each queued order waits on its own account's plan (spec 0016): a full
+    // account pauses only its projects. Probed only when there is work to start
+    // (the probe spawns a process); API keys do not draw from a plan.
+    const auths = new Map<string, AccountAuth>();
+    for (const projectId of new Set(eligible.map((w) => w.projectId))) {
+      auths.set(projectId, await this.accounts.authFor(projectId));
+    }
+    const blocks = new Map<string, { label: string; block: UsageBlock | null }>();
+    for (const auth of auths.values()) {
+      const key = accountKey(auth);
+      if (blocks.has(key)) continue;
+      const block = auth.billsPlan ? usageBlock(await this.planUsage.get(auth), settings) : null;
+      blocks.set(key, { label: auth.label, block });
+    }
+    const plan = planDispatch(
+      eligible.map((w) => ({ id: w.id, account: accountKey(auths.get(w.projectId)!) })),
+      new Map([...blocks].map(([key, value]) => [key, value.block !== null])),
+      slots,
+    );
+    const paused = plan.blocked.map((key) => blocks.get(key)!);
+    if (plan.start.length === 0 && paused.length > 0) {
+      return { ...base, status: "paused_usage", ...pausedReason(paused) };
+    }
 
     let started = 0;
-    for (const workOrder of eligible.slice(0, slots)) {
+    for (const id of plan.start) {
       try {
-        await this.workOrders.start(workOrder.id);
+        await this.workOrders.start(id);
         started += 1;
       } catch (error) {
         this.logger.warn(
-          `could not start ${workOrder.id}: ${error instanceof Error ? error.message : String(error)}`,
+          `could not start ${id}: ${error instanceof Error ? error.message : String(error)}`,
         );
       }
     }
@@ -141,7 +162,8 @@ export class DispatcherService implements OnModuleInit, OnModuleDestroy {
       status: "active",
       reason:
         `${nowRunning}/${settings.maxConcurrentRuns} running` +
-        (queued.length - started > 0 ? ` · ${queued.length - started} queued` : ""),
+        (queued.length - started > 0 ? ` · ${queued.length - started} queued` : "") +
+        (paused.length > 0 ? ` · paused: ${pausedReason(paused).reason}` : ""),
       resumesAt: null,
     };
   }
@@ -165,6 +187,37 @@ export class DispatcherService implements OnModuleInit, OnModuleDestroy {
       resumesAt: null,
     };
   }
+}
+
+const accountKey = (auth: AccountAuth): string => auth.accountId ?? "env";
+
+/**
+ * Which queued work orders to start, in queue order (spec 0016): only those
+ * whose account has headroom, up to the free slots. `blocked`: the accounts
+ * that held back at least one order. Pure.
+ */
+export function planDispatch(
+  queue: { id: string; account: string }[],
+  blocked: Map<string, boolean>,
+  slots: number,
+): { start: string[]; blocked: string[] } {
+  const ready = queue.filter((w) => !blocked.get(w.account));
+  const held = new Set(queue.filter((w) => blocked.get(w.account)).map((w) => w.account));
+  return { start: ready.slice(0, slots).map((w) => w.id), blocked: [...held] };
+}
+
+/** One account: its reason as before accounts. Several: each named, the earliest reset. */
+function pausedReason(paused: { label: string; block: UsageBlock | null }[]): {
+  reason: string;
+  resumesAt: string | null;
+} {
+  const blocks = paused.flatMap((p) => (p.block ? [{ label: p.label, ...p.block }] : []));
+  if (blocks.length === 1) return { reason: blocks[0]!.reason, resumesAt: blocks[0]!.resumesAt };
+  const resets = blocks.flatMap((b) => (b.resumesAt ? [b.resumesAt] : [])).toSorted();
+  return {
+    reason: blocks.map((b) => `${b.label}: ${b.reason}`).join(" · "),
+    resumesAt: resets[0] ?? null,
+  };
 }
 
 /** Plan limits only apply to subscription auth; an unavailable probe never blocks. */
