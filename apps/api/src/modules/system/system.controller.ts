@@ -71,6 +71,7 @@ export class SystemController {
       reposRoot: await this.repos.root(),
       reposRootDefault: this.repos.defaultRoot,
       authSource: (await this.accounts.authFor(null)).billsPlan ? "subscription" : "api_key",
+      claudeLogin: await this.accounts.machineLogin(),
     };
   }
 }

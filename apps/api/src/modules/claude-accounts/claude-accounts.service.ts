@@ -7,8 +7,10 @@ import type {
   ClaudeAccountStatus,
   CreateClaudeAccount,
   DiscoveredAccount,
+  SystemInfo,
 } from "@zastava/contracts";
 import { iso } from "../../common/mappers";
+import { childProcessEnv } from "../../core/config/env.schema";
 import { DatabaseService } from "../../core/database/database.service";
 import { EventsService } from "../../core/events/events.service";
 import {
@@ -112,6 +114,20 @@ export class ClaudeAccountsService {
     ]);
     const accounts = rows.map(accountAuth);
     return defaultId ? accounts : [await this.authFor(null), ...accounts];
+  }
+
+  /** Who `claude` is signed in as in the environment, for "Using claude on this machine". */
+  async machineLogin(): Promise<SystemInfo["claudeLogin"]> {
+    const configDir =
+      childProcessEnv()["CLAUDE_CONFIG_DIR"] ?? path.join(this.cli.home(), ".claude");
+    const auth = await this.cli.status(configDir);
+    if (!auth?.loggedIn) return null;
+    return {
+      configDir,
+      email: auth.email,
+      orgName: auth.orgName,
+      subscriptionType: auth.subscriptionType,
+    };
   }
 
   async exists(id: string): Promise<boolean> {

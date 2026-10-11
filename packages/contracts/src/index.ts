@@ -740,6 +740,18 @@ export const systemInfoSchema = z.object({
   reposRootDefault: z.string(),
   /** What the worker will use for new sessions, judged from its environment. */
   authSource: authSourceSchema,
+  /**
+   * Who `claude` is signed in as in the environment (CLAUDE_CONFIG_DIR, else
+   * ~/.claude), read with `claude auth status`; null when signed out (spec 0016).
+   */
+  claudeLogin: z
+    .object({
+      configDir: z.string(),
+      email: z.string().nullable(),
+      orgName: z.string().nullable(),
+      subscriptionType: z.string().nullable(),
+    })
+    .nullable(),
 });
 export type SystemInfo = z.infer<typeof systemInfoSchema>;
 
