@@ -4,7 +4,7 @@ import { execFile } from "node:child_process";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
-import { hubCandidateOf } from "@zastava/contracts";
+import { hubCandidateOf } from "@yugotool/contracts";
 
 const exec = promisify(execFile);
 

@@ -1,6 +1,6 @@
 import { Controller, Get } from "@nestjs/common";
 import { ApiOkResponse, ApiTags } from "@nestjs/swagger";
-import { type DispatcherState, dispatcherStateSchema } from "@zastava/contracts";
+import { type DispatcherState, dispatcherStateSchema } from "@yugotool/contracts";
 import { createZodDto } from "nestjs-zod";
 import { DispatcherService } from "./dispatcher.service";
 

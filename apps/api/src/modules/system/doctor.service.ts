@@ -9,7 +9,7 @@ import {
   type DoctorCheckKey,
   type DoctorReport,
   TASK_QUEUE,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 import { sql } from "drizzle-orm";
 import type { Env } from "../../core/config/env.schema";
 import { DatabaseService } from "../../core/database/database.service";
@@ -139,7 +139,7 @@ export class DoctorService {
         neededFor: "Needed for pull requests",
         run: () => gh(),
       },
-      // ZASTAVA's own services: the desktop app starts them; dev starts them by hand.
+      // YugoTool's own services: the desktop app starts them; dev starts them by hand.
       {
         key: "database",
         label: "Database",

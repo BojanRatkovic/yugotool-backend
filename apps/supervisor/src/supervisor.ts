@@ -61,7 +61,7 @@ export function restartDelay(crashTimes: number[], now: number): number | null {
  * Starts Postgres → migrations → Temporal → API → worker in order, watches
  * them (exit + health probes), restarts crashed ones with backoff and stops
  * them in reverse. Emits "status" with a SupervisorStatus on every change and
- * mirrors it to `~/.zastava/supervisor.json`.
+ * mirrors it to `~/.yugotool/supervisor.json`.
  */
 export class Supervisor extends EventEmitter<{ status: [SupervisorStatus] }> {
   private readonly services: Record<ServiceName, Service>;

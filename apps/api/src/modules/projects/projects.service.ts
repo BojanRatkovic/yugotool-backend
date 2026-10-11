@@ -24,9 +24,9 @@ import {
   type UpdateLine,
   type UpdateProject,
   type UpdateRoutes,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 import { previewTestDir } from "../../core/artifacts/artifacts";
-import { projectSkills } from "@zastava/skills";
+import { projectSkills } from "@yugotool/skills";
 import { DatabaseService } from "../../core/database/database.service";
 import { EventsService } from "../../core/events/events.service";
 import { TEMPORAL_CLIENT } from "../../core/temporal/temporal.module";

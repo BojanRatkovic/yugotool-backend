@@ -86,7 +86,7 @@ export function isRateLimit(error: unknown): boolean {
   );
 }
 
-/** A ZASTAVA review of this PR is still running (spec 0009). */
+/** A YugoTool review of this PR is still running (spec 0009). */
 export class ReviewAlreadyRunningError extends DomainError {
   readonly code = "review_running";
   readonly kind = "conflict";
@@ -98,7 +98,7 @@ export class PullRequestNotOpenError extends DomainError {
   readonly kind = "conflict";
 }
 
-/** There is no finished ZASTAVA review to post from. */
+/** There is no finished YugoTool review to post from. */
 export class ReviewNotReadyError extends DomainError {
   readonly code = "review_not_ready";
   readonly kind = "conflict";

@@ -1,7 +1,7 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { Context } from "@temporalio/activity";
-import { type PreviewSignIn, type ServerEvent, finishSignInSchema } from "@zastava/contracts";
-import { type Database, projects } from "@zastava/db";
+import { type PreviewSignIn, type ServerEvent, finishSignInSchema } from "@yugotool/contracts";
+import { type Database, projects } from "@yugotool/db";
 import { eq } from "drizzle-orm";
 import type { Browser, BrowserContext, Page } from "playwright";
 import {

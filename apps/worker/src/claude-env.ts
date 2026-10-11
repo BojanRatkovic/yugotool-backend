@@ -1,8 +1,8 @@
 import os from "node:os";
 import path from "node:path";
 import type { Options, SDKMessage } from "@anthropic-ai/claude-agent-sdk";
-import { claudeAccountEnv, type ClaudeAuthTarget } from "@zastava/contracts";
-import { claudeAccounts, type Database, projects, runs, settings, workOrders } from "@zastava/db";
+import { claudeAccountEnv, type ClaudeAuthTarget } from "@yugotool/contracts";
+import { claudeAccounts, type Database, projects, runs, settings, workOrders } from "@yugotool/db";
 import { eq } from "drizzle-orm";
 
 let db: Database | null = null;

@@ -4,7 +4,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import type { Repo } from "@zastava/contracts";
+import type { Repo } from "@yugotool/contracts";
 import type { Env } from "../../core/config/env.schema";
 import { RepoPathInvalidError } from "../projects/project.errors";
 import { hubRepos, isHubRoot } from "../projects/work-hub";

@@ -9,7 +9,7 @@ import { z } from "zod";
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(4810),
-  DATABASE_URL: z.string().default("postgres://localhost:5432/zastava"),
+  DATABASE_URL: z.string().default("postgres://localhost:5432/yugotool"),
   TEMPORAL_ADDRESS: z.string().default("localhost:7233"),
   TEMPORAL_NAMESPACE: z.string().default("default"),
   /** Comma-separated origins allowed by CORS (the Vite dev server proxies, so this is for prod). */
@@ -19,7 +19,7 @@ const envSchema = z.object({
   ANTHROPIC_API_KEY: z.string().optional(),
   CORS_ORIGINS: z.string().default("http://localhost:4800"),
   /**
-   * Built frontend (zastava-frontend/dist) to serve at `/`; the API then moves
+   * Built frontend (yugotool-frontend/dist) to serve at `/`; the API then moves
    * under `/api`, the same paths the Vite dev proxy exposes. Unset in dev.
    */
   WEB_DIST: z.string().optional(),
@@ -32,7 +32,7 @@ const envSchema = z.object({
   /** The Claude Code binary for `claude auth …` (spec 0016); tests point it at a stub. */
   CLAUDE_BIN: z.string().default("claude"),
   /** The packaged app's Agent SDK binary (spec 0017); unset = the SDK's own. Read via `claudeExecutable`. */
-  ZASTAVA_CLAUDE_BIN: z.string().optional(),
+  YUGOTOOL_CLAUDE_BIN: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -51,6 +51,6 @@ export function childProcessEnv(): Record<string, string | undefined> {
 
 /** Agent SDK option for the packaged app's fetched Claude Code (spec 0017); empty in dev. */
 export function claudeExecutable(): { pathToClaudeCodeExecutable?: string } {
-  const bin = process.env["ZASTAVA_CLAUDE_BIN"];
+  const bin = process.env["YUGOTOOL_CLAUDE_BIN"];
   return bin ? { pathToClaudeCodeExecutable: bin } : {};
 }

@@ -1,4 +1,4 @@
-import type { ReviewFinding } from "@zastava/contracts";
+import type { ReviewFinding } from "@yugotool/contracts";
 
 interface Range {
   start: number;

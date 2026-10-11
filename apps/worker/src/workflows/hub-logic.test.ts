@@ -1,4 +1,4 @@
-import { DEFAULT_STATIONS, type Station } from "@zastava/contracts";
+import { DEFAULT_STATIONS, type Station } from "@yugotool/contracts";
 import { describe, expect, it } from "vitest";
 import { buildPrompt } from "./line-logic";
 import { firstEditIndex, hubPlanIndex, runsInHub } from "./hub-logic";
@@ -48,15 +48,15 @@ describe("hub run stations (spec 0014)", () => {
   });
 
   it("the hub prompt replaces the worktree line; repo runs read as before", () => {
-    const run = { title: "T", description: "D", branch: "zastava/t" };
+    const run = { title: "T", description: "D", branch: "yugotool/t" };
     const station = agent("research", false);
     if (station.kind !== "agent") throw new Error("agent expected");
     const regular = buildPrompt(run, station, []);
-    expect(regular).toContain("You are working in a git worktree on branch `zastava/t`.");
-    expect(regular).toContain("`.zastava/`");
+    expect(regular).toContain("You are working in a git worktree on branch `yugotool/t`.");
+    expect(regular).toContain("`.yugotool/`");
     const inHub = buildPrompt({ ...run, branch: "", hub: "/w/hub" }, station, []);
     expect(inHub).toContain("You are in the work hub at `/w/hub`, read-only");
     expect(inHub).not.toContain("git worktree on branch");
-    expect(inHub).not.toContain("`.zastava/`");
+    expect(inHub).not.toContain("`.yugotool/`");
   });
 });

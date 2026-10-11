@@ -1,6 +1,6 @@
 import { Global, Inject, Module, type OnApplicationShutdown } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { createDbClient, type DbClient } from "@zastava/db";
+import { createDbClient, type DbClient } from "@yugotool/db";
 import type { Env } from "../config/env.schema";
 import { DatabaseService } from "./database.service";
 import { DB_CLIENT } from "./database.tokens";

@@ -1,5 +1,5 @@
 {
-  "name": "zastava-backend",
+  "name": "yugotool-backend",
   "version": "0.0.0",
   "private": true,
   "scripts": {
@@ -12,8 +12,8 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "build": "pnpm -r build",
-    "db:generate": "pnpm --filter @zastava/db run db:generate",
-    "db:migrate": "pnpm --filter @zastava/db run db:migrate"
+    "db:generate": "pnpm --filter @yugotool/db run db:generate",
+    "db:migrate": "pnpm --filter @yugotool/db run db:migrate"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

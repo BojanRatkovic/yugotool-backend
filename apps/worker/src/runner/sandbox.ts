@@ -61,7 +61,7 @@ export async function sandboxFor(
     network: { allowedDomains: ALLOWED_DOMAINS, allowLocalBinding: true },
   };
   // Package-manager caches default to the home dir, which the sandbox cannot write.
-  const cache = path.join(os.tmpdir(), "zastava-pkg-cache");
+  const cache = path.join(os.tmpdir(), "yugotool-pkg-cache");
   // The sandbox covers Bash only; file tools are confined by this hook.
   const confine: HookCallback = async (input) => {
     if (input.hook_event_name !== "PreToolUse") return {};
@@ -87,7 +87,7 @@ export async function sandboxFor(
   // The agent's `npm test` runs under the Node the repo pins (spec 0013).
   const env = await pinnedNodeEnv(worktreePath, process.env);
   // The packaged app's Claude Code, fetched on first start (spec 0017); unset = the SDK's own.
-  const claude = process.env["ZASTAVA_CLAUDE_BIN"];
+  const claude = process.env["YUGOTOOL_CLAUDE_BIN"];
   return {
     sandbox,
     hooks: { PreToolUse: [{ hooks: [confine] }] },

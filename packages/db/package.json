@@ -1,5 +1,5 @@
 {
-  "name": "@zastava/db",
+  "name": "@yugotool/db",
   "version": "0.0.0",
   "private": true,
   "type": "commonjs",
@@ -14,7 +14,7 @@
     "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
-    "@zastava/contracts": "workspace:*",
+    "@yugotool/contracts": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "pg": "^8.23.0"
   },

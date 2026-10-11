@@ -7,9 +7,9 @@ import {
   NOTIFICATION_EXTERNAL_DEFAULTS,
   type Settings,
   type UpdateSettings,
-} from "@zastava/contracts";
-import { settings } from "@zastava/db";
-import { broadcast, type Channel, type DesktopSink, send, truncateNotice } from "@zastava/notify";
+} from "@yugotool/contracts";
+import { settings } from "@yugotool/db";
+import { broadcast, type Channel, type DesktopSink, send, truncateNotice } from "@yugotool/notify";
 import { eq, sql } from "drizzle-orm";
 import { DomainError } from "../../common/errors/domain.error";
 import { iso } from "../../common/mappers";
@@ -96,7 +96,7 @@ export class SettingsService {
       current,
       {
         title: "Test notification",
-        body: "ZASTAVA can reach you here.",
+        body: "YugoTool can reach you here.",
         url: `${current.appUrl}/settings`,
       },
       this.desktopSink(),

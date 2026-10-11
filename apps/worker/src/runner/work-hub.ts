@@ -7,15 +7,15 @@ import { lstat, mkdir, readFile, readdir, symlink, writeFile } from "node:fs/pro
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import { hubCandidateOf } from "@zastava/contracts";
-import { bundledHubPlugins, hubUserPlugins, manifestName, pluginName } from "@zastava/skills";
+import { hubCandidateOf } from "@yugotool/contracts";
+import { bundledHubPlugins, hubUserPlugins, manifestName, pluginName } from "@yugotool/skills";
 
 export { bundledHubPlugins, pluginName };
 
 const exec = promisify(execFile);
 
 /** Where generated hub plugins live (one per hub, its skills symlinked in). */
-const HUB_PLUGINS_ROOT = path.join(os.homedir(), ".zastava", "hub-plugins");
+const HUB_PLUGINS_ROOT = path.join(os.homedir(), ".yugotool", "hub-plugins");
 
 /** A hub root: instructions for agents at the top and a `repos/` folder. */
 export function isHubRoot(dir: string): boolean {
@@ -50,9 +50,9 @@ export function hubOfWorktree(worktreePath: string): string | null {
   return isHubRoot(hub) ? hub : null;
 }
 
-/** `<hub>/worktrees/<repo>-zastava-<suffix>`, the hub's own naming. Pure. */
+/** `<hub>/worktrees/<repo>-yugotool-<suffix>`, the hub's own naming. Pure. */
 export function hubWorktreePath(hub: string, repoPath: string, suffix: string): string {
-  return path.join(hub, "worktrees", `${path.basename(repoPath)}-zastava-${suffix}`);
+  return path.join(hub, "worktrees", `${path.basename(repoPath)}-yugotool-${suffix}`);
 }
 
 const SKIP_IGNORED = /(^|\/)(\.DS_Store|[^/]*\.log|[^/]*\.tsbuildinfo)$/;
@@ -130,7 +130,7 @@ export function hubPromptSection(hub: string, worktreePath: string): string {
   return [
     "## Work hub",
     `This repository is part of the work hub at \`${hub}\`. Its instructions (below) and its knowledge apply: read what is relevant (Read/Grep/Glob work anywhere in the hub; \`repos/\` holds clean reference checkouts of the other repos). Its skills are available through the Skill tool.`,
-    `ZASTAVA already did the hub's worktree setup: you are in \`${worktreePath}\`, on a fresh branch from the latest base, with the source checkout's ignored config files linked in. Do not create worktrees, do not edit \`repos/\` or anything outside this worktree, and do not commit, push or open pull requests: ZASTAVA delivers the work.`,
+    `YugoTool already did the hub's worktree setup: you are in \`${worktreePath}\`, on a fresh branch from the latest base, with the source checkout's ignored config files linked in. Do not create worktrees, do not edit \`repos/\` or anything outside this worktree, and do not commit, push or open pull requests: YugoTool delivers the work.`,
     "Where the hub tells you to load a skill and it is not available here, follow its intent with the instructions you have. Where the hub's instructions below conflict with this section, this section wins.",
   ].join("\n\n");
 }

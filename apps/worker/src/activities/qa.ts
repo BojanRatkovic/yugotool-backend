@@ -22,7 +22,7 @@ import {
   type RunEventType,
   type ServerEvent,
   runTarget,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 import {
   type Database,
   projects,
@@ -31,7 +31,7 @@ import {
   runs,
   stationRuns,
   workOrders,
-} from "@zastava/db";
+} from "@yugotool/db";
 import { and, asc, eq, ne } from "drizzle-orm";
 import type { Browser } from "playwright";
 import { z } from "zod";

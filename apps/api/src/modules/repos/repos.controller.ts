@@ -1,6 +1,6 @@
 import { Controller, Get, Query } from "@nestjs/common";
 import { ApiOkResponse, ApiTags } from "@nestjs/swagger";
-import { listBranchesQuerySchema, type Repo, repoSchema } from "@zastava/contracts";
+import { listBranchesQuerySchema, type Repo, repoSchema } from "@yugotool/contracts";
 import { createZodDto } from "nestjs-zod";
 import { ReposService } from "./repos.service";
 

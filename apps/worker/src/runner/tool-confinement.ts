@@ -47,7 +47,7 @@ const DELIVERY_COMMAND =
 
 /**
  * Null when the call is fine; a reason when a Bash command would commit,
- * push or open a pull request. ZASTAVA checkpoints and delivers the work; a
+ * push or open a pull request. YugoTool checkpoints and delivers the work; a
  * hub's own skills (`/p-dev:open-pr`) tell agents to do it themselves, and a
  * plan once did, so the prompt alone is not enough. Pure.
  */
@@ -55,5 +55,5 @@ export function deliveryViolation(tool: string, input: unknown): string | null {
   if (tool !== "Bash" || typeof input !== "object" || input === null) return null;
   const command: unknown = Reflect.get(input, "command");
   if (typeof command !== "string" || !DELIVERY_COMMAND.test(command)) return null;
-  return "Not allowed here: ZASTAVA commits, pushes and opens the pull request when the work is approved. Leave your changes in the working tree.";
+  return "Not allowed here: YugoTool commits, pushes and opens the pull request when the work is approved. Leave your changes in the working tree.";
 }

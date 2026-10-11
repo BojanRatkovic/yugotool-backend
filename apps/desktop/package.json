@@ -1,8 +1,8 @@
 {
-  "name": "@zastava/desktop",
+  "name": "@yugotool/desktop",
   "version": "0.1.0",
   "private": true,
-  "description": "ZASTAVA desktop app: starts the supervisor and opens the UI",
+  "description": "YugoTool desktop app: starts the supervisor and opens the UI",
   "type": "commonjs",
   "main": "./dist/main.js",
   "scripts": {
@@ -17,13 +17,13 @@
     "icon": "NODE_PATH=../worker/node_modules node build/render.cjs"
   },
   "dependencies": {
-    "@zastava/contracts": "workspace:*",
-    "@zastava/supervisor": "workspace:*",
+    "@yugotool/contracts": "workspace:*",
+    "@yugotool/supervisor": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "electron": "^44.5.1",
     "electron-builder": "26.15.3"
   },
-  "productName": "ZASTAVA"
+  "productName": "YugoTool"
 }

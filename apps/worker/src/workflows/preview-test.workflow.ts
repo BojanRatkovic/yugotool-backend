@@ -1,5 +1,5 @@
 // Deterministic workflow code ONLY — no Node APIs, no I/O, no Date/Math.random.
-import type { PreviewTestResult } from "@zastava/contracts";
+import type { PreviewTestResult } from "@yugotool/contracts";
 import { proxyActivities } from "@temporalio/workflow";
 import type { Activities } from "../activities";
 

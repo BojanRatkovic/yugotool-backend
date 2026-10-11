@@ -30,7 +30,7 @@ async function bootstrap(): Promise<void> {
   if (config.get("NODE_ENV", { infer: true }) !== "production") {
     const document = SwaggerModule.createDocument(
       app,
-      new DocumentBuilder().setTitle("ZASTAVA API").setVersion("0.1.0").build(),
+      new DocumentBuilder().setTitle("YugoTool API").setVersion("0.1.0").build(),
     );
     SwaggerModule.setup("docs", app, cleanupOpenApiDoc(document));
   }

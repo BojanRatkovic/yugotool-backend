@@ -2,7 +2,7 @@ import { rmSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import { Injectable, Logger, type OnModuleDestroy } from "@nestjs/common";
-import type { ClaudeAccountLogin, StartClaudeLogin } from "@zastava/contracts";
+import type { ClaudeAccountLogin, StartClaudeLogin } from "@yugotool/contracts";
 import {
   ClaudeLoginFinishedError,
   ClaudeLoginNotFoundError,

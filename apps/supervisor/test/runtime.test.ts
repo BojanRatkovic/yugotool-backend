@@ -21,7 +21,7 @@ import {
 
 /** A .tar.gz with `bin/tool` printing `version`, and its sha256 integrity. */
 function archive(version: string): { bytes: Buffer; integrity: string } {
-  const dir = mkdtempSync(path.join(tmpdir(), "zastava-archive-"));
+  const dir = mkdtempSync(path.join(tmpdir(), "yugotool-archive-"));
   mkdirSync(path.join(dir, "bin"));
   writeFileSync(path.join(dir, "bin", "tool"), `#!/bin/sh\necho ${version}\n`);
   const file = path.join(dir, "out.tar.gz");
@@ -68,7 +68,7 @@ function server(bytes: Buffer, status = 200): typeof fetch & { calls: number } {
   return fake;
 }
 
-const home = (): string => mkdtempSync(path.join(tmpdir(), "zastava-home-"));
+const home = (): string => mkdtempSync(path.join(tmpdir(), "yugotool-home-"));
 
 describe("ensureRuntime", () => {
   it("fetches, checks and installs a tool, reporting progress up to the total", async () => {

@@ -11,8 +11,8 @@ import {
   type OpenPullRequestResult,
   type SplitWorkOrder,
   type WorkOrder,
-} from "@zastava/contracts";
-import { runs } from "@zastava/db";
+} from "@yugotool/contracts";
+import { runs } from "@yugotool/db";
 import { type Client, WorkflowExecutionAlreadyStartedError } from "@temporalio/client";
 import { eq } from "drizzle-orm";
 import { DatabaseService } from "../../core/database/database.service";

@@ -1,5 +1,5 @@
-import type { KnowledgeMount } from "@zastava/contracts";
-import { type Database, knowledgeSources, projectKnowledge, workOrders } from "@zastava/db";
+import type { KnowledgeMount } from "@yugotool/contracts";
+import { type Database, knowledgeSources, projectKnowledge, workOrders } from "@yugotool/db";
 import { asc, eq } from "drizzle-orm";
 import { syncKnowledgeSource } from "../runner/knowledge";
 import type { ShiftDeps } from "./shifts";

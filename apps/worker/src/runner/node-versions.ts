@@ -1,5 +1,5 @@
-// Node versions repos pin (spec 0013): ZASTAVA downloads them itself into
-// ~/.zastava/node, so nothing like nvm has to be installed.
+// Node versions repos pin (spec 0013): YugoTool downloads them itself into
+// ~/.yugotool/node, so nothing like nvm has to be installed.
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
@@ -10,7 +10,7 @@ import { promisify } from "node:util";
 
 const exec = promisify(execFile);
 
-const NODE_ROOT = path.join(os.homedir(), ".zastava", "node");
+const NODE_ROOT = path.join(os.homedir(), ".yugotool", "node");
 const DIST = "https://nodejs.org/dist";
 /** The release index changes a few times a month. */
 const INDEX_MAX_AGE_MS = 12 * 60 * 60 * 1000;
@@ -99,7 +99,7 @@ async function releaseIndex(): Promise<NodeRelease[]> {
     : [];
 }
 
-/** Versions already in ~/.zastava/node, newest first. */
+/** Versions already in ~/.yugotool/node, newest first. */
 async function installedVersions(): Promise<string[]> {
   const entries = await readdir(NODE_ROOT).catch(() => [] as string[]);
   return entries
@@ -117,7 +117,7 @@ export function compareVersions(a: string, b: string): number {
   return 0;
 }
 
-/** Downloads and unpacks one release (checksum-verified) into ~/.zastava/node/<version>. */
+/** Downloads and unpacks one release (checksum-verified) into ~/.yugotool/node/<version>. */
 async function install(version: string): Promise<void> {
   const name = distName(version);
   const tarball = `${name}.tar.gz`;
@@ -189,7 +189,7 @@ export function withBinFirst(env: NodeJS.ProcessEnv, binDir: string): NodeJS.Pro
  * `env` with the Node `dir` pins first on PATH; unchanged when it pins none or
  * the version can't be had. Best effort: a run never fails over this.
  */
-const PNPM_ROOT = path.join(os.homedir(), ".zastava", "tools");
+const PNPM_ROOT = path.join(os.homedir(), ".yugotool", "tools");
 
 /** The exact pnpm a checkout pins in package.json's packageManager ("pnpm@12.4.1+sha512…"). */
 export async function pinnedPnpm(dir: string): Promise<string | null> {
@@ -208,7 +208,7 @@ const pnpmBin = (version: string): string =>
   path.join(PNPM_ROOT, `pnpm-${version}`, "node_modules", ".bin");
 
 /**
- * The pinned pnpm, installed once with npm under ~/.zastava/tools. A global
+ * The pinned pnpm, installed once with npm under ~/.yugotool/tools. A global
  * pnpm switches itself to the pinned version, but an older one cannot install
  * pnpm 12 (its native binary comes from a postinstall it skips): every pnpm
  * command in such a repo failed with "Failed to switch pnpm to v12.4.1".
@@ -232,14 +232,14 @@ export async function ensurePinnedPnpm(
         timeout: 300_000,
       },
     );
-    return `pnpm ${version} (pinned) installed for ZASTAVA's agents`;
+    return `pnpm ${version} (pinned) installed for YugoTool's agents`;
   } catch (error) {
     await rm(prefix, { recursive: true, force: true });
     return `Could not install pnpm ${version} (pinned): ${error instanceof Error ? error.message : String(error)}`;
   }
 }
 
-/** `env` with the pinned pnpm first on PATH, when ZASTAVA has it. */
+/** `env` with the pinned pnpm first on PATH, when YugoTool has it. */
 async function withPinnedPnpm(dir: string, env: NodeJS.ProcessEnv): Promise<NodeJS.ProcessEnv> {
   const version = await pinnedPnpm(dir);
   const bin = version ? pnpmBin(version) : null;

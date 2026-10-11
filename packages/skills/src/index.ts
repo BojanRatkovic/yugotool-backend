@@ -4,7 +4,7 @@
 import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type { ProjectSkill } from "@zastava/contracts";
+import type { ProjectSkill } from "@yugotool/contracts";
 
 /** Plugin names are kebab-case; the hub folder's name is what people call it ("work"). */
 export function pluginName(hub: string): string {

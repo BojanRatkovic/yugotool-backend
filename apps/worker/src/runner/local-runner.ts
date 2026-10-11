@@ -12,7 +12,7 @@ import { hubWorktreePath } from "./work-hub";
 const exec = promisify(execFile);
 
 /** Where worktrees live: outside the repo so the user's checkout is never touched. */
-const WORKTREES_ROOT = path.join(os.homedir(), ".zastava", "worktrees");
+const WORKTREES_ROOT = path.join(os.homedir(), ".yugotool", "worktrees");
 
 export interface Workspace {
   path: string;
@@ -38,7 +38,7 @@ export const localRunner = {
       ? hubWorktreePath(input.hub, input.repoPath, suffix)
       : path.join(WORKTREES_ROOT, input.runId);
     await mkdir(path.dirname(worktreePath), { recursive: true });
-    const branch = `zastava/${suffix}`;
+    const branch = `yugotool/${suffix}`;
     // Best effort: a fresh origin/<base>, so the run doesn't start from a days-old ref.
     await exec("git", ["-C", input.repoPath, "fetch", "--quiet", "origin", input.baseBranch], {
       timeout: 120_000,
@@ -183,7 +183,7 @@ export const localRunner = {
    * A finished run's worktree goes (a node_modules each adds up to GBs).
    * Nothing is lost: unfinished changes are committed to the run's branch
    * (hooks skipped — this is a snapshot, not a delivery) and the shift memory
-   * (`.zastava/`, never committed) is copied to `memoryDir` first. Returns the
+   * (`.yugotool/`, never committed) is copied to `memoryDir` first. Returns the
    * snapshot commit, or null when the tree was clean.
    */
   async archiveWorkspace(input: {
@@ -195,7 +195,7 @@ export const localRunner = {
     const { repoPath, worktreePath } = input;
     let snapshot: string | null = null;
     if (existsSync(worktreePath)) {
-      const memory = path.join(worktreePath, ".zastava");
+      const memory = path.join(worktreePath, ".yugotool");
       if (existsSync(memory)) await cp(memory, input.memoryDir, { recursive: true });
       const git = (...args: string[]) => exec("git", ["-C", worktreePath, ...args]);
       await git("add", "-A");
@@ -270,13 +270,13 @@ export const localRunner = {
     return stdout.trim();
   },
 
-  /** Commits everything (`.zastava/` is excluded) without hooks; null when there was nothing to commit. */
+  /** Commits everything (`.yugotool/` is excluded) without hooks; null when there was nothing to commit. */
   async checkpoint(worktreePath: string, message: string): Promise<string | null> {
     const git = (...args: string[]) => exec("git", ["-C", worktreePath, ...args]);
     await git("add", "-A");
     const { stdout: staged } = await git("diff", "--cached", "--name-only");
     if (!staged.trim()) return null;
-    // A checkpoint is ZASTAVA's own bookkeeping, not the delivered commit: the repo's
+    // A checkpoint is YugoTool's own bookkeeping, not the delivered commit: the repo's
     // hooks run at delivery (runPreCommitHook). Run here they failed the build
     // (overcommit refuses a fresh worktree: "plugins … changed, run overcommit --sign").
     await git("commit", "--no-verify", "-m", message);
@@ -337,7 +337,7 @@ export const localRunner = {
     );
     if (!executable) return null;
     const { stdout: gitDir } = await git("rev-parse", "--absolute-git-dir");
-    const file = path.join(gitDir.trim(), "ZASTAVA_COMMIT_MSG");
+    const file = path.join(gitDir.trim(), "YUGOTOOL_COMMIT_MSG");
     await writeFile(file, `${title}\n\n${SIGNATURE}.\n`);
     try {
       await git("hook", "run", "commit-msg", "--", file);
@@ -437,7 +437,7 @@ export const localRunner = {
       return {
         prUrl: null,
         summary: `Pushed ${input.branch} to origin (${originUrl.trim()}); not a GitHub remote, so no PR.`,
-        reason: `Pushed ${input.branch}, but origin is not on GitHub, so ZASTAVA can't open the pull request.`,
+        reason: `Pushed ${input.branch}, but origin is not on GitHub, so YugoTool can't open the pull request.`,
       };
     }
     const kind = input.draft ? "Draft pull request" : "Pull request";

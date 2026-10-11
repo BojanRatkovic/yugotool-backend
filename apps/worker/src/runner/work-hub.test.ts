@@ -22,7 +22,7 @@ const git = (cwd: string, ...args: string[]) =>
 
 /** <tmp>/work with CLAUDE.md, a skill and repos/app (a git repo with an ignored .env). */
 function makeHub(): { hub: string; repo: string } {
-  const hub = path.join(mkdtempSync(path.join(os.tmpdir(), "zastava-hub-")), "work");
+  const hub = path.join(mkdtempSync(path.join(os.tmpdir(), "yugotool-hub-")), "work");
   const repo = path.join(hub, "repos", "app");
   mkdirSync(path.join(hub, ".claude", "skills", "domain"), { recursive: true });
   writeFileSync(path.join(hub, "CLAUDE.md"), "hub rules\n");
@@ -64,7 +64,7 @@ describe("work hubs (spec 0012)", () => {
 
   it("names worktrees and plugins the hub's way", () => {
     expect(hubWorktreePath("/h/work", "/h/work/repos/frontend", "fix-x-1a2b3c4d")).toBe(
-      "/h/work/worktrees/frontend-zastava-fix-x-1a2b3c4d",
+      "/h/work/worktrees/frontend-yugotool-fix-x-1a2b3c4d",
     );
     expect(pluginName("/Users/me/Acme Work")).toBe("acme-work");
     expect(hubPromptSection("/h/work", "/h/work/worktrees/x")).toContain("Do not create worktrees");

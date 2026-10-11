@@ -8,8 +8,8 @@ import {
   type RouteMap,
   type RunEventType,
   type ServerEvent,
-} from "@zastava/contracts";
-import { type Database, projects } from "@zastava/db";
+} from "@yugotool/contracts";
+import { type Database, projects } from "@yugotool/db";
 import { eq } from "drizzle-orm";
 import { localRunner } from "../runner/local-runner";
 import { buildDiscoveryPrompt, normalizeDiscovery, routeSourceHash } from "../runner/route-map";

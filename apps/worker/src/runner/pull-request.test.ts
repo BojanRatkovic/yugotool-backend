@@ -5,7 +5,7 @@ describe("existingPrUrl", () => {
   it("reads the url from gh's 'already exists' error", () => {
     const error = Object.assign(new Error("Command failed: gh pr create"), {
       stderr:
-        'a pull request for branch "zastava/x" into branch "master" already exists:\nhttps://github.com/acme/app/pull/1234\n',
+        'a pull request for branch "yugotool/x" into branch "master" already exists:\nhttps://github.com/acme/app/pull/1234\n',
     });
     expect(existingPrUrl(error)).toBe("https://github.com/acme/app/pull/1234");
   });

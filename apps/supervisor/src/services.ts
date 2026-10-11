@@ -11,6 +11,7 @@ import { Child, type ChildSpec } from "./child";
 import { databaseUrl, PG_DATABASE, PG_PASSWORD, PG_USER, type SupervisorConfig } from "./config";
 import type { LogFile } from "./log-file";
 import { checkFolderAccess, protectedFolders } from "./folders";
+import { LEGACY_NAME, renameLegacyRole } from "./legacy";
 import { migrate } from "./migrate";
 import { ensureRuntime, findTool, progressText, type RuntimeProgress, toolPath } from "./runtime";
 
@@ -116,7 +117,7 @@ export function claudeBin(config: SupervisorConfig): string | null {
   return tool ? toolPath(config.home, tool) : null;
 }
 
-// ── Postgres (bundled binaries, data in ~/.zastava/pg) ───────────────────────
+// ── Postgres (bundled binaries, data in ~/.yugotool/pg) ───────────────────────
 
 /**
  * Runs the `@embedded-postgres/<platform>` binaries directly. The package's
@@ -161,7 +162,20 @@ function postgres({ config, log, onCrash }: ServiceContext): Service {
         (code, signal) => onCrash("postgres", exitReason(code, signal)),
       );
       child.start();
-      await waitFor(() => pgReady(config, "postgres"), 30_000, "postgres", file);
+      // A cluster from the ZASTAVA days answers to the old role until renamed.
+      await waitFor(
+        async () =>
+          (await pgReady(config, "postgres")) ||
+          pgReady(config, "postgres", { user: LEGACY_NAME, password: LEGACY_NAME }),
+        30_000,
+        "postgres",
+        file,
+      );
+      const renamed = await renameLegacyRole(
+        (user, password, database) => pgClient(config, database, { user, password }),
+        { user: PG_USER, password: PG_PASSWORD, database: PG_DATABASE },
+      );
+      if (renamed) file.line(`renamed role and database ${LEGACY_NAME} to ${PG_USER}`);
       await createDatabase(config);
       return fresh ? "initialised a new cluster" : undefined;
     },
@@ -183,7 +197,7 @@ async function postgresBinaries(): Promise<{ initdb: string; postgres: string }>
 
 async function initdb(bin: string, dataDir: string, file: LogFile): Promise<void> {
   await mkdir(path.dirname(dataDir), { recursive: true });
-  const scratch = await mkdtemp(path.join(os.tmpdir(), "zastava-pg-"));
+  const scratch = await mkdtemp(path.join(os.tmpdir(), "yugotool-pg-"));
   const pwfile = path.join(scratch, "pw");
   await writeFile(pwfile, `${PG_PASSWORD}\n`, { mode: 0o600 });
   try {
@@ -214,19 +228,27 @@ async function createDatabase(config: SupervisorConfig): Promise<void> {
   }
 }
 
-function pgClient(config: SupervisorConfig, database: string): Client {
+function pgClient(
+  config: SupervisorConfig,
+  database: string,
+  login = { user: PG_USER, password: PG_PASSWORD },
+): Client {
   return new Client({
     host: "127.0.0.1",
     port: config.ports.pg,
-    user: PG_USER,
-    password: PG_PASSWORD,
+    user: login.user,
+    password: login.password,
     database,
     connectionTimeoutMillis: 3_000,
   });
 }
 
-async function pgReady(config: SupervisorConfig, database: string): Promise<boolean> {
-  const client = pgClient(config, database);
+async function pgReady(
+  config: SupervisorConfig,
+  database: string,
+  login?: { user: string; password: string },
+): Promise<boolean> {
+  const client = pgClient(config, database, login);
   try {
     await client.connect();
     await client.query("select 1");
@@ -318,7 +340,7 @@ function folders({ config, log, progress }: ServiceContext): Service {
         if (access === "granted") continue;
         if (needed.has(folder)) {
           throw new Error(
-            `ZASTAVA can't read your ${name} folder, where your projects are. Allow it in System Settings → Privacy & Security → Files and Folders → ZASTAVA, then try again`,
+            `YugoTool can't read your ${name} folder, where your projects are. Allow it in System Settings → Privacy & Security → Files and Folders → YugoTool, then try again`,
           );
         }
         denied.push(name);
@@ -354,7 +376,7 @@ async function folderPaths(
   }
 }
 
-// ── Temporal dev server (file DB in ~/.zastava/temporal.db) ───────────────────
+// ── Temporal dev server (file DB in ~/.yugotool/temporal.db) ───────────────────
 
 function temporal({ config, log, onCrash }: ServiceContext): Service {
   const file = log("temporal");
@@ -415,7 +437,7 @@ function temporalBin(config: SupervisorConfig): string {
     }).trim();
   } catch {
     throw new Error(
-      "temporal CLI not found: install it (brew install temporal) or set ZASTAVA_TEMPORAL_BIN",
+      "temporal CLI not found: install it (brew install temporal) or set YUGOTOOL_TEMPORAL_BIN",
     );
   }
 }
@@ -436,7 +458,7 @@ function nodeEnv(config: SupervisorConfig): NodeJS.ProcessEnv {
     TEMPORAL_ADDRESS: `127.0.0.1:${config.ports.temporal}`,
     DESKTOP_NOTICES: config.desktopNotices,
     // Every Agent SDK session runs this binary (spec 0017).
-    ...(claude ? { ZASTAVA_CLAUDE_BIN: claude } : {}),
+    ...(claude ? { YUGOTOOL_CLAUDE_BIN: claude } : {}),
     ...config.extraEnv,
     ...(config.anthropicApiKey ? { ANTHROPIC_API_KEY: config.anthropicApiKey } : {}),
   };

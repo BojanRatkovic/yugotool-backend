@@ -1,5 +1,5 @@
 import type { Client } from "@temporalio/client";
-import { type Line, type LineKind, REVIEW_LINE_STATIONS, type Station } from "@zastava/contracts";
+import { type Line, type LineKind, REVIEW_LINE_STATIONS, type Station } from "@yugotool/contracts";
 import { describe, expect, it, vi } from "vitest";
 import type { DatabaseService } from "../src/core/database/database.service";
 import type { EventsService } from "../src/core/events/events.service";

@@ -1,18 +1,21 @@
 #!/usr/bin/env node
 import { loadConfig } from "./config";
+import { moveLegacyHome } from "./legacy";
 import { pidAlive, readStatus, Supervisor, type SupervisorStatus } from "./supervisor";
 
-const USAGE = `Usage: zastava <command>
+const USAGE = `Usage: yugotool <command>
 
   start    Start Postgres, migrations, Temporal, API and worker; Ctrl-C stops them
   status   Show what a running supervisor reports
   stop     Ask a running supervisor to stop everything
 
-Environment: ZASTAVA_HOME (default ~/.zastava), ZASTAVA_API_PORT (4810),
-ZASTAVA_PG_PORT (4832), ZASTAVA_TEMPORAL_PORT (4833), ZASTAVA_TEMPORAL_UI_PORT (4834).`;
+Environment: YUGOTOOL_HOME (default ~/.yugotool), YUGOTOOL_API_PORT (4810),
+YUGOTOOL_PG_PORT (4832), YUGOTOOL_TEMPORAL_PORT (4833), YUGOTOOL_TEMPORAL_UI_PORT (4834).`;
 
 async function main(): Promise<void> {
   const config = loadConfig();
+  const moved = moveLegacyHome(config.home);
+  if (moved) console.log(`Moved ${moved} to ${config.home}.`);
   switch (process.argv[2]) {
     case "start":
       return start();
@@ -64,7 +67,7 @@ async function main(): Promise<void> {
       process.exit(1);
     }
     print(supervisor.snapshot());
-    console.log(`\nZASTAVA is running at ${supervisor.appUrl}  (logs: ${config.logsDir})`);
+    console.log(`\nYugoTool is running at ${supervisor.appUrl}  (logs: ${config.logsDir})`);
   }
 }
 

@@ -1,6 +1,6 @@
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { NOTIFICATION_JOBS_CHANNEL, type Notification } from "@zastava/contracts";
+import { NOTIFICATION_JOBS_CHANNEL, type Notification } from "@yugotool/contracts";
 import { Client } from "pg";
 import type { Env } from "../../core/config/env.schema";
 import { DatabaseService } from "../../core/database/database.service";

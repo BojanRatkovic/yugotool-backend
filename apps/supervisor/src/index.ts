@@ -1,4 +1,5 @@
 export { databaseUrl, loadConfig, type SupervisorConfig } from "./config";
+export { moveLegacyHome } from "./legacy";
 export { LogFile } from "./log-file";
 export type { ServiceName } from "./services";
 export {

@@ -4,7 +4,7 @@ import {
   type NotificationJob,
   notificationJobSchema,
   notificationKindSchema,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 import {
   type Executor,
   lines,
@@ -13,7 +13,7 @@ import {
   projects,
   runEvents,
   workOrders,
-} from "@zastava/db";
+} from "@yugotool/db";
 import { and, desc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
 import { iso } from "../../common/mappers";
 import type { RenderedNotification, WorkOrderContext } from "./notification-definitions";

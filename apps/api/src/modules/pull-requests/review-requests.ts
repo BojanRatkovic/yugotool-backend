@@ -1,4 +1,4 @@
-import type { NotificationJob, PullRequestList } from "@zastava/contracts";
+import type { NotificationJob, PullRequestList } from "@yugotool/contracts";
 
 export interface ReviewRequestJob {
   job: Extract<NotificationJob, { kind: "pr_review_requested" }>;

@@ -1,6 +1,6 @@
 import type { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
-import type { ProjectRemote } from "@zastava/contracts";
+import type { ProjectRemote } from "@yugotool/contracts";
 import { ZodValidationPipe } from "nestjs-zod";
 import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -33,7 +33,7 @@ async function start(remote: () => Promise<ProjectRemote> = () => Promise.resolv
     providers: [
       PullRequestsService,
       PullRequestWritesService,
-      // ZASTAVA reviews have their own e2e (pull-request-reviews.e2e.test.ts).
+      // YugoTool reviews have their own e2e (pull-request-reviews.e2e.test.ts).
       { provide: PullRequestReviewsService, useValue: {} },
       { provide: GithubClient, useValue: github },
       { provide: ProjectsService, useValue: { remote: vi.fn(remote) } },

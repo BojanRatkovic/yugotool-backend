@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { TestWorkflowEnvironment } from "@temporalio/testing";
 import { Worker } from "@temporalio/worker";
-import { GATE_DECISION_SIGNAL, type GateDecision, type Station } from "@zastava/contracts";
+import { GATE_DECISION_SIGNAL, type GateDecision, type Station } from "@yugotool/contracts";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { AgentStationResult, RunContext } from "../activities";
 import { workOrderRun } from "./work-order-run.workflow";
@@ -51,7 +51,7 @@ function context(kind: "repo" | "hub" | undefined, repo: string | null = null): 
         repos: ["api", "web"],
         repo,
       }
-    : { ...base, worktreePath: "/wt/repo", branch: "zastava/x", baseBranch: "main" };
+    : { ...base, worktreePath: "/wt/repo", branch: "yugotool/x", baseBranch: "main" };
 }
 
 function activities(ctx: RunContext, researchRepo: string | null) {
@@ -83,8 +83,8 @@ function activities(ctx: RunContext, researchRepo: string | null) {
       finishStation: track("finishStation", () => undefined),
       runAgentStation: track("runAgentStation", agentResult),
       prepareRepoWorkspace: track("prepareRepoWorkspace", (input: { repo: string }) => ({
-        worktreePath: `${HUB}/worktrees/${input.repo}-zastava-x`,
-        branch: "zastava/add-paging",
+        worktreePath: `${HUB}/worktrees/${input.repo}-yugotool-x`,
+        branch: "yugotool/add-paging",
         baseBranch: "develop",
       })),
       runChecks: track("runChecks", () => ({ passed: true, output: "" })),
@@ -162,11 +162,11 @@ describe("workOrderRun in a hub project (spec 0014)", () => {
     });
     expect(acts.mocks.prepareRepoWorkspace.mock.calls[0]?.[0]).toMatchObject({ repo: "api" });
     expect(acts.mocks.runChecks.mock.calls[0]?.[0]).toMatchObject({
-      worktreePath: `${HUB}/worktrees/api-zastava-x`,
+      worktreePath: `${HUB}/worktrees/api-yugotool-x`,
     });
     expect(acts.mocks.deliver.mock.calls[0]?.[0]).toMatchObject({
-      worktreePath: `${HUB}/worktrees/api-zastava-x`,
-      branch: "zastava/add-paging",
+      worktreePath: `${HUB}/worktrees/api-yugotool-x`,
+      branch: "yugotool/add-paging",
       baseBranch: "develop",
     });
     expect(acts.mocks.finishRun.mock.calls[0]?.[0]).toMatchObject({ status: "succeeded" });

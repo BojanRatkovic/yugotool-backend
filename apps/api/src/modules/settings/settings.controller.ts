@@ -5,8 +5,8 @@ import {
   type Settings,
   settingsSchema,
   updateSettingsSchema,
-} from "@zastava/contracts";
-import { ChannelNotConfiguredError } from "@zastava/notify";
+} from "@yugotool/contracts";
+import { ChannelNotConfiguredError } from "@yugotool/notify";
 import { createZodDto } from "nestjs-zod";
 import { DomainError } from "../../common/errors/domain.error";
 import { SettingsService } from "./settings.service";

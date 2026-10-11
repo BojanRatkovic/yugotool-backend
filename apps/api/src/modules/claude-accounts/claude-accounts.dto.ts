@@ -6,7 +6,7 @@ import {
   discoveredAccountSchema,
   setDefaultClaudeAccountSchema,
   startClaudeLoginSchema,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 import { createZodDto } from "nestjs-zod";
 
 export class ClaudeAccountDto extends createZodDto(claudeAccountSchema) {}

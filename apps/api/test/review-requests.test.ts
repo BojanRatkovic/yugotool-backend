@@ -1,12 +1,12 @@
-import type { PullRequestList, PullRequestSummary } from "@zastava/contracts";
-import { enqueueNotification, hasNotificationJobs } from "@zastava/notify";
+import type { PullRequestList, PullRequestSummary } from "@yugotool/contracts";
+import { enqueueNotification, hasNotificationJobs } from "@yugotool/notify";
 import { describe, expect, it, vi } from "vitest";
 import { reviewRequestJobs } from "../src/modules/pull-requests/review-requests";
 import { ReviewRequestsWatcher } from "../src/modules/pull-requests/review-requests.watcher";
 
 const PROJECT = "85156849-2497-47fa-a2bd-494c776f572b";
 
-vi.mock("@zastava/notify", () => ({
+vi.mock("@yugotool/notify", () => ({
   enqueueNotification: vi.fn(() => Promise.resolve()),
   hasNotificationJobs: vi.fn(() => Promise.resolve(true)),
 }));

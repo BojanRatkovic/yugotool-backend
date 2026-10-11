@@ -8,7 +8,7 @@ import type {
   CreateClaudeAccount,
   DiscoveredAccount,
   SystemInfo,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 import { iso } from "../../common/mappers";
 import { childProcessEnv } from "../../core/config/env.schema";
 import { DatabaseService } from "../../core/database/database.service";
@@ -241,7 +241,7 @@ export class ClaudeAccountsService {
 
   /**
    * Removes the account; its projects and the default fall back (FKs set null).
-   * A dir ZASTAVA created is signed out and deleted; any other dir is never touched.
+   * A dir YugoTool created is signed out and deleted; any other dir is never touched.
    */
   async remove(id: string): Promise<void> {
     const row = await this.repository.delete(this.database.db, id);
@@ -263,7 +263,7 @@ export class ClaudeAccountsService {
     await this.events.publish({ type: "invalidate", collection: "dispatcher" });
   }
 
-  /** A fresh dir for a new login: `~/.zastava/accounts/<slug>-<random>`. */
+  /** A fresh dir for a new login: `~/.yugotool/accounts/<slug>-<random>`. */
   async createManagedDir(label: string): Promise<string> {
     const slug = label
       .toLowerCase()
@@ -283,7 +283,7 @@ export class ClaudeAccountsService {
   }
 
   private accountsRoot(): string {
-    return path.join(this.cli.home(), ".zastava", "accounts");
+    return path.join(this.cli.home(), ".yugotool", "accounts");
   }
 
   private async one(id: string): Promise<ClaudeAccount> {

@@ -4,8 +4,8 @@ import {
   type CiState,
   type CiStatus,
   type StationRunStatus,
-} from "@zastava/contracts";
-import { type Database, stationRuns, workOrders } from "@zastava/db";
+} from "@yugotool/contracts";
+import { type Database, stationRuns, workOrders } from "@yugotool/db";
 import { and, desc, eq } from "drizzle-orm";
 import { type PullRequestCi, readPullRequestCi } from "../runner/ci-checks";
 import type { CiMode } from "../workflows/ci-logic";
@@ -135,7 +135,7 @@ export function createCiActivities(db: Database, deps: CiDeps) {
 
   async function logResult(runId: string, stationRunId: string, ci: CiStatus): Promise<void> {
     const head = `on ${shortSha(ci.headSha)}${
-      ci.deliveredSha && ci.headSha !== ci.deliveredSha ? " (newer than ZASTAVA's push)" : ""
+      ci.deliveredSha && ci.headSha !== ci.deliveredSha ? " (newer than YugoTool's push)" : ""
     }`;
     const type = ci.state === "failed" ? "error" : "system";
     await deps.appendEvent(

@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { RESEARCH_PLAN_JSON_SCHEMA, stationResearchSchema } from "@zastava/contracts";
+import { RESEARCH_PLAN_JSON_SCHEMA, stationResearchSchema } from "@yugotool/contracts";
 import { afterAll, describe, expect, it } from "vitest";
 import {
   describeSync,
@@ -17,7 +17,7 @@ import {
 } from "./hub-research";
 import { pathViolation } from "./tool-confinement";
 
-const root = mkdtempSync(path.join(os.tmpdir(), "zastava-hub-research-"));
+const root = mkdtempSync(path.join(os.tmpdir(), "yugotool-hub-research-"));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 
 const git = (cwd: string, ...args: string[]) =>
@@ -191,7 +191,7 @@ describe("fallbackPlan", () => {
 
 describe("shared hub sync", () => {
   it("runs one sync per hub and reuses it for two minutes", async () => {
-    const hub = mkdtempSync(path.join(os.tmpdir(), "zastava-sync-"));
+    const hub = mkdtempSync(path.join(os.tmpdir(), "yugotool-sync-"));
     const first = syncHubReposShared(hub, [], 1_000);
     expect(syncHubReposShared(hub, [], 2_000)).toBe(first);
     await first;

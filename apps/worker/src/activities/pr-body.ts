@@ -1,4 +1,4 @@
-import { MODELS } from "@zastava/contracts";
+import { MODELS } from "@yugotool/contracts";
 import {
   type Database,
   lines,
@@ -7,7 +7,7 @@ import {
   shifts,
   stationRuns,
   workOrders,
-} from "@zastava/db";
+} from "@yugotool/db";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { localRunner } from "../runner/local-runner";
 import { type PrQa, type PrStation, renderPrBody } from "../runner/pr-body";

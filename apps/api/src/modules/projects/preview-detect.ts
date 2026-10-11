@@ -1,4 +1,4 @@
-import type { Preview, PreviewDetection } from "@zastava/contracts";
+import type { Preview, PreviewDetection } from "@yugotool/contracts";
 
 type PackageManager = NonNullable<PreviewDetection["packageManager"]>;
 
@@ -71,7 +71,7 @@ export function detectPreview(facts: RepoFacts): PreviewDetection {
   const notes: string[] = [];
   if (nodeVersion) {
     notes.push(
-      `Node ${nodeVersion} is pinned in ${facts.nvmrc ? ".nvmrc" : ".node-version"}; ZASTAVA runs the preview, checks and agents under it (downloaded once).`,
+      `Node ${nodeVersion} is pinned in ${facts.nvmrc ? ".nvmrc" : ".node-version"}; YugoTool runs the preview, checks and agents under it (downloaded once).`,
     );
   }
 

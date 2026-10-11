@@ -1,5 +1,5 @@
 // Pure helpers for the CI watch — deterministic, no I/O.
-import type { CiCheck, CiState } from "@zastava/contracts";
+import type { CiCheck, CiState } from "@yugotool/contracts";
 
 export const CI_POLL_MS = 30_000;
 /** No check registered by then: the repo has no CI for this PR. */
@@ -10,7 +10,7 @@ export const CI_TIMEOUT_MS = 90 * 60_000;
 /** Consecutive polls with nothing pending before "done" is believed. */
 export const CI_SETTLED_POLLS = 2;
 
-/** delivery: the watch right after ZASTAVA pushed. refresh: someone asked to look again. */
+/** delivery: the watch right after YugoTool pushed. refresh: someone asked to look again. */
 export type CiMode = "delivery" | "refresh";
 
 export interface CiWatch {

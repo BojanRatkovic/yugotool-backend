@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { claudeAccounts, type Executor, projects, settings } from "@zastava/db";
+import { claudeAccounts, type Executor, projects, settings } from "@yugotool/db";
 import { asc, eq } from "drizzle-orm";
 
 export type ClaudeAccountRow = typeof claudeAccounts.$inferSelect;

@@ -5,7 +5,7 @@ import type {
   PullRequestDetail,
   PullRequestList,
   PullRequestSummary,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 import { z } from "zod";
 import { ProjectsService } from "../projects/projects.service";
 import { GithubClient } from "./github/gh-client";
@@ -110,7 +110,7 @@ const reviewSnapshotSchema = z.object({
   }),
 });
 
-/** What a ZASTAVA review freezes when it starts. */
+/** What a YugoTool review freezes when it starts. */
 export interface PullRequestReviewSnapshot {
   number: number;
   title: string;
@@ -428,7 +428,7 @@ export class PullRequestsService {
     };
   }
 
-  /** The PR as a ZASTAVA review starts from it: fresh from GitHub, never cached. */
+  /** The PR as a YugoTool review starts from it: fresh from GitHub, never cached. */
   async reviewSnapshot(projectId: string, number: number): Promise<PullRequestReviewSnapshot> {
     const repo = await this.repo(projectId);
     const data = await this.github

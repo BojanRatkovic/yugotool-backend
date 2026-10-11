@@ -12,11 +12,11 @@ import {
   pullRequestListSchema,
   postFindingsSchema,
   startReviewSchema,
-  zastavaReviewBriefListSchema,
-  zastavaReviewQuerySchema,
-  zastavaReviewResultSchema,
-  zastavaReviewSchema,
-} from "@zastava/contracts";
+  yugotoolReviewBriefListSchema,
+  yugotoolReviewQuerySchema,
+  yugotoolReviewResultSchema,
+  yugotoolReviewSchema,
+} from "@yugotool/contracts";
 import { createZodDto } from "nestjs-zod";
 
 export class PullRequestListDto extends createZodDto(pullRequestListSchema) {}
@@ -31,8 +31,8 @@ export class PrSubmitReviewInputDto extends createZodDto(prSubmitReviewInputSche
 export class PrViewedInputDto extends createZodDto(prViewedInputSchema) {}
 export class PrMergeInputDto extends createZodDto(prMergeInputSchema) {}
 export class StartReviewDto extends createZodDto(startReviewSchema) {}
-export class ZastavaReviewDto extends createZodDto(zastavaReviewSchema) {}
-export class ZastavaReviewResultDto extends createZodDto(zastavaReviewResultSchema) {}
-export class ZastavaReviewQueryDto extends createZodDto(zastavaReviewQuerySchema) {}
+export class YugoToolReviewDto extends createZodDto(yugotoolReviewSchema) {}
+export class YugoToolReviewResultDto extends createZodDto(yugotoolReviewResultSchema) {}
+export class YugoToolReviewQueryDto extends createZodDto(yugotoolReviewQuerySchema) {}
 export class PostFindingsDto extends createZodDto(postFindingsSchema) {}
-export class ZastavaReviewBriefListDto extends createZodDto(zastavaReviewBriefListSchema) {}
+export class YugoToolReviewBriefListDto extends createZodDto(yugotoolReviewBriefListSchema) {}

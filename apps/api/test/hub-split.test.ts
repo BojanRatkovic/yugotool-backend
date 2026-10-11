@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type { WorkOrder } from "@zastava/contracts";
+import type { WorkOrder } from "@yugotool/contracts";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { repoProblem, splitProblem } from "../src/modules/work-orders/hub-work";
 import {
@@ -11,7 +11,7 @@ import {
 } from "../src/modules/work-orders/work-order.errors";
 import { WorkOrdersService } from "../src/modules/work-orders/work-orders.service";
 
-const root = mkdtempSync(path.join(os.tmpdir(), "zastava-api-split-"));
+const root = mkdtempSync(path.join(os.tmpdir(), "yugotool-api-split-"));
 const hub = path.join(root, "hub");
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 beforeAll(() => {

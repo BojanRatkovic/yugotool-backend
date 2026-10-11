@@ -11,7 +11,7 @@ import {
   Query,
 } from "@nestjs/common";
 import { ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
-import type { NeedsYouItem, OpenPullRequestResult, WorkOrder } from "@zastava/contracts";
+import type { NeedsYouItem, OpenPullRequestResult, WorkOrder } from "@yugotool/contracts";
 import {
   CreateWorkOrderDto,
   EnqueueDto,

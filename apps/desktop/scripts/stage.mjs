@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * Lays out what goes inside ZASTAVA.app for one CPU architecture:
+ * Lays out what goes inside YugoTool.app for one CPU architecture:
  *
  *   .stage/<arch>/app        the app folder electron-builder packs
  *     package.json           manifest: name, version, main, pinned prod deps
  *     apps/{api,worker,supervisor,desktop}/dist   built JS
  *     packages/db/migrations  SQL the supervisor applies on start
- *     node_modules/          flat npm install for <arch> + @zastava/* copies
+ *     node_modules/          flat npm install for <arch> + @yugotool/* copies
  *     runtime.json           Claude Code + temporal CLI to fetch on first start (spec 0017)
  *
  * pnpm's symlinked store does not survive packing, so production deps are
@@ -36,7 +36,7 @@ if (arch !== "arm64" && arch !== "x64") throw new Error(`unsupported arch ${arch
 
 const desktop = path.resolve(import.meta.dirname, "..");
 const backend = path.resolve(desktop, "..", "..");
-const frontendDist = path.resolve(backend, "..", "zastava-frontend", "dist");
+const frontendDist = path.resolve(backend, "..", "yugotool-frontend", "dist");
 const stage = path.join(desktop, ".stage", arch);
 const app = path.join(stage, "app");
 
@@ -48,7 +48,7 @@ const step = (text) => console.log(`[stage ${arch}] ${text}`);
 /** Run as entry points by path (supervisor spawns api + worker; Electron loads desktop). */
 const APPS = ["api", "worker", "desktop"];
 /**
- * Imported as @zastava/<name>; installed into node_modules from local copies.
+ * Imported as @yugotool/<name>; installed into node_modules from local copies.
  * Every `workspace:` dependency the apps reach, so a new package can't be left out.
  */
 const PACKAGES = {};
@@ -155,8 +155,8 @@ writeFileSync(
   path.join(app, "package.json"),
   `${JSON.stringify(
     {
-      name: "zastava",
-      productName: "ZASTAVA",
+      name: "yugotool",
+      productName: "YugoTool",
       version: desktopManifest.version,
       description: "Software factory: work orders through a line of Claude Code agent stations.",
       author: "Bojan Ratković <ratkovicbojan94@gmail.com>",
@@ -166,7 +166,7 @@ writeFileSync(
       dependencies: sorted({
         ...deps,
         ...Object.fromEntries(
-          Object.keys(PACKAGES).map((name) => [`@zastava/${name}`, `file:../local/${name}`]),
+          Object.keys(PACKAGES).map((name) => [`@yugotool/${name}`, `file:../local/${name}`]),
         ),
       }),
       optionalDependencies: sorted(optionalDeps),
@@ -235,7 +235,7 @@ execFileSync(
 
 // ── Runtime fetched on first start (spec 0017) ───────────────────────────────
 // The two biggest binaries stay out of the app (−345 MB): runtime.json names
-// them, the supervisor downloads and checks them into ~/.zastava/runtime.
+// them, the supervisor downloads and checks them into ~/.yugotool/runtime.
 step("runtime manifest");
 const claudePackage = `@anthropic-ai/claude-agent-sdk-darwin-${arch}`;
 const claudeDir = path.join(app, "node_modules", ...claudePackage.split("/"));

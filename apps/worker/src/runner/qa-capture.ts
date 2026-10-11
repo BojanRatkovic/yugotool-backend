@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
-import { type Preview, QA_VIEWPORTS, type QaTheme, type QaViewport } from "@zastava/contracts";
+import { type Preview, QA_VIEWPORTS, type QaTheme, type QaViewport } from "@yugotool/contracts";
 import pixelmatch from "pixelmatch";
 import { type Browser, chromium, type Page } from "playwright";
 import { PNG } from "pngjs";

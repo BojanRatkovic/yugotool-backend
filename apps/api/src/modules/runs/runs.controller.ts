@@ -12,7 +12,7 @@ import {
   StreamableFile,
 } from "@nestjs/common";
 import { ApiAcceptedResponse, ApiOkResponse, ApiProduces, ApiTags } from "@nestjs/swagger";
-import type { QaRun, Run, RunDiff, RunEvent, RunMemory, Shift } from "@zastava/contracts";
+import type { QaRun, Run, RunDiff, RunEvent, RunMemory, Shift } from "@yugotool/contracts";
 import {
   GateDecisionDto,
   RunDiffDto,

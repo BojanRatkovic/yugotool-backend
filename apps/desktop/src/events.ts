@@ -1,4 +1,4 @@
-import { type ServerEvent, serverEventSchema } from "@zastava/contracts";
+import { type ServerEvent, serverEventSchema } from "@yugotool/contracts";
 
 /** Splits an SSE byte stream into `data:` payloads; keeps the unfinished tail. Pure. */
 export function parseSse(buffer: string): { events: string[]; rest: string } {

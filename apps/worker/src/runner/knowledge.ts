@@ -4,12 +4,12 @@ import { copyFile, mkdir, readdir, rename, rm, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import type { KnowledgeMount, KnowledgeSourceKind } from "@zastava/contracts";
+import type { KnowledgeMount, KnowledgeSourceKind } from "@yugotool/contracts";
 
 const exec = promisify(execFile);
 
 /** Snapshots live outside every repo; agents get read access to one per source. */
-export const KNOWLEDGE_ROOT = path.join(os.homedir(), ".zastava", "knowledge");
+export const KNOWLEDGE_ROOT = path.join(os.homedir(), ".yugotool", "knowledge");
 
 /** Snapshots kept per source: the current one and a couple that runs may still read. */
 const KEEP_SNAPSHOTS = 3;

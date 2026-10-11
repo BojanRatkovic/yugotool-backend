@@ -3,8 +3,8 @@ import type {
   CreateKnowledgeSource,
   KnowledgeSource,
   UpdateKnowledgeSource,
-} from "@zastava/contracts";
-import { type Executor, knowledgeSources, projectKnowledge, projects } from "@zastava/db";
+} from "@yugotool/contracts";
+import { type Executor, knowledgeSources, projectKnowledge, projects } from "@yugotool/db";
 import { asc, eq, inArray } from "drizzle-orm";
 import { iso } from "../../common/mappers";
 

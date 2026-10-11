@@ -10,7 +10,7 @@ import {
   SHIFT_CONTROL_SIGNAL,
   type ShiftControl,
   type ShiftEndReason,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 import {
   CancellationScope,
   condition,

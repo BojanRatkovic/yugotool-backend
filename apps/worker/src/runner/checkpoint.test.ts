@@ -5,7 +5,7 @@ import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { hookMissingDependencies, localRunner } from "./local-runner";
 
-const dir = mkdtempSync(path.join(os.tmpdir(), "zastava-checkpoint-"));
+const dir = mkdtempSync(path.join(os.tmpdir(), "yugotool-checkpoint-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 const git = (...args: string[]) => execFileSync("git", ["-C", dir, ...args], { stdio: "pipe" });
 
@@ -18,7 +18,7 @@ describe("checkpoint", () => {
     writeFileSync(hook, "#!/bin/sh\necho 'run overcommit --sign' >&2\nexit 1\n");
     chmodSync(hook, 0o755);
     writeFileSync(path.join(dir, "a.rb"), "# doc\n");
-    expect(await localRunner.checkpoint(dir, "zastava: shift 1")).toMatch(/^[0-9a-f]+$/);
+    expect(await localRunner.checkpoint(dir, "yugotool: shift 1")).toMatch(/^[0-9a-f]+$/);
   });
 });
 

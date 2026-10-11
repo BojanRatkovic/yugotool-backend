@@ -1,5 +1,5 @@
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from "@nestjs/common";
-import { enqueueNotification, hasNotificationJobs } from "@zastava/notify";
+import { enqueueNotification, hasNotificationJobs } from "@yugotool/notify";
 import { DatabaseService } from "../../core/database/database.service";
 import { ProjectsService } from "../projects/projects.service";
 import { PullRequestsService } from "./pull-requests.service";

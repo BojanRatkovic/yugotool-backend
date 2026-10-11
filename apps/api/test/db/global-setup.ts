@@ -6,7 +6,7 @@ import { ADMIN_URL, TEST_DB, testDatabaseUrl } from "./test-database";
 const MIGRATIONS = path.resolve(__dirname, "../../../../packages/db/migrations");
 
 /**
- * Recreates `zastava_test` and applies every migration, each in its own
+ * Recreates `yugotool_test` and applies every migration, each in its own
  * transaction (drizzle-kit's single transaction breaks on enum additions).
  * No Postgres = the run fails: a DB suite that skips silently tests nothing.
  */

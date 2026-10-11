@@ -3,7 +3,7 @@ import {
   type AgentStation,
   type PreviousFinding,
   type ReviewVerdict,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 import { describe, expect, it } from "vitest";
 import {
   buildReviewPrompt,
@@ -34,7 +34,7 @@ describe("buildReviewPrompt", () => {
       [{ station: "Lint", text: "ok" }],
     );
     expect(prompt).toContain("#7 Add paging");
-    expect(prompt).toContain(".zastava/review-brief.md");
+    expect(prompt).toContain(".yugotool/review-brief.md");
     expect(prompt).toContain("Never modify");
     expect(prompt).toContain("### Lint\nok");
     expect(prompt).toContain("## Output format");

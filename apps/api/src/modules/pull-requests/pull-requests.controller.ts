@@ -16,10 +16,10 @@ import type {
   PrDiff,
   PullRequestDetail,
   PullRequestList,
-  ZastavaReview,
-  ZastavaReviewBriefList,
-  ZastavaReviewResult,
-} from "@zastava/contracts";
+  YugoToolReview,
+  YugoToolReviewBriefList,
+  YugoToolReviewResult,
+} from "@yugotool/contracts";
 import {
   PostFindingsDto,
   PrCommentInputDto,
@@ -34,10 +34,10 @@ import {
   PullRequestListDto,
   PullRequestListQueryDto,
   StartReviewDto,
-  ZastavaReviewBriefListDto,
-  ZastavaReviewDto,
-  ZastavaReviewQueryDto,
-  ZastavaReviewResultDto,
+  YugoToolReviewBriefListDto,
+  YugoToolReviewDto,
+  YugoToolReviewQueryDto,
+  YugoToolReviewResultDto,
 } from "./pull-requests.dto";
 import { PullRequestReviewsService } from "./pull-request-reviews.service";
 import { PullRequestWritesService } from "./pull-request-writes.service";
@@ -52,14 +52,14 @@ export class PullRequestsController {
     private readonly reviews: PullRequestReviewsService,
   ) {}
 
-  /** The latest ZASTAVA review of the PR (spec 0009); `head` = its current head, for `stale`. */
-  @Get(":number/zastava-review")
-  @ApiOkResponse({ type: ZastavaReviewResultDto })
-  async zastavaReview(
+  /** The latest YugoTool review of the PR (spec 0009); `head` = its current head, for `stale`. */
+  @Get(":number/yugotool-review")
+  @ApiOkResponse({ type: YugoToolReviewResultDto })
+  async yugotoolReview(
     @Param("projectId", ParseUUIDPipe) projectId: string,
     @Param("number", ParseIntPipe) number: number,
-    @Query() query: ZastavaReviewQueryDto,
-  ): Promise<ZastavaReviewResult> {
+    @Query() query: YugoToolReviewQueryDto,
+  ): Promise<YugoToolReviewResult> {
     return { review: await this.reviews.latest(projectId, number, query.head) };
   }
 
@@ -67,25 +67,25 @@ export class PullRequestsController {
    * The kept findings (as edited) into my pending review; never submits.
    * 422 `review_stale` when the PR moved past the reviewed commit.
    */
-  @Post(":number/zastava-review/post")
+  @Post(":number/yugotool-review/post")
   @HttpCode(200)
-  @ApiOkResponse({ type: ZastavaReviewDto })
-  postZastavaFindings(
+  @ApiOkResponse({ type: YugoToolReviewDto })
+  postYugoToolFindings(
     @Param("projectId", ParseUUIDPipe) projectId: string,
     @Param("number", ParseIntPipe) number: number,
     @Body() body: PostFindingsDto,
-  ): Promise<ZastavaReview> {
+  ): Promise<YugoToolReview> {
     return this.reviews.post(projectId, number, body);
   }
 
-  /** Starts a ZASTAVA review on the PR's current head; 409 `review_running` while one runs. */
-  @Post(":number/zastava-review")
-  @ApiOkResponse({ type: ZastavaReviewDto })
-  startZastavaReview(
+  /** Starts a YugoTool review on the PR's current head; 409 `review_running` while one runs. */
+  @Post(":number/yugotool-review")
+  @ApiOkResponse({ type: YugoToolReviewDto })
+  startYugoToolReview(
     @Param("projectId", ParseUUIDPipe) projectId: string,
     @Param("number", ParseIntPipe) number: number,
     @Body() body: StartReviewDto,
-  ): Promise<ZastavaReview> {
+  ): Promise<YugoToolReview> {
     return this.reviews.start(projectId, number, body);
   }
 
@@ -99,12 +99,12 @@ export class PullRequestsController {
     return this.service.list(projectId, query.scope, query.teams);
   }
 
-  /** Every PR's latest ZASTAVA review, for the cards (spec 0009). Before `:number`. */
-  @Get("zastava-reviews")
-  @ApiOkResponse({ type: ZastavaReviewBriefListDto })
-  async zastavaReviews(
+  /** Every PR's latest YugoTool review, for the cards (spec 0009). Before `:number`. */
+  @Get("yugotool-reviews")
+  @ApiOkResponse({ type: YugoToolReviewBriefListDto })
+  async yugotoolReviews(
     @Param("projectId", ParseUUIDPipe) projectId: string,
-  ): Promise<ZastavaReviewBriefList> {
+  ): Promise<YugoToolReviewBriefList> {
     return { items: await this.reviews.briefs(projectId) };
   }
 

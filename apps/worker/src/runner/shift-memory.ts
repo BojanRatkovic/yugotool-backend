@@ -2,12 +2,12 @@ import { execFile } from "node:child_process";
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
-import { parseShiftTasks, type ShiftTask } from "@zastava/contracts";
+import { parseShiftTasks, type ShiftTask } from "@yugotool/contracts";
 
 const exec = promisify(execFile);
 
 /** Durable memory of a shift station, inside the run's worktree; never committed. */
-export const MEMORY_DIR = ".zastava";
+export const MEMORY_DIR = ".yugotool";
 
 const memoryPath = (worktreePath: string, file: string): string =>
   path.join(worktreePath, MEMORY_DIR, file);
@@ -21,7 +21,7 @@ async function readOptional(file: string): Promise<string | null> {
 }
 
 export const shiftMemory = {
-  /** Writes goal.md and keeps `.zastava/` out of git (info/exclude is shared by all worktrees). */
+  /** Writes goal.md and keeps `.yugotool/` out of git (info/exclude is shared by all worktrees). */
   async prepare(worktreePath: string, goal: string): Promise<void> {
     await mkdir(path.join(worktreePath, MEMORY_DIR), { recursive: true });
     await writeFile(memoryPath(worktreePath, "goal.md"), `${goal}\n`);

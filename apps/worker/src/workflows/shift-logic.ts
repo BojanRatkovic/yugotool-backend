@@ -4,7 +4,7 @@ import {
   DEFAULT_SHIFT_SETTINGS,
   type Handoff,
   type ShiftStation,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 
 /** Used until the session reports its real window. */
 export const DEFAULT_CONTEXT_WINDOW = 200_000;
@@ -177,10 +177,10 @@ export function buildShiftPrompt(input: {
   const { station } = input;
   const start = input.previousHandoff
     ? `## Handoff from the previous shift\n\n${renderHandoff(input.previousHandoff)}`
-    : '## First shift\nCreate `.zastava/tasks.json` from the goal: a JSON array of `{ id, title, status: "todo" | "doing" | "done", notes }`, small enough that each task is one focused step. Then start on the first task.';
+    : '## First shift\nCreate `.yugotool/tasks.json` from the goal: a JSON array of `{ id, title, status: "todo" | "doing" | "done", notes }`, small enough that each task is one focused step. Then start on the first task.';
   return [
     `# Shift ${input.number} of at most ${station.maxShifts}`,
-    "You work in shifts. Your memory lives on disk, not in this conversation: `.zastava/goal.md`, `.zastava/tasks.json`, `.zastava/progress.md`, `.zastava/learnings.md`. When this session's context fills up you will be asked for a handoff and a fresh session continues from it.",
+    "You work in shifts. Your memory lives on disk, not in this conversation: `.yugotool/goal.md`, `.yugotool/tasks.json`, `.yugotool/progress.md`, `.yugotool/learnings.md`. When this session's context fills up you will be asked for a handoff and a fresh session continues from it.",
     input.goal,
     start,
     input.recentProgress ? `## Recent progress\n\n${input.recentProgress}` : "",
@@ -191,8 +191,8 @@ export function buildShiftPrompt(input: {
         ? `1. Start by running \`${station.doneCommand}\` to see the current state.`
         : "1. Start by checking the current state of the code against the tasks.",
       "2. Work through tasks.json in order; mark a task `doing` when you start it and `done` when it is finished and verified. Update tasks.json as you go — it is how the next shift knows where you are.",
-      "3. Leave the code in a working state after each task. Do not commit; ZASTAVA commits a checkpoint at the end of every shift.",
-      "4. Do not edit `.zastava/progress.md` or `.zastava/learnings.md`; ZASTAVA writes them from your handoff.",
+      "3. Leave the code in a working state after each task. Do not commit; YugoTool commits a checkpoint at the end of every shift.",
+      "4. Do not edit `.yugotool/progress.md` or `.yugotool/learnings.md`; YugoTool writes them from your handoff.",
       station.doneCommand
         ? `5. When every task is done and \`${station.doneCommand}\` passes, stop and summarize.`
         : "5. When every task is done, stop and summarize.",
@@ -214,7 +214,7 @@ export function buildHandoffPrompt(
         : "You stopped, but the goal is not met yet (the done check fails).";
   return [
     why,
-    "1. Update `.zastava/tasks.json` so every task's status is accurate.",
+    "1. Update `.yugotool/tasks.json` so every task's status is accurate.",
     "2. Return the handoff for the next shift: a fresh session that has never seen this conversation. Be concrete and forward-looking — exact file paths, what is half-done, the next steps in order, and traps you hit. Do not describe the past beyond what the next shift needs.",
   ].join("\n\n");
 }

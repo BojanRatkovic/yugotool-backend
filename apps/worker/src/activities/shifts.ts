@@ -10,8 +10,8 @@ import {
   type ShiftEndReason,
   type ShiftStation,
   type NotificationJob,
-} from "@zastava/contracts";
-import { type Database, runs, shifts, stationRuns, workOrders } from "@zastava/db";
+} from "@yugotool/contracts";
+import { type Database, runs, shifts, stationRuns, workOrders } from "@yugotool/db";
 import { eq, sql } from "drizzle-orm";
 import { localRunner } from "../runner/local-runner";
 import { accountNote, claudeAuthFor, withClaudeAuth } from "../claude-env";
@@ -19,7 +19,7 @@ import { sandboxFor } from "../runner/sandbox";
 import { shiftMemory } from "../runner/shift-memory";
 import { skillPlan, skillSection } from "../runner/station-skills";
 import { hubSession } from "../runner/work-hub";
-import { sessionSkills } from "@zastava/skills";
+import { sessionSkills } from "@yugotool/skills";
 import {
   buildHandoffPrompt,
   buildShiftPrompt,
@@ -169,7 +169,7 @@ export function createShiftActivities(db: Database, deps: ShiftDeps) {
       input.endReason;
     const sha = await localRunner.checkpoint(
       input.worktreePath,
-      `zastava: shift ${input.number} — ${firstLine}`,
+      `yugotool: shift ${input.number} — ${firstLine}`,
     );
     if (sha) await deps.appendEvent(input.runId, input.stationRunId, "system", `Checkpoint ${sha}`);
     const commits = await localRunner.commitsSince(input.worktreePath, input.startSha);
@@ -681,7 +681,7 @@ export function createShiftActivities(db: Database, deps: ShiftDeps) {
           summary: output || "The shift ended without a handoff.",
           done: [],
           inProgress: null,
-          nextSteps: ["Re-read .zastava/tasks.json and continue with the first unfinished task."],
+          nextSteps: ["Re-read .yugotool/tasks.json and continue with the first unfinished task."],
           gotchas: [],
           filesToRead: [],
         };

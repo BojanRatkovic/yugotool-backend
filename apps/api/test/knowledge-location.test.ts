@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { expandHome, locationProblem } from "../src/modules/knowledge/knowledge.location";
 
-const dir = mkdtempSync(path.join(os.tmpdir(), "zastava-location-"));
+const dir = mkdtempSync(path.join(os.tmpdir(), "yugotool-location-"));
 const repo = path.join(dir, "repo");
 mkdirSync(path.join(repo, ".git"), { recursive: true });
 afterAll(() => rmSync(dir, { recursive: true, force: true }));

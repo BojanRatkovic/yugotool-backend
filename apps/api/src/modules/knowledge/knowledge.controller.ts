@@ -11,7 +11,7 @@ import {
   Put,
 } from "@nestjs/common";
 import { ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
-import type { KnowledgeSource, ProjectKnowledge } from "@zastava/contracts";
+import type { KnowledgeSource, ProjectKnowledge } from "@yugotool/contracts";
 import {
   CreateKnowledgeSourceDto,
   KnowledgeSourceDto,

@@ -4,9 +4,9 @@ import {
   type PostFindings,
   type StartReview,
   TASK_QUEUE,
-  type ZastavaReview,
-  type ZastavaReviewBrief,
-} from "@zastava/contracts";
+  type YugoToolReview,
+  type YugoToolReviewBrief,
+} from "@yugotool/contracts";
 import { DatabaseService } from "../../core/database/database.service";
 import { EventsService } from "../../core/events/events.service";
 import { TEMPORAL_CLIENT } from "../../core/temporal/temporal.module";
@@ -29,7 +29,7 @@ const REVIEW_RUN_WORKFLOW = "reviewRun";
 const MAX_TITLE = 200;
 const MAX_DESCRIPTION = 20_000;
 
-function toReview(row: ReviewRow, head?: string): ZastavaReview {
+function toReview(row: ReviewRow, head?: string): YugoToolReview {
   return {
     workOrderId: row.workOrderId,
     runId: row.runId,
@@ -45,7 +45,7 @@ function toReview(row: ReviewRow, head?: string): ZastavaReview {
   };
 }
 
-/** ZASTAVA reviews of pull requests (spec 0009): start one, read the latest. */
+/** YugoTool reviews of pull requests (spec 0009): start one, read the latest. */
 @Injectable()
 export class PullRequestReviewsService {
   private readonly logger = new Logger(PullRequestReviewsService.name);
@@ -60,12 +60,12 @@ export class PullRequestReviewsService {
     @Inject(TEMPORAL_CLIENT) private readonly temporal: Client,
   ) {}
 
-  briefs(projectId: string): Promise<ZastavaReviewBrief[]> {
+  briefs(projectId: string): Promise<YugoToolReviewBrief[]> {
     return this.repository.briefs(this.database.db, projectId);
   }
 
   /** The newest review of the PR; `head` (the PR's current head) marks it stale. */
-  async latest(projectId: string, number: number, head?: string): Promise<ZastavaReview | null> {
+  async latest(projectId: string, number: number, head?: string): Promise<YugoToolReview | null> {
     const row = await this.repository.latest(this.database.db, projectId, number);
     return row ? toReview(row, head) : null;
   }
@@ -74,14 +74,14 @@ export class PullRequestReviewsService {
    * Freezes the PR's current head and starts the project's review line on it.
    * Idempotent on the client's id; 409 while another review of the PR runs.
    */
-  async start(projectId: string, number: number, input: StartReview): Promise<ZastavaReview> {
+  async start(projectId: string, number: number, input: StartReview): Promise<YugoToolReview> {
     const db = this.database.db;
     if (input.id && (await this.repository.exists(db, input.id))) {
       const existing = await this.repository.find(db, input.id);
       if (existing) return toReview(existing);
     }
     if (await this.repository.isRunning(db, projectId, number)) {
-      throw new ReviewAlreadyRunningError(`a ZASTAVA review of #${number} is already running`);
+      throw new ReviewAlreadyRunningError(`a YugoTool review of #${number} is already running`);
     }
     const pr = await this.pullRequests.reviewSnapshot(projectId, number);
     if (!pr.open) throw new PullRequestNotOpenError(`pull request #${number} is not open`);
@@ -90,7 +90,7 @@ export class PullRequestReviewsService {
 
     const created = await this.database.transaction(async (tx) => {
       if (await this.repository.isRunning(tx, projectId, number)) {
-        throw new ReviewAlreadyRunningError(`a ZASTAVA review of #${number} is already running`);
+        throw new ReviewAlreadyRunningError(`a YugoTool review of #${number} is already running`);
       }
       const last = await this.repository.lastDoneReview(tx, projectId, number);
       const lastHead = last?.pullRequest.headOid ?? null;
@@ -143,11 +143,11 @@ export class PullRequestReviewsService {
    * GitHub; nothing is submitted. What got in is remembered per finding, also
    * when GitHub refuses one halfway (then 422 with GitHub's message).
    */
-  async post(projectId: string, number: number, input: PostFindings): Promise<ZastavaReview> {
+  async post(projectId: string, number: number, input: PostFindings): Promise<YugoToolReview> {
     const db = this.database.db;
     const row = await this.repository.latest(db, projectId, number);
     if (!row?.verdict || row.runStatus !== "succeeded") {
-      throw new ReviewNotReadyError(`#${number} has no finished ZASTAVA review`);
+      throw new ReviewNotReadyError(`#${number} has no finished YugoTool review`);
     }
     const { plan, unknown } = planPendingReview(row.verdict.findings, input.findings);
     if (unknown.length > 0) {

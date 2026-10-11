@@ -1,6 +1,6 @@
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from "@nestjs/common";
-import type { DispatcherState, PlanUsage, Settings } from "@zastava/contracts";
-import { enqueueNotification } from "@zastava/notify";
+import type { DispatcherState, PlanUsage, Settings } from "@yugotool/contracts";
+import { enqueueNotification } from "@yugotool/notify";
 import { DatabaseService } from "../../core/database/database.service";
 import { EventsService } from "../../core/events/events.service";
 import {

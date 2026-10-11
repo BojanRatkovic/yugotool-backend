@@ -1,4 +1,4 @@
-import { DEFAULT_STATIONS, requestChangesTarget, type Station } from "@zastava/contracts";
+import { DEFAULT_STATIONS, requestChangesTarget, type Station } from "@yugotool/contracts";
 import { describe, expect, it } from "vitest";
 import { buildFollowUp } from "./line-logic";
 

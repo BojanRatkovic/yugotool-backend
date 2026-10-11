@@ -18,7 +18,7 @@ describe("strayListeners", () => {
     const after = [
       { pid: 1, port: "3000", cwd: "/w/run1" },
       { pid: 2, port: "3001", cwd: "/repo/sub" },
-      { pid: 3, port: "4810", cwd: "/zastava/api" },
+      { pid: 3, port: "4810", cwd: "/yugotool/api" },
       { pid: 4, port: "3002", cwd: "/w/run10" },
       { pid: 5, port: "3003", cwd: "/w/run1" },
       { pid: 6, port: "3004", cwd: null },

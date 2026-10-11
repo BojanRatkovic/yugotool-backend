@@ -3,7 +3,7 @@ import os from "node:os";
 import { promisify } from "node:util";
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { claudeAccountEnv } from "@zastava/contracts";
+import { claudeAccountEnv } from "@yugotool/contracts";
 import { z } from "zod";
 import { childProcessEnv, type Env } from "../../core/config/env.schema";
 
@@ -71,7 +71,7 @@ export class ClaudeCli {
     return spawn(this.bin(), args, { env: this.envFor(configDir), stdio: "pipe" });
   }
 
-  /** Best effort: drops the dir's keychain item before ZASTAVA deletes a dir it created. */
+  /** Best effort: drops the dir's keychain item before YugoTool deletes a dir it created. */
   async logout(configDir: string): Promise<void> {
     await exec(this.bin(), ["auth", "logout"], {
       env: this.envFor(configDir),

@@ -26,7 +26,7 @@ export async function removeProjectFiles(input: {
 }
 
 /**
- * Removes runs' worktrees (only under ~/.zastava/worktrees or the work hub's
+ * Removes runs' worktrees (only under ~/.yugotool/worktrees or the work hub's
  * worktrees/, unregistered from their repo) and their artifacts. Branches in
  * the repo are kept. Best effort: returns what failed.
  */

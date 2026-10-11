@@ -5,7 +5,7 @@ import {
   type Notification,
   type NotificationJob,
   type ServerEvent,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 import { ZodValidationPipe } from "nestjs-zod";
 import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";

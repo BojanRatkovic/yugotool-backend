@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type { KnowledgeSourceKind } from "@zastava/contracts";
+import type { KnowledgeSourceKind } from "@yugotool/contracts";
 
 /** `~/x` → absolute; everything else resolved as given. Pure but for the home dir. */
 export function expandHome(location: string): string {

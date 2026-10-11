@@ -1,5 +1,5 @@
 // Deterministic workflow code ONLY — no Node APIs, no I/O, no Date/Math.random.
-import type { KnowledgeMount, ReviewFinding } from "@zastava/contracts";
+import type { KnowledgeMount, ReviewFinding } from "@yugotool/contracts";
 import { CancellationScope, isCancellation, proxyActivities } from "@temporalio/workflow";
 import type { Activities, AgentStationResult, QaResult } from "../activities";
 import type { StationNote } from "./line-logic";

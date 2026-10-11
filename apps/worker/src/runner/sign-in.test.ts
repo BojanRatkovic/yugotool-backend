@@ -1,4 +1,4 @@
-import { summarizeStorageState, storageStateSchema } from "@zastava/contracts";
+import { summarizeStorageState, storageStateSchema } from "@yugotool/contracts";
 import { describe, expect, it } from "vitest";
 import { BrowserTrace, hasState, redactUrl, type StorageState } from "./sign-in";
 

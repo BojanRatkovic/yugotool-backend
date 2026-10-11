@@ -14,9 +14,9 @@
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "paths": {
-      "@zastava/contracts": ["./packages/contracts/src/index.ts"],
-      "@zastava/db": ["./packages/db/src/index.ts"],
-      "@zastava/notify": ["./packages/notify/src/index.ts"]
+      "@yugotool/contracts": ["./packages/contracts/src/index.ts"],
+      "@yugotool/db": ["./packages/db/src/index.ts"],
+      "@yugotool/notify": ["./packages/notify/src/index.ts"]
     },
     "declaration": true,
     "declarationMap": true,

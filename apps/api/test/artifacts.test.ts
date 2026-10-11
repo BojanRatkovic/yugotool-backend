@@ -9,7 +9,7 @@ describe("resolveInside", () => {
   let outside: string;
 
   beforeAll(async () => {
-    const tmp = await mkdtemp(path.join(os.tmpdir(), "zastava-artifacts-"));
+    const tmp = await mkdtemp(path.join(os.tmpdir(), "yugotool-artifacts-"));
     root = path.join(tmp, "run");
     outside = path.join(tmp, "secret.txt");
     await mkdir(path.join(root, "qa", "1"), { recursive: true });

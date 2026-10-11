@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { previewSchema } from "@zastava/contracts";
+import { previewSchema } from "@yugotool/contracts";
 import { previewOrigin, stripAnsi } from "./preview";
 
 describe("stripAnsi", () => {

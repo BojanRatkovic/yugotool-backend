@@ -8,7 +8,7 @@ import {
   startClaudeLoginSchema,
   updateProjectSchema,
   updateSettingsSchema,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 import { describe, expect, it } from "vitest";
 
 const ID = "0199d0a4-0000-7000-8000-000000000001";
@@ -104,9 +104,9 @@ describe("claudeAccountEnv (spec 0016)", () => {
   });
 
   it("points a config dir account at its dir and drops the env API key", () => {
-    expect(claudeAccountEnv(base, dir("/u/.zastava/accounts/a/"), "/u")).toEqual({
+    expect(claudeAccountEnv(base, dir("/u/.yugotool/accounts/a/"), "/u")).toEqual({
       PATH: "/bin",
-      CLAUDE_CONFIG_DIR: "/u/.zastava/accounts/a",
+      CLAUDE_CONFIG_DIR: "/u/.yugotool/accounts/a",
     });
   });
 

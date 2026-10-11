@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { z } from "zod";
 
-/** What the desktop shell remembers between launches (`~/.zastava/desktop.json`). */
+/** What the desktop shell remembers between launches (`~/.yugotool/desktop.json`). */
 const prefsSchema = z.object({
   /** The web app's theme, so the loading screen and window chrome match it before the app loads. */
   theme: z.enum(["dark", "light"]).default("dark"),
@@ -34,6 +34,6 @@ export function quitWarning(running: string[]): { message: string; detail: strin
       running.length === 1
         ? "A work order is running"
         : `${running.length} work orders are running`,
-    detail: `${shown.join("\n")}\n\nQuitting stops their agents mid-session and those runs fail. You can retry them after you reopen ZASTAVA.`,
+    detail: `${shown.join("\n")}\n\nQuitting stops their agents mid-session and those runs fail. You can retry them after you reopen YugoTool.`,
   };
 }

@@ -6,7 +6,7 @@ import {
   type OnModuleInit,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { EVENTS_CHANNEL, type ServerEvent, serverEventSchema } from "@zastava/contracts";
+import { EVENTS_CHANNEL, type ServerEvent, serverEventSchema } from "@yugotool/contracts";
 import { sql } from "drizzle-orm";
 import { Client } from "pg";
 import { Subject, type Observable } from "rxjs";

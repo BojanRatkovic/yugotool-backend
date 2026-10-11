@@ -4,7 +4,7 @@ import type {
   NotificationListQuery,
   NotificationPage,
   UnreadCount,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 import { DatabaseService } from "../../core/database/database.service";
 import { EventsService } from "../../core/events/events.service";
 import { NotificationsRepository } from "./notifications.repository";

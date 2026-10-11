@@ -16,9 +16,9 @@ const git = (cwd: string, ...args: string[]) =>
   execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8" }).trim();
 
 function repo(): string {
-  const dir = mkdtempSync(path.join(tmpdir(), "zastava-uncommit-"));
+  const dir = mkdtempSync(path.join(tmpdir(), "yugotool-uncommit-"));
   git(dir, "init", "-q", "-b", "main");
-  git(dir, "config", "user.email", "test@zastava.local");
+  git(dir, "config", "user.email", "test@yugotool.local");
   git(dir, "config", "user.name", "test");
   writeFileSync(path.join(dir, "a.txt"), "base\n");
   git(dir, "add", "-A");
@@ -55,7 +55,7 @@ describe("moveNewUntracked", () => {
     writeFileSync(path.join(dir, "mine.txt"), "user\n");
     const before = await localRunner.untrackedFiles(dir);
     writeFileSync(path.join(dir, "s1_focused.png"), "png");
-    const out = mkdtempSync(path.join(tmpdir(), "zastava-artifacts-"));
+    const out = mkdtempSync(path.join(tmpdir(), "yugotool-artifacts-"));
 
     expect(await localRunner.moveNewUntracked(dir, before, out)).toEqual(["s1_focused.png"]);
     expect(git(dir, "status", "--porcelain")).toBe("?? mine.txt");
@@ -89,18 +89,18 @@ describe("checkCommitMessage", () => {
 describe("archiveWorkspace", () => {
   it("commits unfinished work to the branch, keeps the memory, removes the worktree", async () => {
     const dir = repo();
-    const tree = path.join(mkdtempSync(path.join(tmpdir(), "zastava-archive-")), "wt");
-    git(dir, "worktree", "add", "-q", "-b", "zastava/task-1", tree);
+    const tree = path.join(mkdtempSync(path.join(tmpdir(), "yugotool-archive-")), "wt");
+    git(dir, "worktree", "add", "-q", "-b", "yugotool/task-1", tree);
     writeFileSync(path.join(tree, "a.txt"), "half done\n");
     writeFileSync(path.join(tree, "new.txt"), "draft\n");
     // A pre-commit hook must not block the snapshot.
     const hook = path.join(dir, ".git", "hooks", "pre-commit");
     writeFileSync(hook, "#!/bin/sh\nexit 1\n");
     chmodSync(hook, 0o755);
-    mkdirSync(path.join(tree, ".zastava"));
-    writeFileSync(path.join(tree, ".zastava", "progress.md"), "step 2\n");
-    writeFileSync(path.join(dir, ".git", "info", "exclude"), ".zastava/\n");
-    const memoryDir = path.join(mkdtempSync(path.join(tmpdir(), "zastava-mem-")), "memory");
+    mkdirSync(path.join(tree, ".yugotool"));
+    writeFileSync(path.join(tree, ".yugotool", "progress.md"), "step 2\n");
+    writeFileSync(path.join(dir, ".git", "info", "exclude"), ".yugotool/\n");
+    const memoryDir = path.join(mkdtempSync(path.join(tmpdir(), "yugotool-mem-")), "memory");
 
     const snapshot = await localRunner.archiveWorkspace({
       repoPath: dir,
@@ -112,17 +112,17 @@ describe("archiveWorkspace", () => {
     expect(snapshot).toMatch(/^[0-9a-f]{7,}$/);
     expect(existsSync(tree)).toBe(false);
     expect(git(dir, "worktree", "list")).not.toContain(tree);
-    expect(git(dir, "show", "zastava/task-1:a.txt")).toBe("half done");
-    expect(git(dir, "show", "zastava/task-1:new.txt")).toBe("draft");
-    expect(git(dir, "log", "-1", "--format=%s", "zastava/task-1")).toBe("wip: unfinished");
+    expect(git(dir, "show", "yugotool/task-1:a.txt")).toBe("half done");
+    expect(git(dir, "show", "yugotool/task-1:new.txt")).toBe("draft");
+    expect(git(dir, "log", "-1", "--format=%s", "yugotool/task-1")).toBe("wip: unfinished");
     expect(readFileSync(path.join(memoryDir, "progress.md"), "utf8")).toBe("step 2\n");
   });
 
   it("removes a clean worktree without a commit", async () => {
     const dir = repo();
-    const tree = path.join(mkdtempSync(path.join(tmpdir(), "zastava-archive-")), "wt");
-    git(dir, "worktree", "add", "-q", "-b", "zastava/task-2", tree);
-    const head = git(dir, "rev-parse", "zastava/task-2");
+    const tree = path.join(mkdtempSync(path.join(tmpdir(), "yugotool-archive-")), "wt");
+    git(dir, "worktree", "add", "-q", "-b", "yugotool/task-2", tree);
+    const head = git(dir, "rev-parse", "yugotool/task-2");
     const memoryDir = path.join(tree, "..", "memory");
     expect(
       await localRunner.archiveWorkspace({
@@ -133,6 +133,6 @@ describe("archiveWorkspace", () => {
       }),
     ).toBeNull();
     expect(existsSync(tree)).toBe(false);
-    expect(git(dir, "rev-parse", "zastava/task-2")).toBe(head);
+    expect(git(dir, "rev-parse", "yugotool/task-2")).toBe(head);
   });
 });

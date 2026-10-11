@@ -9,7 +9,7 @@ import {
   planUsageSchema,
   type SystemInfo,
   systemInfoSchema,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 import { createZodDto } from "nestjs-zod";
 import { ClaudeAccountsService } from "../claude-accounts/claude-accounts.service";
 import { ReposService } from "../repos/repos.service";

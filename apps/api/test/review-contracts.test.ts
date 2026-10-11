@@ -7,7 +7,7 @@ import {
   reviewVerdictSchema,
   updateLineSchema,
   updateReviewLineSchema,
-} from "@zastava/contracts";
+} from "@yugotool/contracts";
 import { describe, expect, it } from "vitest";
 
 const finding = {

@@ -1,4 +1,4 @@
-import type { CiCheck } from "@zastava/contracts";
+import type { CiCheck } from "@yugotool/contracts";
 import { describe, expect, it } from "vitest";
 import {
   CI_MIN_WAIT_MS,
