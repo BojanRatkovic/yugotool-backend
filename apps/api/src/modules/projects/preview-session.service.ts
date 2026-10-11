@@ -12,6 +12,7 @@ import {
   TASK_QUEUE,
 } from "@yugotool/contracts";
 import {
+  previewSessionCopiesDir,
   previewSessionFile,
   previewSignInFile,
   previewSignInFinishFile,
@@ -97,6 +98,7 @@ export class PreviewSessionService {
   async forget(projectId: string): Promise<void> {
     await this.project(projectId);
     await rm(previewSessionFile(projectId), { force: true });
+    await rm(previewSessionCopiesDir(projectId), { recursive: true, force: true });
     await this.events.publish({ type: "invalidate", collection: "projects" });
   }
 

@@ -530,7 +530,12 @@ export type ProjectRemote = z.infer<typeof projectRemoteSchema>;
 export const previewSessionSchema = z.object({
   savedAt: isoDate,
   cookieCount: z.number().int(),
-  /** Cookie domains and localStorage origins, for "signed in to …". */
+  /** localStorage entries; apps that keep their token there have no cookies at all. */
+  storageKeys: z.number().int(),
+  /**
+   * Cookie domains and localStorage hosts, for "signed in to …". Without
+   * ports: the worker moves the session to each preview's ports.
+   */
   domains: z.array(z.string()),
 });
 export type PreviewSession = z.infer<typeof previewSessionSchema>;
@@ -543,19 +548,22 @@ export const storageStateSchema = z.object({
     .array(z.object({ origin: z.string(), localStorage: z.array(z.unknown()).default([]) }).loose())
     .default([]),
 });
-export type StorageStateSummary = Pick<PreviewSession, "cookieCount" | "domains">;
+export type StorageStateSummary = Pick<PreviewSession, "cookieCount" | "storageKeys" | "domains">;
 
-/** Cookie count and where the session applies: cookie domains + localStorage hosts. */
+/** Cookie and localStorage counts, and where the session applies: cookie domains + localStorage hosts. */
 export function summarizeStorageState(
   state: z.infer<typeof storageStateSchema>,
 ): StorageStateSummary {
+  const stored = state.origins.filter((o) => o.localStorage.length > 0);
   const hosts = [
     ...state.cookies.map((c) => c.domain.replace(/^\./, "")),
-    ...state.origins
-      .filter((o) => o.localStorage.length > 0)
-      .map((o) => o.origin.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "").replace(/\/.*$/, "")),
+    ...stored.map((o) => o.origin.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "").replace(/[:/].*$/, "")),
   ];
-  return { cookieCount: state.cookies.length, domains: [...new Set(hosts)].toSorted() };
+  return {
+    cookieCount: state.cookies.length,
+    storageKeys: stored.reduce((sum, o) => sum + o.localStorage.length, 0),
+    domains: [...new Set(hosts)].toSorted(),
+  };
 }
 
 export const previewSignInSchema = z.object({

@@ -1,6 +1,12 @@
-import { existsSync } from "node:fs";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { yugotoolHome } from "./home";
+import {
+  parseSavedSession,
+  type PreviewPlace,
+  retargetSession,
+  type StorageState,
+} from "./sign-in";
 
 /** Screenshots and other run outputs; never inside a worktree, never committed. */
 export const ARTIFACTS_ROOT = path.join(yugotoolHome(), "artifacts");
@@ -29,8 +35,42 @@ export function previewSignInFinishFile(projectId: string): string {
   return path.join(previewTestDir(projectId), "sign-in-finish.json");
 }
 
-/** The saved session to start browsers with, or null when the project has none. */
-export function existingSession(projectId: string): string | null {
-  const file = previewSessionFile(projectId);
-  return existsSync(file) ? file : null;
+/** Copies of the session moved to one running preview, for browsers that need a file. */
+export function previewSessionCopiesDir(projectId: string): string {
+  return path.join(previewTestDir(projectId), "sessions");
+}
+
+/**
+ * The saved session moved to the preview at `place` (see retargetSession),
+ * or null when the project has none or the file is unreadable.
+ */
+export async function sessionFor(
+  projectId: string,
+  place: PreviewPlace,
+): Promise<StorageState | null> {
+  const raw = await readFile(previewSessionFile(projectId), "utf8").catch(() => null);
+  const saved = raw ? parseSavedSession(raw) : null;
+  return saved ? retargetSession(saved, place) : null;
+}
+
+/**
+ * sessionFor written to a file (0600) for a browser that only takes a path,
+ * like the judge's Playwright MCP. Remove it with `rm` once that browser is done.
+ */
+export async function sessionFileFor(
+  projectId: string,
+  place: PreviewPlace,
+): Promise<string | null> {
+  const state = await sessionFor(projectId, place);
+  if (!state) return null;
+  const dir = previewSessionCopiesDir(projectId);
+  await mkdir(dir, { recursive: true, mode: 0o700 });
+  const file = path.join(dir, `${place.port}.json`);
+  await writeFile(file, JSON.stringify(state), { mode: 0o600 });
+  return file;
+}
+
+/** Removes a sessionFileFor copy; never throws. */
+export async function dropSessionFile(file: string | null): Promise<void> {
+  if (file) await rm(file, { force: true }).catch(() => undefined);
 }

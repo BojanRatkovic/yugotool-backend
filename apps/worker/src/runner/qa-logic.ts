@@ -264,6 +264,8 @@ export function buildJudgePrompt(input: {
   scenarios?: (PlannedScenario & { ref: string })[];
   /** False when the planner did not run or failed: the judge explores from "/". */
   planned?: boolean;
+  /** True when captures and the browser start with the project's saved sign-in. */
+  signedIn?: boolean;
 }): string {
   const scenarios = input.scenarios ?? [];
   const changed = input.checks.filter((c) => c.status !== "pass");
@@ -311,8 +313,11 @@ export function buildJudgePrompt(input: {
       "1. Open the base, pr and diff screenshots of every changed check with the Read tool and compare them. Do not open unchanged ones.",
       "2. Mark each changed check `intended` (the work order asked for it and it looks right) or `fail` (a regression, broken layout, overlap, cut-off text, an error, or the requested change looks wrong). Give a concrete reason in `note`.",
       input.interactive
-        ? `3. The app on this branch runs at ${input.prUrl}. Use the browser tools to verify the work order's acceptance criteria ("Done when", or what the description asks for) like a QA engineer: open the page, click, type, submit. Take a screenshot (browser_take_screenshot) of each important state. Report each listed scenario with its ref (s1, s2, …) and any other scenario you checked with ref null; status pass or fail, and the path. Stay on ${input.prUrl}; other origins are blocked.`
+        ? `3. The app on this branch runs at ${input.prUrl}. Use the browser tools to verify the work order's acceptance criteria ("Done when", or what the description asks for) like a QA engineer: open the page, click, type, submit. Take a screenshot (browser_take_screenshot) of each important state. Report each listed scenario with its ref (s1, s2, …) and any other scenario you checked with ref null; status pass or fail, and the path. Stay on ${input.prUrl}; other origins are blocked, except the app's own mock API on the second preview port.`
         : "3. Do not use a browser; judge from the screenshots only.",
+      input.signedIn
+        ? "If screens show the app's sign-in page, the saved sign-in no longer works: do not judge those screens as regressions; say in `summary` that the user should click Sign in again under Project settings → Preview."
+        : "The app runs signed out (no saved sign-in). If screens only show its sign-in page, do not judge them as regressions; say in `summary` that the user should sign in once under Project settings → Preview.",
       "4. If the work order asked for a visible change and no screen changed, that is a `fail` (ref null) unless the change is not visible by nature.",
       "5. verdict is `fail` when any check is `fail` with severity critical or important; minor problems alone pass. Keep `summary` to 1–3 sentences.",
     ].join("\n"),

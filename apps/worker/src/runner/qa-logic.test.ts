@@ -213,6 +213,20 @@ describe("prompts and reports", () => {
     expect(buildJudgePrompt({ ...base, planned: false })).toContain("## No plan");
   });
 
+  it("tells the judge what a sign-in page means", () => {
+    const base = {
+      title: "t",
+      description: "d",
+      diffStat: "",
+      checks: [],
+      prUrl: "http://localhost:5555",
+      interactive: true,
+      previousReport: null,
+    };
+    expect(buildJudgePrompt({ ...base, signedIn: true })).toContain("click Sign in again");
+    expect(buildJudgePrompt({ ...base, signedIn: false })).toContain("sign in once");
+  });
+
   it("builds a builder report from failing checks only", () => {
     const report = buildQaReport("layout broken", [
       { ...check, status: "fail", note: "button overflows", severity: "critical" },

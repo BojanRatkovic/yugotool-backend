@@ -8,6 +8,7 @@ import pixelmatch from "pixelmatch";
 import { type Browser, chromium, type Page } from "playwright";
 import { PNG } from "pngjs";
 import { previewUrl, withPorts } from "./preview";
+import type { StorageState } from "./sign-in";
 
 const exec = promisify(execFile);
 
@@ -96,8 +97,8 @@ export async function capturePage(input: {
   viewport: QaViewport;
   theme: QaTheme;
   file: string;
-  /** Saved sign-in (storage state file) the page starts with; null: signed out. */
-  session?: string | null;
+  /** Saved sign-in, moved to this preview (sessionFor); null: signed out. */
+  session?: StorageState | null;
 }): Promise<Capture> {
   const size = QA_VIEWPORTS[input.viewport];
   const context = await input.browser.newContext({
