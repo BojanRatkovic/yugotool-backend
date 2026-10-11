@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { pathViolation } from "./tool-confinement";
+import { deliveryViolation as delivery } from "./tool-confinement";
 
 const wt = "/Users/me/.zastava/worktrees/run1";
 
@@ -29,5 +30,27 @@ describe("pathViolation", () => {
   it("ignores tools without paths", () => {
     expect(pathViolation("Bash", { command: "rm -rf /" }, wt)).toBeNull();
     expect(pathViolation("mcp__playwright__browser_click", { ref: "e1" }, wt)).toBeNull();
+  });
+});
+
+describe("delivery commands", () => {
+  it("refuses commit, push and opening a PR, and nothing else", () => {
+    for (const command of [
+      "git commit -m x",
+      "git -C repo push origin HEAD",
+      "cd api && git push",
+      "gh pr create --fill",
+      "rubocop -a; git commit -am fix",
+    ])
+      expect(delivery("Bash", { command })).not.toBeNull();
+    for (const command of [
+      "git status",
+      "git log --oneline",
+      "git diff",
+      "echo 'git commit later'x",
+      "gh pr view 1",
+    ])
+      expect(delivery("Bash", { command })).toBeNull();
+    expect(delivery("Read", { command: "git push" })).toBeNull();
   });
 });

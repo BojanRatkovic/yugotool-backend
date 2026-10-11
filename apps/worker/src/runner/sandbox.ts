@@ -4,7 +4,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import type { HookCallback, Options } from "@anthropic-ai/claude-agent-sdk";
 import { pinnedNodeEnv } from "./node-versions";
-import { pathViolation } from "./tool-confinement";
+import { deliveryViolation, pathViolation } from "./tool-confinement";
 
 const exec = promisify(execFile);
 
@@ -63,13 +63,15 @@ export async function sandboxFor(
   // The sandbox covers Bash only; file tools are confined by this hook.
   const confine: HookCallback = async (input) => {
     if (input.hook_event_name !== "PreToolUse") return {};
-    const reason = pathViolation(
-      input.tool_name,
-      input.tool_input,
-      worktreePath,
-      options.readRoots,
-      options.readOnly,
-    );
+    const reason =
+      deliveryViolation(input.tool_name, input.tool_input) ??
+      pathViolation(
+        input.tool_name,
+        input.tool_input,
+        worktreePath,
+        options.readRoots,
+        options.readOnly,
+      );
     return reason
       ? {
           hookSpecificOutput: {

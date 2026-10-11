@@ -2,6 +2,7 @@
 // the API (for `/` autocomplete) and by the worker (to tell a session which
 // of the named ones to load), with the same rules the worker loads them by.
 import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import type { ProjectSkill } from "@zastava/contracts";
 
@@ -85,7 +86,89 @@ function skillsIn(
   });
 }
 
+/** Where Claude Code keeps the person's settings and installed plugins. */
+const claudeConfigDir = (): string =>
+  process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), ".claude");
+
+function readJson(file: string): unknown {
+  try {
+    return JSON.parse(readFileSync(file, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+const record = (value: unknown): Record<string, unknown> =>
+  typeof value === "object" && value !== null ? Object.fromEntries(Object.entries(value)) : {};
+
+/**
+ * Plugins the person installed and enabled in their own Claude Code
+ * (`name@marketplace`), by plugin name. Agents load project settings only, so
+ * these reach a session only when a hub asks for them (`hubUserPlugins`).
+ */
+export function enabledUserPlugins(configDir = claudeConfigDir()): Map<string, string> {
+  const enabled = record(record(readJson(path.join(configDir, "settings.json"))).enabledPlugins);
+  const installed = record(
+    record(readJson(path.join(configDir, "plugins", "installed_plugins.json"))).plugins,
+  );
+  const found = new Map<string, string>();
+  for (const [key, on] of Object.entries(enabled)) {
+    if (on !== true) continue;
+    const entries = installed[key];
+    const first: unknown = Array.isArray(entries) ? entries[0] : null;
+    const installPath = record(first).installPath;
+    const name = key.split("@")[0];
+    if (name && typeof installPath === "string" && existsSync(installPath))
+      found.set(name, installPath);
+  }
+  return found;
+}
+
+/**
+ * The plugin names a hub's instructions invoke as `/plugin:skill` (Acme's
+ * AGENTS.md: "you must load the `/p-dev:code` skill"). Pure.
+ */
+export function invokedPlugins(instructions: string): string[] {
+  const names = new Set<string>();
+  for (const match of instructions.matchAll(/(?:^|[\s`(])\/([\w.-]+):[\w.-]+/g)) {
+    if (match[1]) names.add(match[1]);
+  }
+  return [...names];
+}
+
+/**
+ * The person's enabled plugins that the hub's top-level CLAUDE.md/AGENTS.md
+ * invoke: a hub that tells agents to load `/p-dev:code` gets p-dev, from where
+ * the person installed it. Paths, by plugin name.
+ */
+export function hubUserPlugins(hub: string, configDir = claudeConfigDir()): string[] {
+  const text = ["CLAUDE.md", "AGENTS.md"]
+    .map((f) => {
+      try {
+        return readFileSync(path.join(hub, f), "utf8");
+      } catch {
+        return "";
+      }
+    })
+    .join("\n");
+  const wanted = invokedPlugins(text);
+  if (wanted.length === 0) return [];
+  const user = enabledUserPlugins(configDir);
+  const shipped = new Set(bundledHubPlugins(hub).map(manifestName));
+  return wanted.flatMap((name) => {
+    const dir = user.get(name);
+    return dir && !shipped.has(name) ? [dir] : [];
+  });
+}
+
 function hubFound(hub: string): Found[] {
+  const fromUser = hubUserPlugins(hub).flatMap((dir) =>
+    skillsIn(path.join(dir, "skills"), manifestName(dir), "hub", null),
+  );
+  return [...hubOwnFound(hub), ...fromUser];
+}
+
+function hubOwnFound(hub: string): Found[] {
   const bundled = bundledHubPlugins(hub);
   const shipped = bundled.flatMap((dir) =>
     skillsIn(path.join(dir, "skills"), manifestName(dir), "hub", null),

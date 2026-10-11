@@ -2,7 +2,14 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node
 import os from "node:os";
 import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { projectSkills, sessionSkills, skillDescription } from "./index";
+import {
+  enabledUserPlugins,
+  hubUserPlugins,
+  invokedPlugins,
+  projectSkills,
+  sessionSkills,
+  skillDescription,
+} from "./index";
 
 const root = mkdtempSync(path.join(os.tmpdir(), "zastava-skills-"));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
@@ -52,5 +59,32 @@ describe("project skills (spec 0015)", () => {
     ]);
     expect(sessionSkills(hub, hub)).toEqual(["repos:rails-way", "work:domain"]);
     expect(sessionSkills(app, hub)).toContain("local-only");
+  });
+
+  it("loads the user plugins a hub's instructions invoke", () => {
+    expect(invokedPlugins("Load the `/p-dev:code` skill. See src/a:b and https://x/y:z")).toEqual([
+      "p-dev",
+    ]);
+    const config = path.join(root, "config");
+    const installed = path.join(root, "cache", "p-dev");
+    mkdirSync(path.join(installed, ".claude-plugin"), { recursive: true });
+    writeFileSync(path.join(installed, ".claude-plugin", "plugin.json"), '{"name":"p-dev"}');
+    skill(path.join(installed, "skills"), "code", "Coding rules.");
+    mkdirSync(path.join(config, "plugins"), { recursive: true });
+    writeFileSync(
+      path.join(config, "settings.json"),
+      JSON.stringify({ enabledPlugins: { "p-dev@acme": true, "off@acme": false } }),
+    );
+    writeFileSync(
+      path.join(config, "plugins", "installed_plugins.json"),
+      JSON.stringify({ plugins: { "p-dev@acme": [{ installPath: installed }] } }),
+    );
+    expect([...enabledUserPlugins(config)]).toEqual([["p-dev", installed]]);
+    const hub = path.join(root, "phub");
+    mkdirSync(hub);
+    writeFileSync(path.join(hub, "AGENTS.md"), "You must load the `/p-dev:code` skill.\n");
+    expect(hubUserPlugins(hub, config)).toEqual([installed]);
+    writeFileSync(path.join(hub, "AGENTS.md"), "No plugins here.\n");
+    expect(hubUserPlugins(hub, config)).toEqual([]);
   });
 });

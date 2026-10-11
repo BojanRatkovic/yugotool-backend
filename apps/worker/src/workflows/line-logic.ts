@@ -9,6 +9,27 @@ const MAX_NOTE_CHARS = 12_000;
 export interface StationNote {
   station: string;
   text: string;
+  /** Written by a person (a gate comment), not an agent: may name skills (spec 0015). */
+  human?: boolean;
+}
+
+/**
+ * What a person wrote for this work: the description and their gate
+ * comments. Only these `/skill` mentions load skills; an agent's plan that
+ * names `/p-dev:open-pr` must not make the builder load it. Pure.
+ */
+export function humanText(
+  description: string,
+  notes: readonly StationNote[],
+  pending: StationNote | null = null,
+): string {
+  return [
+    description,
+    ...notes.filter((n) => n.human).map((n) => n.text),
+    pending?.human ? pending.text : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 /**

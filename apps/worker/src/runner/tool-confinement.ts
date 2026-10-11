@@ -41,3 +41,19 @@ export function pathViolation(
   if (roots.some((root) => isInside(target, path.resolve(root)))) return null;
   return `${tool} is limited to the run's worktree (${worktree}); ${target} is outside it. Use paths inside the worktree.`;
 }
+
+const DELIVERY_COMMAND =
+  /(?:^|[;&|(]\s*|\s)(?:git(?:\s+-[cC]\s+\S+)*\s+(?:commit|push)\b|gh\s+pr\s+(?:create|merge|ready)\b)/;
+
+/**
+ * Null when the call is fine; a reason when a Bash command would commit,
+ * push or open a pull request. ZASTAVA checkpoints and delivers the work; a
+ * hub's own skills (`/p-dev:open-pr`) tell agents to do it themselves, and a
+ * plan once did, so the prompt alone is not enough. Pure.
+ */
+export function deliveryViolation(tool: string, input: unknown): string | null {
+  if (tool !== "Bash" || typeof input !== "object" || input === null) return null;
+  const command: unknown = Reflect.get(input, "command");
+  if (typeof command !== "string" || !DELIVERY_COMMAND.test(command)) return null;
+  return "Not allowed here: ZASTAVA commits, pushes and opens the pull request when the work is approved. Leave your changes in the working tree.";
+}

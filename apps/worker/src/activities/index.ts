@@ -52,7 +52,7 @@ import {
   researchOutput,
   fallbackPlan,
   resolveResearch,
-  syncHubRepos,
+  syncHubReposShared,
 } from "../runner/hub-research";
 import {
   hubOfRepo,
@@ -348,7 +348,7 @@ export function createActivities(db: Database) {
           "system",
           `Work hub ${hub}: planning runs in the hub, read-only${row.workOrder.repo ? ` · repo ${row.workOrder.repo}` : " · Research picks the repo"}`,
         );
-        const synced = await syncHubRepos(
+        const synced = await syncHubReposShared(
           hub,
           repos.map((name) => ({ name, baseBranch: repoSettings[name]?.baseBranch ?? "main" })),
         );
@@ -688,6 +688,8 @@ export function createActivities(db: Database) {
       knowledge?: KnowledgeMount[];
       /** A read-only station of a hub run, in the hub itself (`worktreePath` = the hub). */
       hubResearch?: HubResearchInput;
+      /** What a person wrote (description, gate comments): its `/skill` mentions load (spec 0015). */
+      skillText?: string;
     }): Promise<AgentStationResult> {
       const model = input.modelOverride ?? input.station.model;
       const effort = input.effortOverride ?? input.station.effort;
@@ -709,7 +711,7 @@ export function createActivities(db: Database) {
       const readRoots = [...(input.knowledge ?? []).map((k) => k.dir), ...(hub?.readRoots ?? [])];
       const skills = skillPlan(
         input.station.skills ?? [],
-        `${input.prompt}\n${input.station.prompt}`,
+        `${input.skillText ?? ""}\n${input.station.prompt}`,
         sessionSkills(input.worktreePath, hub?.hub ?? null),
       );
       const tools = [

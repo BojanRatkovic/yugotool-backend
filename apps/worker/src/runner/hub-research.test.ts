@@ -13,6 +13,7 @@ import {
   resolveResearch,
   syncDecision,
   syncHubRepos,
+  syncHubReposShared,
 } from "./hub-research";
 import { pathViolation } from "./tool-confinement";
 
@@ -185,5 +186,16 @@ describe("fallbackPlan", () => {
       fallbackPlan(["Mapping the code.", plan, "I already sent it."], "I already sent it."),
     ).toBe(plan);
     expect(fallbackPlan([], "1. Do it")).toBe("1. Do it");
+  });
+});
+
+describe("shared hub sync", () => {
+  it("runs one sync per hub and reuses it for two minutes", async () => {
+    const hub = mkdtempSync(path.join(os.tmpdir(), "zastava-sync-"));
+    const first = syncHubReposShared(hub, [], 1_000);
+    expect(syncHubReposShared(hub, [], 2_000)).toBe(first);
+    await first;
+    expect(syncHubReposShared(hub, [], 1_000 + 60_000)).toBe(first);
+    expect(syncHubReposShared(hub, [], 1_000 + 3 * 60_000)).not.toBe(first);
   });
 });

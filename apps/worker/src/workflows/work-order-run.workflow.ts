@@ -26,6 +26,7 @@ import {
   buildFollowUp,
   MAX_FIX_LOOPS,
   type StationNote,
+  humanText,
   validatorPassed,
 } from "./line-logic";
 import {
@@ -250,7 +251,7 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
           });
           // Human-requested changes are not capped: the reviewer decides when to stop.
           sendBack(
-            { station: `${station.name} (changes requested)`, text: decision.comment },
+            { station: `${station.name} (changes requested)`, text: decision.comment, human: true },
             changesTarget,
           );
           continue;
@@ -271,7 +272,11 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
           return;
         }
         if (decision.comment) {
-          notes.push({ station: station.name, text: `Human reviewer: ${decision.comment}` });
+          notes.push({
+            station: station.name,
+            text: `Human reviewer: ${decision.comment}`,
+            human: true,
+          });
         }
         if (decision.delivery) delivery = decision.delivery;
         // The plan gate of a hub run may switch the repo before the worktree exists.
@@ -396,6 +401,8 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
             effortOverride: run.effortOverride,
             maxBudgetUsd: left,
             ...(resume ? { resume } : {}),
+            skills: station.kind === "agent" ? (station.skills ?? []) : [],
+            skillText: humanText(run.description, notes, pending),
           });
           resume = null;
           last = result;
@@ -550,6 +557,7 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
         modelOverride: run.modelOverride,
         effortOverride: run.effortOverride,
         resumeSessionId: resume ? sessionId : null,
+        skillText: humanText(run.description, notes, pending),
         ...(readsKnowledge(station) && knowledge.length > 0 ? { knowledge } : {}),
       });
       if (result.sessionId) sessions.set(index, result.sessionId);

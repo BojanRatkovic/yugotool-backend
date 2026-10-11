@@ -17,7 +17,9 @@ import { localRunner } from "../runner/local-runner";
 import { withApiKey } from "../claude-env";
 import { sandboxFor } from "../runner/sandbox";
 import { shiftMemory } from "../runner/shift-memory";
+import { skillPlan, skillSection } from "../runner/station-skills";
 import { hubSession } from "../runner/work-hub";
+import { sessionSkills } from "@zastava/skills";
 import {
   buildHandoffPrompt,
   buildShiftPrompt,
@@ -294,6 +296,10 @@ export function createShiftActivities(db: Database, deps: ShiftDeps) {
       maxBudgetUsd: number | null;
       /** Work came back: continue this session with `prompt` instead of a fresh shift. */
       resume?: { sessionId: string; prompt: string } | null;
+      /** The station's "always load" skills (spec 0015). */
+      skills?: string[];
+      /** What a person wrote (description, gate comments): its `/skill` mentions load. */
+      skillText?: string;
     }): Promise<ShiftResult> {
       const { station } = input;
       const model = input.modelOverride ?? station.model;
@@ -335,7 +341,25 @@ export function createShiftActivities(db: Database, deps: ShiftDeps) {
 
       const hub = await hubSession(input.worktreePath);
       const readRoots = hub?.readRoots ?? [];
-      const tools = [...station.allowedTools, ...(hub?.tools ?? [])];
+      const skills = skillPlan(
+        input.skills ?? [],
+        `${input.skillText ?? ""}\n${station.prompt}`,
+        sessionSkills(input.worktreePath, hub?.hub ?? null),
+      );
+      const skillNote = [
+        skills.load.length ? `Skills to load: ${skills.load.join(", ")}` : null,
+        skills.missing.length ? `not available here: ${skills.missing.join(", ")}` : null,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+      if (skillNote) await deps.appendEvent(input.runId, input.stationRunId, "system", skillNote);
+      const tools = [
+        ...new Set([
+          ...station.allowedTools,
+          ...(hub?.tools ?? []),
+          ...(skills.load.length ? ["Skill"] : []),
+        ]),
+      ];
       const sandboxed = await withApiKey(await sandboxFor(input.worktreePath, { readRoots }));
       const baseOptions = {
         cwd: input.worktreePath,
@@ -351,7 +375,9 @@ export function createShiftActivities(db: Database, deps: ShiftDeps) {
         systemPrompt: {
           type: "preset" as const,
           preset: "claude_code" as const,
-          append: hub ? `${station.prompt}\n\n${hub.prompt}` : station.prompt,
+          append: [station.prompt, hub?.prompt, skillSection(skills.load)]
+            .filter(Boolean)
+            .join("\n\n"),
         },
         abortController,
       };

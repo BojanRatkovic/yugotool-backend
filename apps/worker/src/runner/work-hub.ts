@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { hubCandidateOf } from "@zastava/contracts";
-import { bundledHubPlugins, manifestName, pluginName } from "@zastava/skills";
+import { bundledHubPlugins, hubUserPlugins, manifestName, pluginName } from "@zastava/skills";
 
 export { bundledHubPlugins, pluginName };
 
@@ -164,7 +164,11 @@ export async function hubInstructions(hub: string): Promise<string | null> {
 export async function hubPluginNames(hub: string): Promise<string[]> {
   const plugins = await hubPlugins(hub);
   const bundled = new Set(bundledHubPlugins(hub));
-  return plugins.map((p) => (bundled.has(p.path) ? manifestName(p.path) : pluginName(hub)));
+  return plugins.map((p) =>
+    bundled.has(p.path) || !p.path.startsWith(HUB_PLUGINS_ROOT)
+      ? manifestName(p.path)
+      : pluginName(hub),
+  );
 }
 
 /** Every plugin a session on this hub loads: the bundled ones, plus `.claude/skills` as one. */
@@ -173,7 +177,12 @@ export async function hubPlugins(hub: string): Promise<{ type: "local"; path: st
   const generated = await hubPlugin(hub).catch(() => null);
   // A bundled plugin named like the hub already is "the hub's skills"; two would clash.
   const clash = bundled.some((dir) => manifestName(dir) === pluginName(hub));
-  const paths = generated && !clash ? [...bundled, generated.path] : bundled;
+  const paths = [
+    ...bundled,
+    ...(generated && !clash ? [generated.path] : []),
+    // Plugins the hub's instructions invoke, from where the person installed them.
+    ...hubUserPlugins(hub),
+  ];
   return paths.map((p) => ({ type: "local" as const, path: p }));
 }
 

@@ -56,6 +56,7 @@ export const localRunner = {
       worktreePath,
       start,
     ]);
+    await trustRepoHooks(worktreePath);
     return { path: worktreePath, branch };
   },
 
@@ -269,13 +270,16 @@ export const localRunner = {
     return stdout.trim();
   },
 
-  /** Commits everything (`.zastava/` is excluded); null when there was nothing to commit. */
+  /** Commits everything (`.zastava/` is excluded) without hooks; null when there was nothing to commit. */
   async checkpoint(worktreePath: string, message: string): Promise<string | null> {
     const git = (...args: string[]) => exec("git", ["-C", worktreePath, ...args]);
     await git("add", "-A");
     const { stdout: staged } = await git("diff", "--cached", "--name-only");
     if (!staged.trim()) return null;
-    await git("commit", "-m", message);
+    // A checkpoint is ZASTAVA's own bookkeeping, not the delivered commit: the repo's
+    // hooks run at delivery (runPreCommitHook). Run here they failed the build
+    // (overcommit refuses a fresh worktree: "plugins … changed, run overcommit --sign").
+    await git("commit", "--no-verify", "-m", message);
     const { stdout } = await git("rev-parse", "--short", "HEAD");
     return stdout.trim();
   },
@@ -467,6 +471,21 @@ export const localRunner = {
     }
   },
 };
+
+/**
+ * Overcommit signs each hook plugin by its path, so a fresh worktree fails
+ * every commit with "plugins … changed, run overcommit --sign" (it failed a
+ * whole run at the repo-hooks check, sent back to a builder that could not fix
+ * it). Signed here, before any agent touched the worktree, it trusts exactly
+ * the base branch's hooks; a builder that later edits them is asked again.
+ * Best effort: no overcommit, nothing to do.
+ */
+async function trustRepoHooks(worktreePath: string): Promise<void> {
+  if (!existsSync(path.join(worktreePath, ".overcommit.yml"))) return;
+  for (const args of [["--sign"], ["--sign", "pre-commit"]]) {
+    await exec("overcommit", args, { cwd: worktreePath, timeout: 60_000 }).catch(() => undefined);
+  }
+}
 
 /** gh's "a pull request for branch … already exists: <url>" → the url. Pure. */
 export function existingPrUrl(error: unknown): string | null {
