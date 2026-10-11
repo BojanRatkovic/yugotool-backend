@@ -20,7 +20,7 @@ const git = (cwd: string, ...args: string[]) =>
     .toString()
     .trim();
 
-/** A repo like Acme's work repo: tracked knowledge, gitignored secrets. */
+/** A repo like a team's work repo: tracked knowledge, gitignored secrets. */
 function workRepo(): string {
   const repo = temp();
   git(repo, "init", "-q", "-b", "main");

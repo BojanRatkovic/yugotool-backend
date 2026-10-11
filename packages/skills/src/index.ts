@@ -128,7 +128,7 @@ export function enabledUserPlugins(configDir = claudeConfigDir()): Map<string, s
 }
 
 /**
- * The plugin names a hub's instructions invoke as `/plugin:skill` (Acme's
+ * The plugin names a hub's instructions invoke as `/plugin:skill` (e.g. a hub's
  * AGENTS.md: "you must load the `/p-dev:code` skill"). Pure.
  */
 export function invokedPlugins(instructions: string): string[] {

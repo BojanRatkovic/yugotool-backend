@@ -2,6 +2,7 @@
   "name": "yugotool-backend",
   "version": "0.0.0",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "dev": "pnpm -r --parallel dev",
     "dev:temporal": "temporal server start-dev --db-filename .temporal.db",

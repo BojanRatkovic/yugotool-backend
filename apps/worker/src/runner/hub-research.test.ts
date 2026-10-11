@@ -132,9 +132,7 @@ describe("resolveResearch", () => {
   });
 
   it("a preset repo wins over the model's pick", () => {
-    expect(resolveResearch({ plan: "p", repo: "shop-backend" }, repos, "shop").repo).toBe(
-      "shop",
-    );
+    expect(resolveResearch({ plan: "p", repo: "shop-backend" }, repos, "shop").repo).toBe("shop");
   });
 
   it("keeps a resolvable split and takes its first repo; drops a bad or single-item one", () => {
