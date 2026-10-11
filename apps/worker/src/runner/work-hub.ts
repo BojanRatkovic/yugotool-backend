@@ -3,7 +3,7 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, statSync } from "node:fs";
-import { lstat, mkdir, readFile, readdir, symlink, writeFile } from "node:fs/promises";
+import { copyFile, lstat, mkdir, readFile, readdir, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { hubCandidateOf } from "@yugotool/contracts";
@@ -72,7 +72,10 @@ export function linkableIgnored(entries: string[]): string[] {
 /**
  * Worktrees share `.git` but not gitignored files (`.env`, `config/application.yml`):
  * symlink them from the source checkout, as the hub's own recipe does, so the
- * app finds its config. Returns the linked paths.
+ * app finds its config. A `.gitignore` (a tool cache's own `*`, like
+ * `.fallow/`) is copied instead: git skips symlinked ignore files, so a link
+ * would turn the cache into new files in the diff and the delivery commit.
+ * Returns the linked paths.
  */
 export async function linkIgnoredFiles(
   sourceRepo: string,
@@ -90,7 +93,8 @@ export async function linkIgnoredFiles(
     const info = await lstat(from).catch(() => null);
     if (!info?.isFile() || info.size > MAX_LINKED_BYTES || existsSync(to)) continue;
     await mkdir(path.dirname(to), { recursive: true });
-    await symlink(from, to).then(
+    const carry = path.basename(file) === ".gitignore" ? copyFile : symlink;
+    await carry(from, to).then(
       () => linked.push(file),
       () => undefined,
     );

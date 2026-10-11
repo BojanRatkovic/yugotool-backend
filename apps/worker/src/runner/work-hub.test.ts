@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readlinkSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readlinkSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
@@ -81,8 +81,13 @@ describe("work hubs (spec 0012)", () => {
     expect(hubOfWorktree(worktree)).toBe(hub);
     expect(hubOfWorktree(repo)).toBeNull();
 
-    expect(await linkIgnoredFiles(repo, worktree)).toEqual([".env"]);
+    mkdirSync(path.join(repo, ".cache"));
+    writeFileSync(path.join(repo, ".cache", ".gitignore"), "*\n");
+    writeFileSync(path.join(repo, ".cache", "index.bin"), "x");
+    expect(await linkIgnoredFiles(repo, worktree)).toEqual([".cache/.gitignore", ".cache/index.bin", ".env"]);
     expect(readlinkSync(path.join(worktree, ".env"))).toBe(path.join(repo, ".env"));
+    expect(lstatSync(path.join(worktree, ".cache", ".gitignore")).isFile()).toBe(true);
+    expect(git(worktree, "status", "--porcelain")).toBe("");
     expect(existsSync(path.join(worktree, "debug.log"))).toBe(false);
 
     const plugin = await hubPlugin(hub);
