@@ -31,6 +31,8 @@ const envSchema = z.object({
   HOST: z.string().optional(),
   /** The Claude Code binary for `claude auth …` (spec 0016); tests point it at a stub. */
   CLAUDE_BIN: z.string().default("claude"),
+  /** The packaged app's Agent SDK binary (spec 0017); unset = the SDK's own. Read via `claudeExecutable`. */
+  ZASTAVA_CLAUDE_BIN: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -45,4 +47,10 @@ export function validateEnv(config: Record<string, unknown>): Env {
  */
 export function childProcessEnv(): Record<string, string | undefined> {
   return { ...process.env };
+}
+
+/** Agent SDK option for the packaged app's fetched Claude Code (spec 0017); empty in dev. */
+export function claudeExecutable(): { pathToClaudeCodeExecutable?: string } {
+  const bin = process.env["ZASTAVA_CLAUDE_BIN"];
+  return bin ? { pathToClaudeCodeExecutable: bin } : {};
 }

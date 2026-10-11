@@ -11,14 +11,22 @@ import { Child, type ChildSpec } from "./child";
 import { databaseUrl, PG_DATABASE, PG_PASSWORD, PG_USER, type SupervisorConfig } from "./config";
 import type { LogFile } from "./log-file";
 import { migrate } from "./migrate";
+import { ensureRuntime, findTool, progressText, type RuntimeProgress, toolPath } from "./runtime";
 
 const execFileAsync = promisify(execFile);
 const binariesSchema = z.object({ initdb: z.string(), postgres: z.string() });
 
-export type ServiceName = "postgres" | "migrations" | "temporal" | "api" | "worker";
+export type ServiceName = "runtime" | "postgres" | "migrations" | "temporal" | "api" | "worker";
 
 /** Start order; stop runs in reverse. */
-export const SERVICE_ORDER: ServiceName[] = ["postgres", "migrations", "temporal", "api", "worker"];
+export const SERVICE_ORDER: ServiceName[] = [
+  "runtime",
+  "postgres",
+  "migrations",
+  "temporal",
+  "api",
+  "worker",
+];
 
 export interface Service {
   name: ServiceName;
@@ -37,16 +45,65 @@ export interface ServiceContext {
   config: SupervisorConfig;
   log: (name: ServiceName) => LogFile;
   onCrash: (name: ServiceName, reason: string) => void;
+  /** A long start reporting how far it got (the runtime download). */
+  progress: (name: ServiceName, progress: RuntimeProgress, detail: string) => void;
 }
 
 export function createServices(ctx: ServiceContext): Record<ServiceName, Service> {
   return {
+    runtime: runtime(ctx),
     postgres: postgres(ctx),
     migrations: migrations(ctx),
     temporal: temporal(ctx),
     api: api(ctx),
     worker: worker(ctx),
   };
+}
+
+// ── Runtime (packaged app: Claude Code + Temporal, fetched once) ──────────────
+
+/** Progress reports at most this often; a 140 MB download sends thousands of chunks. */
+const PROGRESS_EVERY_MS = 200;
+
+function runtime({ config, log, progress }: ServiceContext): Service {
+  const file = log("runtime");
+  let abort: AbortController | null = null;
+  return {
+    name: "runtime",
+    oneShot: true,
+    port: null,
+    pid: () => null,
+    async start() {
+      if (!config.runtime) return "not needed";
+      abort = new AbortController();
+      let last = 0;
+      const fetched = await ensureRuntime(config.home, config.runtime, {
+        signal: abort.signal,
+        onProgress: (bytes, tools) => {
+          const now = Date.now();
+          if (now - last < PROGRESS_EVERY_MS && bytes.done !== bytes.total) return;
+          last = now;
+          const what = tools.map((tool) => tool.label).join(" and ");
+          progress("runtime", bytes, `downloading ${what} · ${progressText(bytes)}`);
+        },
+      });
+      for (const tool of fetched) file.line(`fetched ${tool.label} ${tool.version}`);
+      return fetched.length
+        ? `fetched ${fetched.map((tool) => `${tool.label} ${tool.version}`).join(", ")}`
+        : "up to date";
+    },
+    async stop() {
+      abort?.abort();
+      abort = null;
+    },
+    healthy: () => Promise.resolve(true),
+  };
+}
+
+/** The fetched Claude Code binary, or null to let the Agent SDK find its own. */
+export function claudeBin(config: SupervisorConfig): string | null {
+  const tool = config.runtime && findTool(config.runtime, "claude");
+  return tool ? toolPath(config.home, tool) : null;
 }
 
 // ── Postgres (bundled binaries, data in ~/.zastava/pg) ───────────────────────
@@ -218,50 +275,54 @@ function migrations({ config, log }: ServiceContext): Service {
 
 function temporal({ config, log, onCrash }: ServiceContext): Service {
   const file = log("temporal");
-  const bin = temporalBin(config);
-  const child = new Child(
-    {
-      command: bin,
-      args: [
-        "server",
-        "start-dev",
-        "--db-filename",
-        config.temporalDb,
-        "--ip",
-        "127.0.0.1",
-        "--port",
-        String(config.ports.temporal),
-        "--ui-port",
-        String(config.ports.temporalUi),
-        "--http-port",
-        String(config.ports.temporalHttp),
-        "--log-level",
-        "warn",
-      ],
-      cwd: config.home,
-      env: { PATH: config.path },
-      stopTimeoutMs: 10_000,
-    },
-    file,
-    (code, signal) => onCrash("temporal", exitReason(code, signal)),
-  );
+  // Resolved at start: in a packaged app the binary is fetched by the runtime step.
+  const spec = (): ChildSpec => ({
+    command: temporalBin(config),
+    args: [
+      "server",
+      "start-dev",
+      "--db-filename",
+      config.temporalDb,
+      "--ip",
+      "127.0.0.1",
+      "--port",
+      String(config.ports.temporal),
+      "--ui-port",
+      String(config.ports.temporalUi),
+      "--http-port",
+      String(config.ports.temporalHttp),
+      "--log-level",
+      "warn",
+    ],
+    cwd: config.home,
+    env: { PATH: config.path },
+    stopTimeoutMs: 10_000,
+  });
+  let child: Child | null = null;
   return {
     name: "temporal",
     oneShot: false,
     port: config.ports.temporal,
-    pid: () => child.pid,
+    pid: () => child?.pid ?? null,
     async start() {
+      child = new Child(spec(), file, (code, signal) =>
+        onCrash("temporal", exitReason(code, signal)),
+      );
       child.start();
       await waitFor(() => portOpen(config.ports.temporal), 30_000, "temporal", file);
       return `UI http://127.0.0.1:${config.ports.temporalUi}`;
     },
-    stop: () => child.stop(),
+    stop: async () => {
+      await child?.stop();
+    },
     healthy: () => portOpen(config.ports.temporal),
   };
 }
 
 function temporalBin(config: SupervisorConfig): string {
   if (config.temporalBin) return config.temporalBin;
+  const fetched = config.runtime && findTool(config.runtime, "temporal");
+  if (fetched) return toolPath(config.home, fetched);
   const bundled = path.join(config.home, "bin", "temporal");
   if (existsSync(bundled)) return bundled;
   try {
@@ -285,11 +346,14 @@ function temporalBin(config: SupervisorConfig): string {
  */
 function nodeEnv(config: SupervisorConfig): NodeJS.ProcessEnv {
   const { NODE_ENV: _nodeEnv, ...inherited } = process.env;
+  const claude = claudeBin(config);
   return {
     ...inherited,
     DATABASE_URL: databaseUrl(config),
     TEMPORAL_ADDRESS: `127.0.0.1:${config.ports.temporal}`,
     DESKTOP_NOTICES: config.desktopNotices,
+    // Every Agent SDK session runs this binary (spec 0017).
+    ...(claude ? { ZASTAVA_CLAUDE_BIN: claude } : {}),
     ...config.extraEnv,
     ...(config.anthropicApiKey ? { ANTHROPIC_API_KEY: config.anthropicApiKey } : {}),
   };

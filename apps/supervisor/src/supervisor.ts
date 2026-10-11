@@ -5,6 +5,7 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { z } from "zod";
 import type { SupervisorConfig } from "./config";
 import { LogFile } from "./log-file";
+import type { RuntimeProgress } from "./runtime";
 import {
   createServices,
   firstFreePort,
@@ -16,12 +17,14 @@ import {
 } from "./services";
 
 const serviceStatusSchema = z.object({
-  name: z.enum(["postgres", "migrations", "temporal", "api", "worker"]),
+  name: z.enum(["runtime", "postgres", "migrations", "temporal", "api", "worker"]),
   state: z.enum(["stopped", "starting", "running", "done", "restarting", "failed"]),
   pid: z.number().int().nullable(),
   port: z.number().int().nullable(),
   /** Last start message or error, one line. */
   detail: z.string().nullable(),
+  /** Bytes so far while a start downloads (the runtime step); null otherwise. */
+  progress: z.object({ done: z.number(), total: z.number().nullable() }).nullable().default(null),
   restarts: z.number().int(),
   since: z.string(),
   logFile: z.string(),
@@ -76,6 +79,7 @@ export class Supervisor extends EventEmitter<{ status: [SupervisorStatus] }> {
       config,
       log: (name) => this.log(name),
       onCrash: (name, reason) => void this.handleCrash(name, reason),
+      progress: (name, progress, detail) => this.progress(name, progress, detail),
     });
     for (const name of SERVICE_ORDER) {
       const service = this.services[name];
@@ -85,6 +89,7 @@ export class Supervisor extends EventEmitter<{ status: [SupervisorStatus] }> {
         pid: null,
         port: service.port,
         detail: null,
+        progress: null,
         restarts: 0,
         since: new Date().toISOString(),
         logFile: this.log(name).file,
@@ -139,7 +144,8 @@ export class Supervisor extends EventEmitter<{ status: [SupervisorStatus] }> {
       } catch (error) {
         this.log(name).line(`stop failed: ${message(error)}`);
       }
-      this.set(name, "stopped", null);
+      // A failed row keeps saying so: the loading screen shows which one broke.
+      if (current !== "failed") this.set(name, "stopped", null);
     }
     await rm(this.config.stateFile, { force: true });
     await Promise.all([...this.logs.values()].map((log) => log.close()));
@@ -203,8 +209,22 @@ export class Supervisor extends EventEmitter<{ status: [SupervisorStatus] }> {
     if (!current) return;
     current.state = state;
     current.detail = detail;
+    current.progress = null;
     current.since = new Date().toISOString();
     this.log("supervisor").line(`${name}: ${state}${detail ? ` (${detail})` : ""}`);
+    this.publish();
+  }
+
+  /** A starting service's progress: shown, not logged (it ticks several times a second). */
+  private progress(name: ServiceName, progress: RuntimeProgress, detail: string): void {
+    const current = this.status.get(name);
+    if (!current || current.state !== "starting") return;
+    current.progress = progress;
+    current.detail = detail;
+    this.publish();
+  }
+
+  private publish(): void {
     const snapshot = this.snapshot();
     void writeFile(this.config.stateFile, `${JSON.stringify(snapshot, null, 2)}\n`).catch(
       () => undefined,

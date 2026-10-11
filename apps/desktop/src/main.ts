@@ -35,13 +35,14 @@ const shellPath = loginShellPath();
 process.env["PATH"] = withWellKnownDirs(shellPath.path ?? process.env["PATH"] ?? "");
 /**
  * Packaged app layout (scripts/dist.mjs): code in Resources/app, the web UI in
- * Resources/web, the temporal CLI in Resources/bin. A checkout uses its siblings.
+ * Resources/web. Claude Code and the temporal CLI are fetched on first start
+ * from what Resources/app/runtime.json names (spec 0017). A checkout uses its siblings.
  */
 const packagedPaths = app.isPackaged
   ? {
       ZASTAVA_BACKEND_ROOT: app.getAppPath(),
       ZASTAVA_WEB_DIST: path.join(process.resourcesPath, "web"),
-      ZASTAVA_TEMPORAL_BIN: path.join(process.resourcesPath, "bin", "temporal"),
+      ZASTAVA_RUNTIME_MANIFEST: path.join(app.getAppPath(), "runtime.json"),
     }
   : {};
 const config = {

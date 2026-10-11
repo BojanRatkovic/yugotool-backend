@@ -3,7 +3,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { query, type SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import os from "node:os";
 import { claudeAccountEnv, type PlanUsage, type UsageWindow } from "@zastava/contracts";
-import { childProcessEnv } from "../../core/config/env.schema";
+import { childProcessEnv, claudeExecutable } from "../../core/config/env.schema";
 import type { AccountAuth } from "../claude-accounts/claude-accounts.service";
 
 /** The probe spawns a Claude Code process; a minute of staleness is fine for a meter. */
@@ -57,7 +57,7 @@ export class PlanUsageService {
       : undefined;
     const session = query({
       prompt: idle,
-      options: { settingSources: [], tools: [], ...(env ? { env } : {}) },
+      options: { settingSources: [], tools: [], ...claudeExecutable(), ...(env ? { env } : {}) },
     });
     const timeout = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error("usage probe timed out")), PROBE_TIMEOUT_MS),

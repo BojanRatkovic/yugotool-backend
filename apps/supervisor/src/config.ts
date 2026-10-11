@@ -1,6 +1,7 @@
 import os from "node:os";
 import path from "node:path";
 import { z } from "zod";
+import { readRuntimeManifest, type RuntimeManifest } from "./runtime";
 
 /** apps/supervisor/dist → the zastava-backend checkout. */
 const BACKEND_ROOT = path.resolve(__dirname, "..", "..", "..");
@@ -19,6 +20,11 @@ const envSchema = z.object({
   ZASTAVA_TEMPORAL_HTTP_PORT: z.coerce.number().int().positive().default(4835),
   /** `temporal` CLI; default: ~/.zastava/bin/temporal, else the one on PATH. */
   ZASTAVA_TEMPORAL_BIN: z.string().optional(),
+  /**
+   * runtime.json of a packaged app (spec 0017): Claude Code and Temporal are
+   * fetched into ~/.zastava/runtime on first start. Unset in a checkout.
+   */
+  ZASTAVA_RUNTIME_MANIFEST: z.string().optional(),
   ZASTAVA_BACKEND_ROOT: z.string().default(BACKEND_ROOT),
   ZASTAVA_WEB_DIST: z.string().default(path.join(BACKEND_ROOT, "..", "zastava-frontend", "dist")),
   /** Node used for the API and worker; default: the one running the supervisor. */
@@ -38,6 +44,8 @@ export interface SupervisorConfig {
   stateFile: string;
   ports: { api: number; pg: number; temporal: number; temporalUi: number; temporalHttp: number };
   temporalBin: string | null;
+  /** Binaries to fetch on start; null = use what is installed (a checkout). */
+  runtime: RuntimeManifest | null;
   backendRoot: string;
   migrationsDir: string;
   apiEntry: string;
@@ -69,6 +77,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): SupervisorConf
       temporalHttp: e.ZASTAVA_TEMPORAL_HTTP_PORT,
     },
     temporalBin: e.ZASTAVA_TEMPORAL_BIN ?? null,
+    runtime: e.ZASTAVA_RUNTIME_MANIFEST ? readRuntimeManifest(e.ZASTAVA_RUNTIME_MANIFEST) : null,
     backendRoot: backend,
     migrationsDir: path.join(backend, "packages", "db", "migrations"),
     apiEntry: path.join(backend, "apps", "api", "dist", "main.js"),
