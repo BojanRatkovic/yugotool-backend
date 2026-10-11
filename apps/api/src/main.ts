@@ -12,7 +12,11 @@ import { GlobalExceptionFilter } from "./common/filters/global-exception.filter"
 import type { Env } from "./core/config/env.schema";
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // Open SSE streams never end on their own: without this, shutdown (and every dev
+  // restart) waited forever on a browser tab's /events connection.
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    forceCloseConnections: true,
+  });
   const config = app.get<ConfigService<Env, true>>(ConfigService);
 
   app.useGlobalPipes(new ZodValidationPipe());

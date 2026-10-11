@@ -47,8 +47,13 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleDestroy(): Promise<void> {
     this.subject.complete();
+    this.closed.next();
+    this.closed.complete();
     await this.listener?.end();
   }
+
+  /** Emits once when the service shuts down. */
+  readonly closed = new Subject<void>();
 
   get stream(): Observable<ServerEvent> {
     return this.subject.asObservable();
