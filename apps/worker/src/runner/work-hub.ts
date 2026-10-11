@@ -3,7 +3,7 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, statSync } from "node:fs";
-import { lstat, mkdir, readdir, symlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, readdir, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -137,10 +137,73 @@ export function pluginName(hub: string): string {
 export function hubPromptSection(hub: string, worktreePath: string): string {
   return [
     "## Work hub",
-    `This repository is part of the work hub at \`${hub}\`. Its CLAUDE.md/AGENTS.md (already loaded) and its knowledge apply: read what is relevant (Read/Grep/Glob work anywhere in the hub; \`repos/\` holds clean reference checkouts of the other repos).`,
+    `This repository is part of the work hub at \`${hub}\`. Its instructions (below) and its knowledge apply: read what is relevant (Read/Grep/Glob work anywhere in the hub; \`repos/\` holds clean reference checkouts of the other repos). Its skills are available through the Skill tool.`,
     `ZASTAVA already did the hub's worktree setup: you are in \`${worktreePath}\`, on a fresh branch from the latest base, with the source checkout's ignored config files linked in. Do not create worktrees, do not edit \`repos/\` or anything outside this worktree, and do not commit, push or open pull requests: ZASTAVA delivers the work.`,
-    "Where the hub tells you to load a skill and it is not available here, follow its intent with the instructions you have.",
+    "Where the hub tells you to load a skill and it is not available here, follow its intent with the instructions you have. Where the hub's instructions below conflict with this section, this section wins.",
   ].join("\n\n");
+}
+
+const MAX_INSTRUCTIONS = 64 * 1024;
+
+/**
+ * The hub's CLAUDE.md (else AGENTS.md) with its `@file` import lines expanded,
+ * one level, files inside the hub only. A session in a hub worktree loads the
+ * hub's CLAUDE.md from the parent folder but not its imports (they sit outside
+ * the session's project), so the hub's rules never reached it. Null without one.
+ */
+export async function hubInstructions(hub: string): Promise<string | null> {
+  const file = ["CLAUDE.md", "AGENTS.md"].map((f) => path.join(hub, f)).find((f) => existsSync(f));
+  if (!file) return null;
+  const lines = (await readFile(file, "utf8")).split("\n");
+  const expanded = await Promise.all(
+    lines.map(async (line) => {
+      const target = /^@(\S+)\s*$/.exec(line.trim())?.[1];
+      if (!target) return line;
+      const resolved = path.resolve(hub, target);
+      if (!resolved.startsWith(`${hub}${path.sep}`)) return line;
+      return readFile(resolved, "utf8").catch(() => line);
+    }),
+  );
+  const text = expanded.join("\n").trim();
+  return text ? text.slice(0, MAX_INSTRUCTIONS) : null;
+}
+
+/**
+ * Plugins the hub ships itself (`<hub>/plugins/<name>/.claude-plugin/plugin.json`,
+ * how a hub serves its skills to sessions whose cwd is a worktree). The Agent
+ * SDK only loads the project's settings, so a marketplace the person enabled
+ * in their own settings never reaches an agent.
+ */
+export function bundledHubPlugins(hub: string): string[] {
+  const root = path.join(hub, "plugins");
+  try {
+    return readdirSync(root, { withFileTypes: true })
+      .filter(
+        (e) =>
+          e.isDirectory() && existsSync(path.join(root, e.name, ".claude-plugin", "plugin.json")),
+      )
+      .map((e) => path.join(root, e.name))
+      .toSorted((a, b) => a.localeCompare(b));
+  } catch {
+    return [];
+  }
+}
+
+/** What Activity names: the hub's bundled plugins and, when it has `.claude/skills`, those skills. */
+export async function hubPluginNames(hub: string): Promise<string[]> {
+  const plugins = await hubPlugins(hub);
+  const bundled = new Set(bundledHubPlugins(hub));
+  return plugins.map((p) => (bundled.has(p.path) ? path.basename(p.path) : pluginName(hub)));
+}
+
+/** Every plugin a session on this hub loads: the bundled ones, plus `.claude/skills` as one. */
+export async function hubPlugins(hub: string): Promise<{ type: "local"; path: string }[]> {
+  const bundled = bundledHubPlugins(hub);
+  const generated = await hubPlugin(hub).catch(() => null);
+  // A bundled plugin named like the hub already is "the hub's skills"; two would clash.
+  const clash = bundled.some((dir) => path.basename(dir) === pluginName(hub));
+  const paths = generated && !clash ? [...bundled, generated.path] : bundled;
+  return paths.map((p) => ({ type: "local" as const, path: p }));
 }
 
 function isDirectory(dir: string): boolean {
@@ -153,8 +216,8 @@ function isDirectory(dir: string): boolean {
 
 /**
  * What a session in a hub worktree adds to its options: the hub readable,
- * its skills as a plugin (with the Skill tool to use them) and the hub
- * section of the system prompt. Null outside a hub.
+ * its plugins (with the Skill tool to use them) and the hub section of the
+ * system prompt, with the hub's instructions in it. Null outside a hub.
  */
 export async function hubSession(worktreePath: string): Promise<{
   hub: string;
@@ -165,12 +228,15 @@ export async function hubSession(worktreePath: string): Promise<{
 } | null> {
   const hub = hubOfWorktree(worktreePath);
   if (!hub) return null;
-  const plugin = await hubPlugin(hub).catch(() => null);
+  const plugins = await hubPlugins(hub);
+  const instructions = await hubInstructions(hub);
   return {
     hub,
     readRoots: [hub],
-    plugins: plugin ? [{ type: "local", path: plugin.path }] : [],
-    tools: plugin ? ["Skill"] : [],
-    prompt: hubPromptSection(hub, worktreePath),
+    plugins,
+    tools: plugins.length ? ["Skill"] : [],
+    prompt: instructions
+      ? `${hubPromptSection(hub, worktreePath)}\n\n## The hub's instructions\n\n${instructions}`
+      : hubPromptSection(hub, worktreePath),
   };
 }

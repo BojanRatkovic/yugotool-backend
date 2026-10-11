@@ -6,7 +6,10 @@ import { afterAll, describe, expect, it } from "vitest";
 import {
   hubOfRepo,
   hubOfWorktree,
+  bundledHubPlugins,
+  hubInstructions,
   hubPlugin,
+  hubPlugins,
   hubPromptSection,
   hubWorktreePath,
   linkableIgnored,
@@ -86,5 +89,26 @@ describe("work hubs (spec 0012)", () => {
     expect(plugin?.skills).toEqual(["domain"]);
     expect(existsSync(path.join(plugin?.path ?? "", "skills", "domain", "SKILL.md"))).toBe(true);
     rmSync(plugin?.path ?? "", { recursive: true, force: true });
+  });
+
+  it("expands the hub's CLAUDE.md imports and loads the plugins it ships", async () => {
+    const { hub } = makeHub();
+    made.push(hub);
+    writeFileSync(path.join(hub, "CLAUDE.md"), "@AGENTS.md\n@../outside.md\n");
+    writeFileSync(path.join(hub, "AGENTS.md"), "Auto-preview by default.\n");
+    const instructions = await hubInstructions(hub);
+    expect(instructions).toContain("Auto-preview by default.");
+    expect(instructions).toContain("@../outside.md");
+
+    const shipped = path.join(hub, "plugins", "work-skills");
+    mkdirSync(path.join(shipped, ".claude-plugin"), { recursive: true });
+    writeFileSync(path.join(shipped, ".claude-plugin", "plugin.json"), '{"name":"work-skills"}\n');
+    mkdirSync(path.join(hub, "plugins", "notes"), { recursive: true });
+    expect(bundledHubPlugins(hub)).toEqual([shipped]);
+    const plugins = await hubPlugins(hub);
+    expect(plugins.map((p) => p.path)).toContain(shipped);
+    expect(plugins).toHaveLength(2);
+    for (const p of plugins)
+      if (p.path !== shipped) rmSync(p.path, { recursive: true, force: true });
   });
 });

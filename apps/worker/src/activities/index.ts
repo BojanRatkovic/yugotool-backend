@@ -56,7 +56,8 @@ import {
 } from "../runner/hub-research";
 import {
   hubOfRepo,
-  hubPlugin,
+  hubPluginNames,
+  hubPlugins,
   hubRepoNames,
   hubSession,
   linkIgnoredFiles,
@@ -390,14 +391,14 @@ export function createActivities(db: Database) {
       );
       if (hub) {
         const linked = await linkIgnoredFiles(row.project.repoPath, workspace.path).catch(() => []);
-        const plugin = await hubPlugin(hub).catch(() => null);
+        const plugins = await hubPluginNames(hub).catch(() => []);
         await appendEvent(
           input.runId,
           null,
           "system",
           [
-            `Work hub ${hub}: worktree in its worktrees/, hub CLAUDE.md/AGENTS.md and knowledge readable`,
-            plugin ? `skills ${plugin.skills.join(", ")}` : null,
+            `Work hub ${hub}: worktree in its worktrees/, hub instructions in the prompt, knowledge readable`,
+            plugins.length ? `plugins ${plugins.join(", ")}` : null,
             linked.length ? `linked ignored files ${linked.join(", ")}` : null,
           ]
             .filter(Boolean)
@@ -476,14 +477,14 @@ export function createActivities(db: Database) {
         `Workspace ready for ${input.repo} on branch ${workspace.branch} (from ${baseBranch})`,
       );
       const linked = await linkIgnoredFiles(repoPath, workspace.path).catch(() => []);
-      const plugin = await hubPlugin(input.hub).catch(() => null);
+      const plugins = await hubPluginNames(input.hub).catch(() => []);
       await appendEvent(
         input.runId,
         null,
         "system",
         [
-          `Work hub ${input.hub}: worktree in its worktrees/, hub CLAUDE.md/AGENTS.md and knowledge readable`,
-          plugin ? `skills ${plugin.skills.join(", ")}` : null,
+          `Work hub ${input.hub}: worktree in its worktrees/, hub instructions in the prompt, knowledge readable`,
+          plugins.length ? `plugins ${plugins.join(", ")}` : null,
           linked.length ? `linked ignored files ${linked.join(", ")}` : null,
         ]
           .filter(Boolean)
@@ -693,9 +694,14 @@ export function createActivities(db: Database) {
       ctx.cancellationSignal.addEventListener("abort", () => abortController.abort());
 
       const research = input.hubResearch ?? null;
-      // In the hub the project settings load its own skills; a hub worktree gets them as a plugin.
+      // In the hub its CLAUDE.md loads as the project's; its plugins load in both places.
       const hub = research
-        ? { readRoots: [], plugins: [], tools: ["Skill"], prompt: hubResearchPrompt(research) }
+        ? {
+            readRoots: [],
+            plugins: await hubPlugins(input.worktreePath),
+            tools: ["Skill"],
+            prompt: hubResearchPrompt(research),
+          }
         : await hubSession(input.worktreePath);
       const readRoots = [...(input.knowledge ?? []).map((k) => k.dir), ...(hub?.readRoots ?? [])];
       const tools = [...input.station.allowedTools, ...(hub?.tools ?? [])];
