@@ -39,15 +39,37 @@ const frontendDist = path.resolve(backend, "..", "zastava-frontend", "dist");
 const stage = path.join(desktop, ".stage", arch);
 const app = path.join(stage, "app");
 
-/** Run as entry points by path (supervisor spawns api + worker; Electron loads desktop). */
-const APPS = ["api", "worker", "desktop"];
-/** Imported as @zastava/<name>; installed into node_modules from local copies. */
-const PACKAGES = { contracts: "packages", db: "packages", notify: "packages", supervisor: "apps" };
-
 const sorted = (record) =>
   Object.fromEntries(Object.entries(record).toSorted(([a], [b]) => a.localeCompare(b)));
 const readJson = (file) => JSON.parse(readFileSync(file, "utf8"));
 const step = (text) => console.log(`[stage ${arch}] ${text}`);
+
+/** Run as entry points by path (supervisor spawns api + worker; Electron loads desktop). */
+const APPS = ["api", "worker", "desktop"];
+/**
+ * Imported as @zastava/<name>; installed into node_modules from local copies.
+ * Every `workspace:` dependency the apps reach, so a new package can't be left out.
+ */
+const PACKAGES = {};
+{
+  const workspace = new Map();
+  for (const root of ["apps", "packages"]) {
+    for (const name of readdirSync(path.join(backend, root))) {
+      const file = path.join(backend, root, name, "package.json");
+      if (existsSync(file)) workspace.set(readJson(file).name, { name, root, file });
+    }
+  }
+  const queue = APPS.map((name) => path.join(backend, "apps", name, "package.json"));
+  while (queue.length > 0) {
+    const manifest = readJson(queue.pop());
+    for (const [dep, range] of Object.entries(manifest.dependencies ?? {})) {
+      const target = workspace.get(dep);
+      if (!String(range).startsWith("workspace:") || !target || PACKAGES[target.name]) continue;
+      PACKAGES[target.name] = target.root;
+      queue.push(target.file);
+    }
+  }
+}
 
 // ── Preconditions ─────────────────────────────────────────────────────────────
 for (const dir of [
@@ -177,6 +199,26 @@ if (!existsSync(path.join(bridgeReleases, bridgeTarget)))
 for (const target of readdirSync(bridgeReleases)) {
   if (target !== bridgeTarget)
     rmSync(path.join(bridgeReleases, target), { recursive: true, force: true });
+}
+
+// Postgres contrib modules: the schema uses none (gen_random_uuid is core). Keep
+// what initdb and the server load themselves: PL/pgSQL, the text-search
+// dictionaries, encoding conversions, replication output plugins.
+const pgModules = path.join(
+  app,
+  "node_modules",
+  "@embedded-postgres",
+  `darwin-${arch}`,
+  "native",
+  "lib",
+  "postgresql",
+);
+const keepPgModule = (file) =>
+  /^(plpgsql|dict_snowball|libpqwalreceiver|pgoutput)\.dylib$|_and_/.test(file);
+if (!existsSync(path.join(pgModules, "plpgsql.dylib")))
+  throw new Error(`no plpgsql in ${pgModules}`);
+for (const file of readdirSync(pgModules)) {
+  if (!keepPgModule(file)) rmSync(path.join(pgModules, file), { recursive: true, force: true });
 }
 
 // ── Workflow bundle: the worker skips webpack at start-up ────────────────────
