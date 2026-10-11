@@ -32,6 +32,8 @@ const envSchema = z.object({
   /** Passed through to the worker (API-key auth instead of the Claude login). */
   ANTHROPIC_API_KEY: z.string().optional(),
   PATH: z.string().default("/usr/bin:/bin"),
+  /** The API's default repos folder (same default); Settings may override it. */
+  REPOS_ROOT: z.string().default(path.join(os.homedir(), "Desktop", "Developer")),
   /** "app" when the desktop app shows notifications itself. */
   ZASTAVA_DESKTOP_NOTICES: z.enum(["osascript", "app"]).default("osascript"),
 });
@@ -54,6 +56,8 @@ export interface SupervisorConfig {
   node: string;
   anthropicApiKey: string | undefined;
   path: string;
+  /** Default repos folder; the folders step asks macOS for its guarded parent. */
+  reposRoot: string;
   desktopNotices: "osascript" | "app";
   /** Added to the API's and worker's env (the desktop app sets ELECTRON_RUN_AS_NODE). */
   extraEnv?: Record<string, string>;
@@ -86,6 +90,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): SupervisorConf
     node: e.ZASTAVA_NODE,
     anthropicApiKey: e.ANTHROPIC_API_KEY,
     path: e.PATH,
+    reposRoot: e.REPOS_ROOT,
     desktopNotices: e.ZASTAVA_DESKTOP_NOTICES,
   };
 }

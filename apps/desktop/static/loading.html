@@ -220,6 +220,7 @@
         runtime: "Claude Code + workflow engine",
         postgres: "Database",
         migrations: "Migrations",
+        folders: "Folder access",
         temporal: "Workflow engine",
         api: "API",
         worker: "Worker",
@@ -232,15 +233,16 @@
         restarting: "Restarting…",
         failed: "Failed",
       };
-      const order = ["runtime", "postgres", "migrations", "temporal", "api", "worker"];
+      const order = ["runtime", "postgres", "migrations", "folders", "temporal", "api", "worker"];
       const services = document.getElementById("services");
       const hint = document.getElementById("hint");
       const HINT = "Starting the factory…";
       const render = (status) => {
         const byName = Object.fromEntries((status?.services ?? []).map((s) => [s.name, s]));
-        // A checkout has nothing to fetch: no row for it.
+        // Nothing to fetch (a checkout) or no guarded folder in use: no row.
         const shown = order.filter(
-          (name) => !(name === "runtime" && byName.runtime?.detail === "not needed"),
+          (name) =>
+            !((name === "runtime" || name === "folders") && byName[name]?.detail === "not needed"),
         );
         services.replaceChildren(
           ...shown.map((name) => {
@@ -251,7 +253,9 @@
               '<span class="dot"></span><span class="name"></span><span class="state"></span>';
             row.querySelector(".name").textContent = LABELS[name];
             row.querySelector(".state").textContent = STATES[s.state];
-            if (s.state === "starting" && s.progress) {
+            if (name === "folders" && s.state === "starting" && s.progress) {
+              row.querySelector(".state").textContent = "Waiting for you";
+            } else if (s.state === "starting" && s.progress) {
               const { done, total } = s.progress;
               const pct = total ? Math.min(100, Math.round((done / total) * 100)) : null;
               row.classList.add("has-progress");
@@ -271,9 +275,12 @@
         );
         if (document.getElementById("error").style.display === "block") return;
         const fetching = byName.runtime?.state === "starting" ? byName.runtime : null;
-        hint.textContent = fetching?.progress
-          ? `First start: ${fetching.detail}. This happens once.`
-          : HINT;
+        const asking = byName.folders?.state === "starting" ? byName.folders : null;
+        hint.textContent = asking?.progress
+          ? `macOS is asking: click Allow to ${asking.detail}. Don't see the dialog? System Settings → Privacy & Security → Files and Folders → ZASTAVA.`
+          : fetching?.progress
+            ? `First start: ${fetching.detail}. This happens once.`
+            : HINT;
       };
       render(null);
       const desktop = window.zastavaDesktop;

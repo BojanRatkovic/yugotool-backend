@@ -10,19 +10,28 @@ import { z } from "zod";
 import { Child, type ChildSpec } from "./child";
 import { databaseUrl, PG_DATABASE, PG_PASSWORD, PG_USER, type SupervisorConfig } from "./config";
 import type { LogFile } from "./log-file";
+import { checkFolderAccess, protectedFolders } from "./folders";
 import { migrate } from "./migrate";
 import { ensureRuntime, findTool, progressText, type RuntimeProgress, toolPath } from "./runtime";
 
 const execFileAsync = promisify(execFile);
 const binariesSchema = z.object({ initdb: z.string(), postgres: z.string() });
 
-export type ServiceName = "runtime" | "postgres" | "migrations" | "temporal" | "api" | "worker";
+export type ServiceName =
+  | "runtime"
+  | "postgres"
+  | "migrations"
+  | "folders"
+  | "temporal"
+  | "api"
+  | "worker";
 
 /** Start order; stop runs in reverse. */
 export const SERVICE_ORDER: ServiceName[] = [
   "runtime",
   "postgres",
   "migrations",
+  "folders",
   "temporal",
   "api",
   "worker",
@@ -45,7 +54,7 @@ export interface ServiceContext {
   config: SupervisorConfig;
   log: (name: ServiceName) => LogFile;
   onCrash: (name: ServiceName, reason: string) => void;
-  /** A long start reporting how far it got (the runtime download). */
+  /** A long start reporting how far it got (the runtime download, a macOS dialog). */
   progress: (name: ServiceName, progress: RuntimeProgress, detail: string) => void;
 }
 
@@ -54,6 +63,7 @@ export function createServices(ctx: ServiceContext): Record<ServiceName, Service
     runtime: runtime(ctx),
     postgres: postgres(ctx),
     migrations: migrations(ctx),
+    folders: folders(ctx),
     temporal: temporal(ctx),
     api: api(ctx),
     worker: worker(ctx),
@@ -271,6 +281,79 @@ function migrations({ config, log }: ServiceContext): Service {
   };
 }
 
+// ── Folder access (one-shot, macOS) ───────────────────────────────────────────
+
+/**
+ * Asks macOS for the guarded folders (Desktop, Documents, Downloads) the
+ * projects and the repos folder live in, before the API reads them. Unanswered,
+ * the dialog blocks those reads and the API hangs; here the loading screen
+ * says what it waits for. A refusal fails the start only for a project's folder.
+ */
+function folders({ config, log, progress }: ServiceContext): Service {
+  const file = log("folders");
+  let abort: AbortController | null = null;
+  return {
+    name: "folders",
+    oneShot: true,
+    port: null,
+    pid: () => null,
+    async start() {
+      if (process.platform !== "darwin") return "not needed";
+      const { projects, reposRoot } = await folderPaths(config);
+      const needed = new Set(protectedFolders(projects));
+      const wanted = protectedFolders([...projects, reposRoot ?? config.reposRoot]);
+      if (wanted.length === 0) return "not needed";
+      abort = new AbortController();
+      const denied: string[] = [];
+      for (const folder of wanted) {
+        const name = path.basename(folder);
+        const access = await checkFolderAccess(folder, {
+          signal: abort.signal,
+          onWaiting: () => {
+            file.line(`waiting for the macOS dialog for ${folder}`);
+            progress("folders", { done: 0, total: null }, `allow access to your ${name} folder`);
+          },
+        });
+        file.line(`${folder}: ${access}`);
+        if (access === "granted") continue;
+        if (needed.has(folder)) {
+          throw new Error(
+            `ZASTAVA can't read your ${name} folder, where your projects are. Allow it in System Settings → Privacy & Security → Files and Folders → ZASTAVA, then try again`,
+          );
+        }
+        denied.push(name);
+      }
+      return denied.length
+        ? `no access to ${denied.join(", ")}; pick another repos folder in Settings`
+        : wanted.map((folder) => path.basename(folder)).join(", ");
+    },
+    async stop() {
+      abort?.abort();
+      abort = null;
+    },
+    healthy: () => Promise.resolve(true),
+  };
+}
+
+async function folderPaths(
+  config: SupervisorConfig,
+): Promise<{ projects: string[]; reposRoot: string | null }> {
+  const client = new Client({ connectionString: databaseUrl(config) });
+  await client.connect();
+  try {
+    const projects = await client.query<{ repo_path: string }>(`select repo_path from projects`);
+    const settings = await client.query<{ repos_root: string | null }>(
+      `select repos_root from settings limit 1`,
+    );
+    return {
+      projects: projects.rows.map((row) => row.repo_path),
+      reposRoot: settings.rows[0]?.repos_root ?? null,
+    };
+  } finally {
+    await client.end();
+  }
+}
+
 // ── Temporal dev server (file DB in ~/.zastava/temporal.db) ───────────────────
 
 function temporal({ config, log, onCrash }: ServiceContext): Service {
@@ -345,7 +428,7 @@ function temporalBin(config: SupervisorConfig): string {
  * inherit it, and `npm ci` under NODE_ENV=production skips devDependencies.
  */
 function nodeEnv(config: SupervisorConfig): NodeJS.ProcessEnv {
-  const { NODE_ENV: _nodeEnv, ...inherited } = process.env;
+  const { NODE_ENV: _nodeEnv, ...inherited } = withoutClaudeSession(process.env);
   const claude = claudeBin(config);
   return {
     ...inherited,
@@ -357,6 +440,18 @@ function nodeEnv(config: SupervisorConfig): NodeJS.ProcessEnv {
     ...config.extraEnv,
     ...(config.anthropicApiKey ? { ANTHROPIC_API_KEY: config.anthropicApiKey } : {}),
   };
+}
+
+/**
+ * Variables a Claude Code session sets for its own children. Started from such
+ * a terminal, the app passed them on and every Agent SDK session it ran took
+ * itself for a child of that session and hung. User settings (CLAUDE_CONFIG_DIR,
+ * CLAUDE_CODE_USE_BEDROCK…) stay. Pure.
+ */
+export function withoutClaudeSession(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const session =
+    /^(CLAUDECODE|CLAUDE_PID|CLAUDE_AGENT_SDK_VERSION|CLAUDE_CODE_(ENTRYPOINT|EXECPATH|CHILD_SESSION|SESSION_.+|MESSAGING_.+|SDK_.+))$/;
+  return Object.fromEntries(Object.entries(env).filter(([key]) => !session.test(key)));
 }
 
 function apiEnv(config: SupervisorConfig): NodeJS.ProcessEnv {
@@ -411,17 +506,16 @@ function api({ config, log, onCrash }: ServiceContext): Service {
 
 function worker({ config, log, onCrash }: ServiceContext): Service {
   const file = log("worker");
-  const child = new Child(
-    {
-      command: config.node,
-      args: [config.workerEntry],
-      cwd: path.dirname(path.dirname(config.workerEntry)),
-      env: nodeEnv(config),
-      // Lets in-flight bookkeeping finish; agent sessions are cut (runs fail, can be run again).
-      stopTimeoutMs: 30_000,
-    },
-    file,
-    (code, signal) => onCrash("worker", exitReason(code, signal)),
+  const spec: ChildSpec = {
+    command: config.node,
+    args: [config.workerEntry],
+    cwd: path.dirname(path.dirname(config.workerEntry)),
+    env: nodeEnv(config),
+    // Lets in-flight bookkeeping finish; agent sessions are cut (runs fail, can be run again).
+    stopTimeoutMs: 30_000,
+  };
+  const child = new Child(spec, file, (code, signal) =>
+    onCrash("worker", exitReason(code, signal)),
   );
   return {
     name: "worker",
@@ -432,6 +526,8 @@ function worker({ config, log, onCrash }: ServiceContext): Service {
       if (!existsSync(config.workerEntry))
         throw new Error(`worker not built: ${config.workerEntry}`);
       await mkdir(config.home, { recursive: true });
+      // PATH may have changed since (the desktop app reads the login shell late).
+      spec.env = nodeEnv(config);
       child.start();
       // The worker logs nothing on success; staying up for a few seconds means it connected.
       await sleep(3_000);

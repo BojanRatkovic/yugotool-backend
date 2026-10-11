@@ -29,10 +29,9 @@ const needsYouListSchema = needsYouItemSchema.array();
 
 if (!app.requestSingleInstanceLock()) app.quit();
 
-// Finder-launched apps get launchd's PATH; take the login shell's so git, gh,
-// nvm and temporal resolve. API and worker run on Electron's own Node.
-const shellPath = loginShellPath();
-process.env["PATH"] = withWellKnownDirs(shellPath.path ?? process.env["PATH"] ?? "");
+// Finder-launched apps get launchd's PATH; the login shell's comes in before
+// the API starts (readShellPath). API and worker run on Electron's own Node.
+process.env["PATH"] = withWellKnownDirs(process.env["PATH"] ?? "");
 /**
  * Packaged app layout (scripts/dist.mjs): code in Resources/app, the web UI in
  * Resources/web. Claude Code and the temporal CLI are fetched on first start
@@ -70,11 +69,22 @@ let asking = false;
 
 // Crash logs stay on this Mac: minidumps in ~/.zastava/crashes, the rest in logs/desktop.log.
 const log = new LogFile(config.logsDir, "desktop");
-log.line(
-  shellPath.error
-    ? `PATH: login shell failed, using fallback (${shellPath.error}): ${process.env["PATH"]}`
-    : `PATH: ${process.env["PATH"]}`,
-);
+
+/**
+ * Takes the login shell's PATH so git, gh and nvm resolve for API, worker and
+ * agents. Read after the folders step: rc files that touch ~/Desktop would
+ * otherwise wait on macOS's access dialog and time out.
+ */
+function readShellPath(): void {
+  const shellPath = loginShellPath();
+  if (shellPath.path) process.env["PATH"] = withWellKnownDirs(shellPath.path);
+  config.path = process.env["PATH"] ?? config.path;
+  log.line(
+    shellPath.error
+      ? `PATH: login shell failed, using fallback (${shellPath.error}): ${process.env["PATH"]}`
+      : `PATH: ${process.env["PATH"]}`,
+  );
+}
 app.setPath("crashDumps", path.join(config.home, "crashes"));
 crashReporter.start({ uploadToServer: false });
 process.on("uncaughtException", (error) => log.line(`uncaught: ${error.stack ?? String(error)}`));
@@ -174,7 +184,9 @@ function supervisorReady(): boolean {
 }
 
 async function startServices(): Promise<void> {
-  supervisor = new Supervisor(config);
+  supervisor = new Supervisor(config, (name) => {
+    if (name === "api") readShellPath();
+  });
   supervisor.on("status", (next) => {
     status = next;
     window?.webContents.send("zastava:status", next);

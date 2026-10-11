@@ -8,6 +8,8 @@ import type { AccountAuth } from "../claude-accounts/claude-accounts.service";
 
 /** The probe spawns a Claude Code process; a minute of staleness is fine for a meter. */
 const CACHE_MS = 60_000;
+/** A failed probe (cold start, network) is tried again soon, not shown for a minute. */
+const FAILED_CACHE_MS = 5_000;
 const PROBE_TIMEOUT_MS = 20_000;
 
 interface RawWindow {
@@ -30,7 +32,8 @@ export class PlanUsageService {
   async get(account: Pick<AccountAuth, "accountId" | "target"> | null = null): Promise<PlanUsage> {
     const key = account?.accountId ?? "env";
     const hit = this.cached.get(key);
-    if (hit && Date.now() - hit.at < CACHE_MS) return hit.value;
+    if (hit && Date.now() - hit.at < (hit.value.error ? FAILED_CACHE_MS : CACHE_MS))
+      return hit.value;
     let pending = this.inflight.get(key);
     if (!pending) {
       pending = this.probe(account).finally(() => this.inflight.delete(key));

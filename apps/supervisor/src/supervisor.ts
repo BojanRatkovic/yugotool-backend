@@ -17,7 +17,7 @@ import {
 } from "./services";
 
 const serviceStatusSchema = z.object({
-  name: z.enum(["runtime", "postgres", "migrations", "temporal", "api", "worker"]),
+  name: z.enum(["runtime", "postgres", "migrations", "folders", "temporal", "api", "worker"]),
   state: z.enum(["stopped", "starting", "running", "done", "restarting", "failed"]),
   pid: z.number().int().nullable(),
   port: z.number().int().nullable(),
@@ -73,7 +73,11 @@ export class Supervisor extends EventEmitter<{ status: [SupervisorStatus] }> {
   private stopping = false;
   private readonly startedAt = new Date().toISOString();
 
-  constructor(private readonly config: SupervisorConfig) {
+  constructor(
+    private readonly config: SupervisorConfig,
+    /** Runs before each service's first start (the desktop app reads the login shell before the API). */
+    private readonly beforeStart: (name: ServiceName) => void | Promise<void> = () => undefined,
+  ) {
     super();
     this.services = createServices({
       config,
@@ -122,6 +126,7 @@ export class Supervisor extends EventEmitter<{ status: [SupervisorStatus] }> {
     await this.claimPorts();
     for (const name of SERVICE_ORDER) {
       try {
+        await this.beforeStart(name);
         await this.startService(name);
       } catch (error) {
         await this.stop();
