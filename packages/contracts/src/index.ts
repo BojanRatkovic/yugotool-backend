@@ -1287,8 +1287,20 @@ export const runSchema = z.object({
 });
 export type Run = z.infer<typeof runSchema>;
 
+export const diffFileSchema = z.object({
+  path: z.string(),
+  /** Set when the file was renamed. */
+  oldPath: z.string().nullable(),
+  status: z.enum(["added", "deleted", "modified", "renamed"]),
+  additions: z.number().int(),
+  deletions: z.number().int(),
+  binary: z.boolean(),
+});
+export type DiffFile = z.infer<typeof diffFileSchema>;
+
+/** Every changed file, always complete; `truncated` only when the patch passed its (very large) cap. */
 export const runDiffSchema = z.object({
-  stat: z.string(),
+  files: z.array(diffFileSchema),
   patch: z.string(),
   truncated: z.boolean(),
 });

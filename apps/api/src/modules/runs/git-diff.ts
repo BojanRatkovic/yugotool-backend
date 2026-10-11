@@ -39,9 +39,64 @@ export function gitCapped(cwd: string, args: string[], maxChars: number): Promis
   });
 }
 
+import type { DiffFile } from "@yugotool/contracts";
+
 export interface DiffLimits {
   patchChars: number;
-  statChars: number;
+  /** Cap for the `--numstat` / `--name-status` listings: kilobytes, even for thousands of files. */
+  listChars: number;
+}
+
+export interface Diff {
+  files: DiffFile[];
+  patch: string;
+  truncated: boolean;
+}
+
+const STATUS: Record<string, DiffFile["status"]> = {
+  A: "added",
+  D: "deleted",
+  R: "renamed",
+};
+
+/**
+ * `git diff -z --numstat` and `-z --name-status` (both with `-M`) → files.
+ * Pure. A rename is `R<score>\0old\0new` in the one and `a\td\t\0old\0new` in
+ * the other; a binary file counts `-\t-`.
+ */
+export function parseDiffFiles(numstat: string, nameStatus: string): DiffFile[] {
+  const statuses = new Map<string, DiffFile["status"]>();
+  const names = nameStatus.split("\0");
+  for (let i = 0; i + 1 < names.length;) {
+    const code = names[i] ?? "";
+    const renamed = code.startsWith("R") || code.startsWith("C");
+    const target = names[renamed ? i + 2 : i + 1] ?? "";
+    statuses.set(target, STATUS[code.charAt(0)] ?? "modified");
+    i += renamed ? 3 : 2;
+  }
+  const files: DiffFile[] = [];
+  const fields = numstat.split("\0");
+  for (let i = 0; i < fields.length;) {
+    const match = /^(-|\d+)\t(-|\d+)\t(.*)$/s.exec(fields[i] ?? "");
+    if (match === null) {
+      i += 1;
+      continue;
+    }
+    const [, added = "-", deleted = "-", inline = ""] = match;
+    const renamed = inline === "";
+    const oldPath = renamed ? (fields[i + 1] ?? "") : null;
+    const filePath = renamed ? (fields[i + 2] ?? "") : inline;
+    i += renamed ? 3 : 1;
+    files.push({
+      path: filePath,
+      oldPath,
+      status: statuses.get(filePath) ?? (renamed ? "renamed" : "modified"),
+      additions: added === "-" ? 0 : Number(added),
+      deletions: deleted === "-" ? 0 : Number(deleted),
+      binary: added === "-" && deleted === "-",
+    });
+  }
+  return files;
 }
 
 /**
@@ -61,29 +116,29 @@ export async function diffBase(cwd: string, baseBranch: string, head = "HEAD"): 
   return baseBranch;
 }
 
-/**
- * Worktree vs the merge-base with its base: committed and uncommitted changes, new files included.
- * Both the patch and the stat are capped; an over-long stat is cut at a line
- * boundary and closed with the `--shortstat` summary so totals stay visible.
- */
+/** The file list and the patch of `git diff <range>`; the list is never cut. */
+async function diffOf(cwd: string, range: string[], limits: DiffLimits): Promise<Diff> {
+  const flags = ["-M", "--no-color", "--no-ext-diff"];
+  const [numstat, nameStatus, patch] = await Promise.all([
+    gitCapped(cwd, ["diff", ...flags, "-z", "--numstat", ...range], limits.listChars),
+    gitCapped(cwd, ["diff", ...flags, "-z", "--name-status", ...range], limits.listChars),
+    gitCapped(cwd, ["diff", ...flags, ...range], limits.patchChars),
+  ]);
+  return {
+    files: parseDiffFiles(numstat.text, nameStatus.text),
+    patch: patch.text,
+    truncated: patch.truncated,
+  };
+}
+
+/** Worktree vs the merge-base with its base: committed and uncommitted changes, new files included. */
 export async function worktreeDiff(
   cwd: string,
   baseBranch: string,
   limits: DiffLimits,
-): Promise<{ stat: string; patch: string; truncated: boolean }> {
+): Promise<Diff> {
   await gitCapped(cwd, ["add", "--intent-to-add", "."], 10_000);
-  const base = await diffBase(cwd, baseBranch);
-  const [stat, patch] = await Promise.all([
-    gitCapped(cwd, ["diff", "--stat", base], limits.statChars),
-    gitCapped(cwd, ["diff", base], limits.patchChars),
-  ]);
-  let statText = stat.text.trim();
-  if (stat.truncated) {
-    const short = await gitCapped(cwd, ["diff", "--shortstat", base], 1_000);
-    const lastNewline = stat.text.lastIndexOf("\n");
-    statText = `${stat.text.slice(0, Math.max(lastNewline, 0))}\n …\n${short.text.trim()}`.trim();
-  }
-  return { stat: statText, patch: patch.text, truncated: patch.truncated };
+  return diffOf(cwd, [await diffBase(cwd, baseBranch)], limits);
 }
 
 /**
@@ -95,17 +150,6 @@ export async function branchDiff(
   branch: string,
   baseBranch: string,
   limits: DiffLimits,
-): Promise<{ stat: string; patch: string; truncated: boolean }> {
-  const base = await diffBase(repoPath, baseBranch, branch);
-  const [stat, patch] = await Promise.all([
-    gitCapped(repoPath, ["diff", "--stat", base, branch], limits.statChars),
-    gitCapped(repoPath, ["diff", base, branch], limits.patchChars),
-  ]);
-  let statText = stat.text.trim();
-  if (stat.truncated) {
-    const short = await gitCapped(repoPath, ["diff", "--shortstat", base, branch], 1_000);
-    const lastNewline = stat.text.lastIndexOf("\n");
-    statText = `${stat.text.slice(0, Math.max(lastNewline, 0))}\n …\n${short.text.trim()}`.trim();
-  }
-  return { stat: statText, patch: patch.text, truncated: patch.truncated };
+): Promise<Diff> {
+  return diffOf(repoPath, [await diffBase(repoPath, baseBranch, branch), branch], limits);
 }

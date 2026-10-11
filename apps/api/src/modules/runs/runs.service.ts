@@ -39,10 +39,10 @@ import { RunsRepository } from "./runs.repository";
 
 /** Shift station memory inside the worktree (written by the worker). */
 const MEMORY_DIR = ".yugotool";
-/** A diff bigger than this is unreadable in a sheet anyway. */
-const MAX_PATCH_CHARS = 200_000;
-/** A `--stat` past this is cut and closed with the `--shortstat` totals. */
-const MAX_STAT_CHARS = 50_000;
+/** The UI virtualizes the patch, so only a runaway diff (a committed dump) hits this. */
+const MAX_PATCH_CHARS = 30_000_000;
+/** The file list: ~100 bytes a file, so this is tens of thousands of files. */
+const MAX_LIST_CHARS = 5_000_000;
 
 @Injectable()
 export class RunsService {
@@ -65,7 +65,7 @@ export class RunsService {
   async diff(runId: string): Promise<RunDiff> {
     const workspace = await this.repository.findWorkspace(this.database.db, runId);
     if (!workspace) throw new RunNotFoundError(`run ${runId} not found`);
-    const limits = { patchChars: MAX_PATCH_CHARS, statChars: MAX_STAT_CHARS };
+    const limits = { patchChars: MAX_PATCH_CHARS, listChars: MAX_LIST_CHARS };
     const cwd = workspace.worktreePath;
     if (cwd && existsSync(cwd)) return worktreeDiff(cwd, workspace.baseBranch, limits);
     // Finished runs: the worktree was removed, the branch holds the work.
