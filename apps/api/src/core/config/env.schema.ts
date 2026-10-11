@@ -29,10 +29,20 @@ const envSchema = z.object({
   DESKTOP_NOTICES: z.enum(["osascript", "app"]).default("osascript"),
   /** Interface to bind; the desktop app keeps it on loopback. */
   HOST: z.string().optional(),
+  /** The Claude Code binary for `claude auth …` (spec 0016); tests point it at a stub. */
+  CLAUDE_BIN: z.string().default("claude"),
 });
 
 export type Env = z.infer<typeof envSchema>;
 
 export function validateEnv(config: Record<string, unknown>): Env {
   return envSchema.parse(config);
+}
+
+/**
+ * The environment child processes inherit (`claude auth …`), before a Claude
+ * account adjusts it. Read here so this file stays the only `process.env` reader.
+ */
+export function childProcessEnv(): Record<string, string | undefined> {
+  return { ...process.env };
 }

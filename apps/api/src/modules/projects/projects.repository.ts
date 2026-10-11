@@ -12,7 +12,15 @@ import type {
   UpdateHubRepo,
   UpdateProject,
 } from "@zastava/contracts";
-import { type Executor, lines, projects, runs, stationRuns, workOrders } from "@zastava/db";
+import {
+  claudeAccounts,
+  type Executor,
+  lines,
+  projects,
+  runs,
+  stationRuns,
+  workOrders,
+} from "@zastava/db";
 import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { iso } from "../../common/mappers";
 import { hubOfRepo } from "./work-hub";
@@ -189,6 +197,14 @@ export class ProjectsRepository {
       .where(eq(projects.id, id))
       .returning();
     return row ? toProject(row) : null;
+  }
+
+  async claudeAccountExists(db: Executor, id: string): Promise<boolean> {
+    const [row] = await db
+      .select({ id: claudeAccounts.id })
+      .from(claudeAccounts)
+      .where(eq(claudeAccounts.id, id));
+    return row !== undefined;
   }
 
   async update(db: Executor, id: string, patch: UpdateProject): Promise<Project | null> {

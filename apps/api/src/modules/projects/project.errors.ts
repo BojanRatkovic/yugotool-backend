@@ -62,3 +62,8 @@ export class PreviewSignInNotRunningError extends DomainError {
   readonly code = "preview_sign_in_not_running";
   readonly kind = "conflict";
 }
+
+export class ProjectClaudeAccountNotFoundError extends DomainError {
+  readonly code = "claude_account_not_found";
+  readonly kind = "not_found";
+}

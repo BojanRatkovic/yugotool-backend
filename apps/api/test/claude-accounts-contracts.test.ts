@@ -3,8 +3,11 @@ import {
   claudeAccountSchema,
   createClaudeAccountSchema,
   discoveredAccountSchema,
+  claudeAccountEnv,
   settingsSchema,
+  startClaudeLoginSchema,
   updateProjectSchema,
+  updateSettingsSchema,
 } from "@zastava/contracts";
 import { describe, expect, it } from "vitest";
 
@@ -30,20 +33,24 @@ describe("Claude account contracts (spec 0016)", () => {
     expect(account).not.toHaveProperty("apiKey");
   });
 
-  it("creates from a config dir, a login or an API key", () => {
+  it("creates from a config dir or an API key; logins start elsewhere", () => {
     expect(
       createClaudeAccountSchema.parse({ kind: "config_dir", configDir: "/u/.claude" }).kind,
     ).toBe("config_dir");
-    expect(
-      createClaudeAccountSchema.parse({ kind: "login", label: "Personal", email: "a@b.co" }).kind,
-    ).toBe("login");
+    expect(createClaudeAccountSchema.safeParse({ kind: "login", label: "Personal" }).success).toBe(
+      false,
+    );
+    expect(startClaudeLoginSchema.parse({ label: "Personal", email: "a@b.co" })).toEqual({
+      label: "Personal",
+      email: "a@b.co",
+    });
     expect(
       createClaudeAccountSchema.parse({ kind: "api_key", label: "Key", apiKey: " sk-ant-x " }),
     ).toMatchObject({ apiKey: "sk-ant-x" });
   });
 
-  it("rejects a login without a label and an API key account without a key", () => {
-    expect(createClaudeAccountSchema.safeParse({ kind: "login" }).success).toBe(false);
+  it("rejects a config dir account without a dir and an API key account without a key", () => {
+    expect(createClaudeAccountSchema.safeParse({ kind: "config_dir" }).success).toBe(false);
     expect(createClaudeAccountSchema.safeParse({ kind: "api_key", label: "Key" }).success).toBe(
       false,
     );
@@ -78,5 +85,38 @@ describe("Claude account contracts (spec 0016)", () => {
     expect(updateProjectSchema.parse({ claudeAccountId: null })).toEqual({ claudeAccountId: null });
     expect(updateProjectSchema.safeParse({ claudeAccountId: "nope" }).success).toBe(false);
     expect(settingsSchema.shape.defaultClaudeAccountId.parse(null)).toBeNull();
+    // The default goes through PUT /claude-accounts/default, which checks the account.
+    expect(updateSettingsSchema.parse({ defaultClaudeAccountId: ID })).toEqual({});
+  });
+});
+
+const dir = (configDir: string) => ({ kind: "config_dir" as const, configDir, apiKey: null });
+
+describe("claudeAccountEnv (spec 0016)", () => {
+  const base = {
+    PATH: "/bin",
+    ANTHROPIC_API_KEY: "sk-env",
+    CLAUDE_CONFIG_DIR: "/u/.claude-personal",
+  };
+
+  it("leaves the environment alone without an account", () => {
+    expect(claudeAccountEnv(base, null, "/u")).toBe(base);
+  });
+
+  it("points a config dir account at its dir and drops the env API key", () => {
+    expect(claudeAccountEnv(base, dir("/u/.zastava/accounts/a/"), "/u")).toEqual({
+      PATH: "/bin",
+      CLAUDE_CONFIG_DIR: "/u/.zastava/accounts/a",
+    });
+  });
+
+  it("runs ~/.claude with CLAUDE_CONFIG_DIR unset", () => {
+    expect(claudeAccountEnv(base, dir("/u/.claude/"), "/u/")).toEqual({ PATH: "/bin" });
+  });
+
+  it("sets an API key account's key", () => {
+    expect(
+      claudeAccountEnv(base, { kind: "api_key", configDir: null, apiKey: "sk-acct" }, "/u"),
+    ).toMatchObject({ ANTHROPIC_API_KEY: "sk-acct" });
   });
 });

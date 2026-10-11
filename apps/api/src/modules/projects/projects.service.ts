@@ -34,6 +34,7 @@ import {
   PreviewNotConfiguredError,
   PreviewScreenshotMissingError,
   PreviewTestRunningError,
+  ProjectClaudeAccountNotFoundError,
   ProjectHasActiveWorkError,
   ProjectNotFoundError,
   HubRepoNotFoundError,
@@ -185,6 +186,13 @@ export class ProjectsService {
   }
 
   async update(projectId: string, input: UpdateProject): Promise<Project> {
+    if (
+      input.claudeAccountId &&
+      !(await this.repository.claudeAccountExists(this.database.db, input.claudeAccountId))
+    )
+      throw new ProjectClaudeAccountNotFoundError(
+        `Claude account ${input.claudeAccountId} not found`,
+      );
     const project = await this.repository.update(this.database.db, projectId, input);
     if (!project) throw new ProjectNotFoundError(`project ${projectId} not found`);
     await this.events.publish({ type: "invalidate", collection: "projects" });

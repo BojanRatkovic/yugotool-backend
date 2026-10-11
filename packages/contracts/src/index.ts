@@ -842,29 +842,40 @@ export const claudeAccountSchema = z.object({
 });
 export type ClaudeAccount = z.infer<typeof claudeAccountSchema>;
 
-export const createClaudeAccountSchema = z.discriminatedUnion("kind", [
-  /** Use a config dir already signed in on this machine (from discovery). */
-  z.object({
+/**
+ * Adds a config dir already signed in on this machine (from discovery), or an API
+ * key. New logins go through `startClaudeLoginSchema`. An object, not a union, so
+ * it works as a DTO.
+ */
+export const createClaudeAccountSchema = z
+  .object({
     id: z.uuid().optional(),
-    kind: z.literal("config_dir"),
-    configDir: z.string().trim().min(1),
+    kind: claudeAccountKindSchema,
+    /** Defaults to the dir's email for a config dir; required for an API key. */
     label: z.string().trim().min(1).max(120).optional(),
-  }),
-  /** Sign in to a new account in a dir ZASTAVA creates (`claude auth login`). */
-  z.object({
-    id: z.uuid().optional(),
-    kind: z.literal("login"),
-    label: z.string().trim().min(1).max(120),
-    email: z.email().optional(),
-  }),
-  z.object({
-    id: z.uuid().optional(),
-    kind: z.literal("api_key"),
-    label: z.string().trim().min(1).max(120),
-    apiKey: z.string().trim().min(1),
-  }),
-]);
+    configDir: z.string().trim().min(1).optional(),
+    apiKey: z.string().trim().min(1).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.kind === "config_dir" && !value.configDir)
+      ctx.addIssue({ code: "custom", path: ["configDir"], message: "Pick a config dir." });
+    if (value.kind === "api_key" && !value.apiKey)
+      ctx.addIssue({ code: "custom", path: ["apiKey"], message: "Paste the API key." });
+    if (value.kind === "api_key" && !value.label)
+      ctx.addIssue({ code: "custom", path: ["label"], message: "Name the key." });
+  });
 export type CreateClaudeAccount = z.infer<typeof createClaudeAccountSchema>;
+
+/**
+ * Starts `claude auth login`: in a new dir ZASTAVA creates (the account is added
+ * when it succeeds), or again in an existing account's dir (`accountId`).
+ */
+export const startClaudeLoginSchema = z.object({
+  label: z.string().trim().min(1).max(120).optional(),
+  email: z.email().optional(),
+  accountId: z.uuid().optional(),
+});
+export type StartClaudeLogin = z.infer<typeof startClaudeLoginSchema>;
 
 /**
  * A `claude auth login` in progress (spec 0016 §4). `url` is the manual link for
@@ -878,6 +889,12 @@ export const claudeAccountLoginSchema = z.object({
   error: z.string().nullable(),
 });
 export type ClaudeAccountLogin = z.infer<typeof claudeAccountLoginSchema>;
+
+export const setDefaultClaudeAccountSchema = z.object({
+  /** null: back to the worker's environment (today's behaviour). */
+  accountId: z.uuid().nullable(),
+});
+export type SetDefaultClaudeAccount = z.infer<typeof setDefaultClaudeAccountSchema>;
 
 export const claudeAccountLoginCodeSchema = z.object({ code: z.string().trim().min(1) });
 export type ClaudeAccountLoginCode = z.infer<typeof claudeAccountLoginCodeSchema>;
@@ -901,6 +918,37 @@ export const accountPlanUsageSchema = z.object({
   usage: planUsageSchema,
 });
 export type AccountPlanUsage = z.infer<typeof accountPlanUsageSchema>;
+
+/** What a session needs to know about its account to sign in. */
+export interface ClaudeAuthTarget {
+  kind: ClaudeAccountKind;
+  configDir: string | null;
+  apiKey: string | null;
+}
+
+/**
+ * The environment a `claude` process runs with on `account` (spec 0016 §4).
+ * No account: `base` as is (today's behaviour). A config dir clears
+ * ANTHROPIC_API_KEY, and `<home>/.claude` runs with CLAUDE_CONFIG_DIR unset:
+ * set explicitly it reads another keychain item and reports signed out. Pure.
+ */
+export function claudeAccountEnv(
+  base: Record<string, string | undefined>,
+  account: ClaudeAuthTarget | null,
+  home: string,
+): Record<string, string | undefined> {
+  if (!account) return base;
+  const env = { ...base };
+  if (account.kind === "api_key") {
+    if (account.apiKey) env["ANTHROPIC_API_KEY"] = account.apiKey;
+    return env;
+  }
+  delete env["ANTHROPIC_API_KEY"];
+  const dir = (account.configDir ?? "").replace(/\/+$/, "");
+  if (!dir || dir === `${home.replace(/\/+$/, "")}/.claude`) delete env["CLAUDE_CONFIG_DIR"];
+  else env["CLAUDE_CONFIG_DIR"] = dir;
+  return env;
+}
 
 // ── Work order ──────────────────────────────────────────────────────────────
 
@@ -1959,7 +2007,13 @@ export const settingsSchema = z.object({
 export type Settings = z.infer<typeof settingsSchema>;
 
 export const updateSettingsSchema = settingsSchema
-  .omit({ updatedAt: true, anthropicApiKeyHint: true, anthropicApiKeySource: true })
+  .omit({
+    updatedAt: true,
+    anthropicApiKeyHint: true,
+    anthropicApiKeySource: true,
+    // Set through the Claude accounts endpoints, which check the account exists.
+    defaultClaudeAccountId: true,
+  })
   .partial()
   .extend({
     /** Write-only: a key saves it (checked with Anthropic first), null removes the saved key. */
@@ -2116,6 +2170,8 @@ export const collectionNameSchema = z.enum([
   "reviews",
   /** The bell (spec 0011): read state changed. New ones arrive as `notification`. */
   "notifications",
+  /** Settings → Claude accounts (spec 0016). */
+  "claude_accounts",
 ]);
 export type CollectionName = z.infer<typeof collectionNameSchema>;
 

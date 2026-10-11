@@ -129,7 +129,7 @@ export function maskApiKey(key: string): string {
  * Asks Anthropic whether the key works (listing models costs nothing). Only a
  * clear rejection blocks the save; offline, the key is saved unchecked.
  */
-async function checkApiKey(key: string): Promise<void> {
+export async function checkApiKey(key: string): Promise<void> {
   let res: Response;
   try {
     res = await fetch("https://api.anthropic.com/v1/models?limit=1", {
