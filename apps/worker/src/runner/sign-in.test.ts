@@ -141,8 +141,22 @@ describe("retargetSession", () => {
     const { signedInOn: _, ...legacy } = saved;
     const moved = retargetSession(legacy, { host: "localhost", port: 52245, port2: 52246 });
     expect(moved.origins[0]?.origin).toBe("http://localhost:52245");
-    // The API port was not recorded, so its mentions stay.
-    expect(moved.origins[0]?.localStorage[0]?.name).toBe("ptm:auth@localhost-54433");
+    // The one other local port its storage mentions is the API's.
+    expect(moved.origins[0]?.localStorage[0]).toEqual(
+      item("ptm:auth@localhost-52246", '{"token":"t","api":"http://localhost:52246/api/v2"}'),
+    );
+    // Two candidates: the API port stays unknown.
+    const ambiguous = {
+      ...legacy,
+      origins: [
+        {
+          origin: "http://localhost:54432",
+          localStorage: [item("a@localhost-54433", "1"), item("b", "localhost:6000")],
+        },
+      ],
+    };
+    const kept = retargetSession(ambiguous, { host: "localhost", port: 52245, port2: 52246 });
+    expect(kept.origins[0]).toEqual({ ...ambiguous.origins[0], origin: "http://localhost:52245" });
   });
 
   it("leaves the session alone when the ports match or the origin is ambiguous", () => {

@@ -60,9 +60,18 @@ export function hasState(state: StorageState): boolean {
 
 const LOOPBACK = ["localhost", "127.0.0.1"];
 
+const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** `host:port` as apps write it into storage: `localhost:4010`, `localhost-4010`, … */
+function mentions(hosts: string[], ports: string): RegExp {
+  return new RegExp(`(${hosts.map(escapeRegExp).join("|")})(:|-|_|%3A)(${ports})(?!\\d)`, "gi");
+}
+
 /**
  * Sessions saved before `signedInOn` existed: the one origin on this Mac
- * that holds localStorage is where the sign-in ran. Null when it is ambiguous.
+ * that holds localStorage is where the sign-in ran, and the one other local
+ * port its storage mentions is `$PORT2` (e.g. `auth@localhost-54433`). Null
+ * when the origin is ambiguous.
  */
 function inferPlace(state: StorageState, host: string): PreviewPlace | null {
   const local = state.origins
@@ -70,10 +79,16 @@ function inferPlace(state: StorageState, host: string): PreviewPlace | null {
     .map((o) => URL.parse(o.origin))
     .filter((url) => url && url.port && [host, ...LOOPBACK].includes(url.hostname));
   if (local.length !== 1 || !local[0]) return null;
-  return { host: local[0].hostname, port: Number(local[0].port), port2: -1 };
+  const { hostname, port } = local[0];
+  const others = new Set<number>();
+  const pattern = mentions([hostname, ...LOOPBACK], "\\d{2,5}");
+  for (const origin of state.origins)
+    for (const item of origin.localStorage)
+      for (const match of `${item.name}\n${item.value}`.matchAll(pattern))
+        if (match[3] !== port) others.add(Number(match[3]));
+  const [port2] = others.size === 1 ? others : [-1];
+  return { host: hostname, port: Number(port), port2: port2 ?? -1 };
 }
-
-const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
  * Moves a saved session to the preview it is used on. Every preview gets
@@ -95,10 +110,7 @@ export function retargetSession(saved: SavedSession, to: PreviewPlace): StorageS
   const hosts = [...new Set([from.host, ...LOOPBACK])];
   const isOurs = (hostname: string): boolean => hosts.includes(hostname);
   // One pass, so a new port that equals another old one is not moved twice.
-  const mention = new RegExp(
-    `(${hosts.map(escapeRegExp).join("|")})(:|-|_|%3A)(${[...ports.keys()].join("|")})(?!\\d)`,
-    "gi",
-  );
+  const mention = mentions(hosts, [...ports.keys()].join("|"));
   const rewrite = (text: string): string =>
     text.replace(
       mention,
