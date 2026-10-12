@@ -103,14 +103,16 @@ describe("archiveWorkspace", () => {
     writeFileSync(path.join(dir, ".git", "info", "exclude"), ".yugotool/\n");
     const memoryDir = path.join(mkdtempSync(path.join(tmpdir(), "yugotool-mem-")), "memory");
 
-    const snapshot = await localRunner.archiveWorkspace({
+    const { snapshot, deletedBranch } = await localRunner.archiveWorkspace({
       repoPath: dir,
       worktreePath: tree,
       memoryDir,
       message: "wip: unfinished",
+      baseBranch: "main",
     });
 
     expect(snapshot).toMatch(/^[0-9a-f]{7,}$/);
+    expect(deletedBranch).toBeNull();
     expect(existsSync(tree)).toBe(false);
     expect(git(dir, "worktree", "list")).not.toContain(tree);
     expect(git(dir, "show", "yugotool/task-1:a.txt")).toBe("half done");
@@ -132,9 +134,41 @@ describe("archiveWorkspace", () => {
         memoryDir,
         message: "x",
       }),
-    ).toBeNull();
+    ).toEqual({ snapshot: null, deletedBranch: null });
     expect(existsSync(tree)).toBe(false);
     expect(git(dir, "rev-parse", "yugotool/task-2")).toBe(head);
+  });
+
+  it("deletes the branch of a run that changed nothing", async () => {
+    const dir = repo();
+    const tree = path.join(mkdtempSync(path.join(tmpdir(), "yugotool-archive-")), "wt");
+    git(dir, "worktree", "add", "-q", "-b", "yugotool/rejected", tree);
+    const archived = await localRunner.archiveWorkspace({
+      repoPath: dir,
+      worktreePath: tree,
+      memoryDir: path.join(tree, "..", "memory"),
+      message: "x",
+      baseBranch: "main",
+    });
+    expect(archived).toEqual({ snapshot: null, deletedBranch: "yugotool/rejected" });
+    expect(git(dir, "branch", "--list", "yugotool/rejected")).toBe("");
+  });
+
+  it("keeps a clean branch that holds commits of its own", async () => {
+    const dir = repo();
+    const tree = path.join(mkdtempSync(path.join(tmpdir(), "yugotool-archive-")), "wt");
+    git(dir, "worktree", "add", "-q", "-b", "yugotool/delivered", tree);
+    writeFileSync(path.join(tree, "a.txt"), "delivered\n");
+    git(tree, "commit", "-qam", "the work");
+    const archived = await localRunner.archiveWorkspace({
+      repoPath: dir,
+      worktreePath: tree,
+      memoryDir: path.join(tree, "..", "memory"),
+      message: "x",
+      baseBranch: "main",
+    });
+    expect(archived.deletedBranch).toBeNull();
+    expect(git(dir, "show", "yugotool/delivered:a.txt")).toBe("delivered");
   });
 });
 

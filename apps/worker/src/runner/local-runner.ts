@@ -216,17 +216,24 @@ export const localRunner = {
    * Nothing is lost: unfinished changes are committed to the run's branch
    * (hooks skipped — this is a snapshot, not a delivery) and the shift memory
    * (`.yugotool/`, never committed) is copied to `memoryDir` first. Returns the
-   * snapshot commit, or null when the tree was clean.
+   * snapshot commit (null when the tree was clean) and, with `baseBranch`, the
+   * run's branch when it was deleted for holding nothing past the base.
    */
   async archiveWorkspace(input: {
     repoPath: string;
     worktreePath: string;
     memoryDir: string;
     message: string;
-  }): Promise<string | null> {
+    baseBranch?: string;
+  }): Promise<{ snapshot: string | null; deletedBranch: string | null }> {
     const { repoPath, worktreePath } = input;
     let snapshot: string | null = null;
+    let branch = "";
     if (existsSync(worktreePath)) {
+      branch = await gitIn(worktreePath)("symbolic-ref", "--quiet", "--short", "HEAD").then(
+        (out) => out.stdout.trim(),
+        () => "",
+      );
       const memory = path.join(worktreePath, ".yugotool");
       if (existsSync(memory)) await cp(memory, input.memoryDir, { recursive: true });
       const git = gitIn(worktreePath);
@@ -240,7 +247,35 @@ export const localRunner = {
     await localRunner.removeWorktree(repoPath, worktreePath);
     // QA's second worktree on the base commit, if a run stopped mid-QA.
     await localRunner.removeWorktree(repoPath, `${worktreePath}-qa-base`);
-    return snapshot;
+    const deletedBranch =
+      snapshot === null && input.baseBranch
+        ? await localRunner.dropEmptyBranch(repoPath, branch, input.baseBranch)
+        : null;
+    return { snapshot, deletedBranch };
+  },
+
+  /**
+   * Deletes a run's branch (`yugotool/…` only) that has no commit past the base:
+   * a run stopped before it changed anything. Returns the branch when deleted.
+   */
+  async dropEmptyBranch(
+    repoPath: string,
+    branch: string,
+    baseBranch: string,
+  ): Promise<string | null> {
+    if (!branch.startsWith("yugotool/")) return null;
+    const git = gitIn(repoPath);
+    const ahead = await git(
+      "rev-list",
+      "--count",
+      `${await localRunner.baseRef(repoPath, baseBranch)}..refs/heads/${branch}`,
+    ).then(
+      (out) => Number(out.stdout.trim()),
+      () => -1,
+    );
+    if (ahead !== 0) return null;
+    await git("branch", "-D", branch);
+    return branch;
   },
 
   async headSha(worktreePath: string): Promise<string> {

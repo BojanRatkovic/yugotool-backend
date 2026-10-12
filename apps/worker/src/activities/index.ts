@@ -148,6 +148,14 @@ const AUTH_LABEL: Record<AuthSource, string> = {
 };
 
 /** Keys and helpers bill the API; a claude.ai login draws on the subscription. */
+/** What archiving a run's worktree did, for its Activity. */
+function archiveNote(snapshot: string | null, deletedBranch: string | null): string {
+  if (snapshot) return `Worktree removed; unfinished changes kept on the branch (${snapshot})`;
+  return deletedBranch
+    ? `Worktree removed; nothing was changed, so its branch ${deletedBranch} was deleted`
+    : "Worktree removed; the branch keeps the work";
+}
+
 function toAuthSource(source: ApiKeySource): AuthSource {
   if (
     source === "ANTHROPIC_API_KEY" ||
@@ -571,20 +579,15 @@ export function createActivities(db: Database) {
         .where(eq(runs.id, input.runId));
       if (!row?.worktreePath) return;
       try {
-        const snapshot = await localRunner.archiveWorkspace({
-          repoPath: runTarget(row.project, row.runRepo).repoPath,
+        const { repoPath, baseBranch } = runTarget(row.project, row.runRepo);
+        const { snapshot, deletedBranch } = await localRunner.archiveWorkspace({
+          repoPath,
           worktreePath: row.worktreePath,
           memoryDir: path.join(runArtifactsDir(input.runId), "memory"),
           message: `wip: unfinished changes of YugoTool run ${input.runId.slice(0, 8)} (${row.status})`,
+          baseBranch,
         });
-        await appendEvent(
-          input.runId,
-          null,
-          "system",
-          snapshot
-            ? `Worktree removed; unfinished changes kept on the branch (${snapshot})`
-            : "Worktree removed; the branch keeps the work",
-        );
+        await appendEvent(input.runId, null, "system", archiveNote(snapshot, deletedBranch));
       } catch (error) {
         await appendEvent(
           input.runId,
