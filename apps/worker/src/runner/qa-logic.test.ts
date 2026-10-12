@@ -4,6 +4,7 @@ import {
   browserActionLabel,
   buildJudgePrompt,
   buildQaReport,
+  reportedPath,
   deriveRoutes,
   judgedStatus,
   MAX_PLANNED_SCREENS,
@@ -364,5 +365,18 @@ describe("planner", () => {
     expect(prompt).toContain("- Tasks: `/:ws/tasks` → example `/1-acme/tasks` — All tasks");
     expect(prompt).toContain("components: src/routes/tasks.tsx");
     expect(prompt).not.toContain("Already checked");
+  });
+});
+
+describe("reportedPath", () => {
+  it("keeps a route or a repo file the judge names", () => {
+    expect(reportedPath("/1-acme/home", null)).toBe("/1-acme/home");
+    expect(reportedPath("tests/currency.test.ts", "/x")).toBe("tests/currency.test.ts");
+  });
+
+  it("drops the judge's own screenshot on disk for the planned route", () => {
+    const shot = "/Users/me/.yugotool/artifacts/r1/qa/1/agent/home.png";
+    expect(reportedPath(shot, "/1-acme/home")).toBe("/1-acme/home");
+    expect(reportedPath(shot, undefined)).toBeNull();
   });
 });

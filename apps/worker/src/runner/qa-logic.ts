@@ -491,3 +491,19 @@ export function judgedStatus(
 ): "pass" | "fail" | "intended" {
   return judged === "pass" && before === "changed" ? "intended" : judged;
 }
+
+/** A screenshot the judge saved on this Mac, not a place in the app or the repo. */
+const LOCAL_FILE = /^(\/|~\/|[A-Za-z]:\\).*\.(png|jpe?g|webp|gif)$/i;
+
+/**
+ * Where a judge-reported check happened: its route or repo file. The judge
+ * sometimes gives its screenshot's path on disk instead; that means nothing
+ * to a PR reader, so the planned route stands in for it.
+ */
+export function reportedPath(
+  judged: string | null,
+  planned: string | null | undefined,
+): string | null {
+  const own = judged && !LOCAL_FILE.test(judged) ? judged : null;
+  return own ?? planned ?? null;
+}

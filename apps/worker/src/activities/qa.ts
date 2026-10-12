@@ -69,6 +69,7 @@ import {
   type PlannedScenario,
   type PlannedScreen,
   planScreens,
+  reportedPath,
   qaPassed,
   slugify,
   splitVerdict,
@@ -654,7 +655,7 @@ export function createQaActivities(db: Database, deps: QaDeps) {
             position: position++,
             name: planned?.name ?? extra.name,
             kind: "scenario",
-            path: extra.path ?? planned?.path ?? null,
+            path: reportedPath(extra.path, planned?.path),
             status: extra.status,
             note: extra.note,
             reason: planned
