@@ -59,12 +59,8 @@ const STATUS: Record<string, DiffFile["status"]> = {
   R: "renamed",
 };
 
-/**
- * `git diff -z --numstat` and `-z --name-status` (both with `-M`) → files.
- * Pure. A rename is `R<score>\0old\0new` in the one and `a\td\t\0old\0new` in
- * the other; a binary file counts `-\t-`.
- */
-export function parseDiffFiles(numstat: string, nameStatus: string): DiffFile[] {
+/** `git diff -z -M --name-status` → status by (new) path. A rename/copy is `R<score>\0old\0new`. */
+function parseNameStatus(nameStatus: string): Map<string, DiffFile["status"]> {
   const statuses = new Map<string, DiffFile["status"]>();
   const names = nameStatus.split("\0");
   for (let i = 0; i + 1 < names.length;) {
@@ -74,6 +70,18 @@ export function parseDiffFiles(numstat: string, nameStatus: string): DiffFile[] 
     statuses.set(target, STATUS[code.charAt(0)] ?? "modified");
     i += renamed ? 3 : 2;
   }
+  return statuses;
+}
+
+const count = (n: string) => (n === "-" ? 0 : Number(n));
+
+/**
+ * `git diff -z --numstat` and `-z --name-status` (both with `-M`) → files.
+ * Pure. A rename is `R<score>\0old\0new` in the one and `a\td\t\0old\0new` in
+ * the other; a binary file counts `-\t-`.
+ */
+export function parseDiffFiles(numstat: string, nameStatus: string): DiffFile[] {
+  const statuses = parseNameStatus(nameStatus);
   const files: DiffFile[] = [];
   const fields = numstat.split("\0");
   for (let i = 0; i < fields.length;) {
@@ -83,18 +91,18 @@ export function parseDiffFiles(numstat: string, nameStatus: string): DiffFile[] 
       continue;
     }
     const [, added = "-", deleted = "-", inline = ""] = match;
+    // A rename leaves the path empty and puts old and new in the next two fields.
     const renamed = inline === "";
-    const oldPath = renamed ? (fields[i + 1] ?? "") : null;
     const filePath = renamed ? (fields[i + 2] ?? "") : inline;
-    i += renamed ? 3 : 1;
     files.push({
       path: filePath,
-      oldPath,
+      oldPath: renamed ? (fields[i + 1] ?? "") : null,
       status: statuses.get(filePath) ?? (renamed ? "renamed" : "modified"),
-      additions: added === "-" ? 0 : Number(added),
-      deletions: deleted === "-" ? 0 : Number(deleted),
+      additions: count(added),
+      deletions: count(deleted),
       binary: added === "-" && deleted === "-",
     });
+    i += renamed ? 3 : 1;
   }
   return files;
 }
