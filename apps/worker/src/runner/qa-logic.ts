@@ -322,8 +322,9 @@ export function buildJudgePrompt(input: {
         ? `3. The app on this branch runs at ${input.prUrl}. Use the browser tools to verify the work order's acceptance criteria ("Done when", or what the description asks for) like a QA engineer: open the page, click, type, submit. Take a screenshot (browser_take_screenshot) of each important state. Report each listed scenario with its ref (s1, s2, …) and any other scenario you checked with ref null; status pass or fail, and the path. Stay on ${input.prUrl}; other origins are blocked, except the app's own mock API on the second preview port.`
         : "3. Do not use a browser; judge from the screenshots only.",
       input.signedIn
-        ? "If screens show the app's sign-in page, the saved sign-in no longer works: do not judge those screens as regressions; say in `summary` that the user should click Sign in again under Project settings → Preview."
-        : "The app runs signed out (no saved sign-in). If screens only show its sign-in page, do not judge them as regressions; say in `summary` that the user should sign in once under Project settings → Preview.",
+        ? "If screens show the app's sign-in page, the saved sign-in no longer works: set `signedOut` true, do not judge those screens as regressions, and say in `summary` that the user should click Sign in again under Project settings → Preview."
+        : "The app runs signed out (no saved sign-in). If screens only show its sign-in page, set `signedOut` true, do not judge them as regressions, and say in `summary` that the user should sign in once under Project settings → Preview.",
+      "Otherwise `signedOut` is false.",
       "4. If the work order asked for a visible change and no screen changed, that is a `fail` (ref null) unless the change is not visible by nature.",
       "5. verdict is `fail` when any check is `fail` with severity critical or important; minor problems alone pass. Keep `summary` to 1–3 sentences.",
     ].join("\n"),

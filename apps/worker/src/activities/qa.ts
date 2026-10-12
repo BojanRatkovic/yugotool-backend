@@ -81,7 +81,7 @@ import { needsDiscovery } from "../runner/route-map";
 import { discoverRouteMap, runStructuredSession } from "./routes";
 import { accountNote, claudeAuthFor, withClaudeAuth } from "../claude-env";
 import { sandboxFor } from "../runner/sandbox";
-import { placeOf } from "../runner/sign-in";
+import { placeOf, sessionProblem } from "../runner/sign-in";
 
 const HEARTBEAT_MS = 10_000;
 /** Sidecar of a cached base screenshot. */
@@ -129,6 +129,8 @@ export interface QaResult {
   /** Markdown for the builder when status is failed. */
   report: string;
   costUsd: number;
+  /** Failed because the app showed its sign-in page: the user's to fix, not the builder's. */
+  signedOut?: boolean;
 }
 
 /** File-safe, unique per path: readable prefix + a short hash (long paths share prefixes). */
@@ -689,7 +691,13 @@ export function createQaActivities(db: Database, deps: QaDeps) {
           passed ? "system" : "error",
           `QA ${passed ? "passed" : "failed"} · ${counts.pass} pass · ${counts.fail} fail · ${counts.intended} intended — ${summary}`,
         );
-        return { status: passed ? "passed" : "failed", summary, report, costUsd };
+        return {
+          status: passed ? "passed" : "failed",
+          summary,
+          report,
+          costUsd,
+          signedOut: judged.verdict.signedOut,
+        };
       } catch (error) {
         const summary = `QA crashed: ${error instanceof Error ? error.message : String(error)}`;
         await finishQa("error", summary).catch(() => undefined);
@@ -754,6 +762,7 @@ export function createQaActivities(db: Database, deps: QaDeps) {
           onProgress: () => ctx.heartbeat(),
         });
         browser = await launchBrowser();
+        const session = await sessionFor(input.projectId, placeOf(running));
         const shot = await capturePage({
           browser,
           origin: running.url,
@@ -763,13 +772,15 @@ export function createQaActivities(db: Database, deps: QaDeps) {
           viewport: "desktop",
           theme: "light",
           file: path.join(dir, "screenshot.png"),
-          session: await sessionFor(input.projectId, placeOf(running)),
+          session,
         });
         const logs = tail(running.logs(), 200);
+        // It came up, but on the sign-in page: say so, the session is what needs fixing.
+        const error = shot.error ?? sessionProblem(preview.readyPath, shot.landedPath, session);
         return await finish({
-          ok: !shot.error,
+          ok: !error,
           logs,
-          error: shot.error,
+          error,
           screenshotUrl: shot.error
             ? null
             : `/projects/${input.projectId}/preview/screenshot?t=${Date.now()}`,

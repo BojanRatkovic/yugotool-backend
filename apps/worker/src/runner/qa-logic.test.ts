@@ -108,6 +108,7 @@ describe("newConsoleErrors", () => {
 const verdict = (over: Partial<QaVerdict> = {}): QaVerdict => ({
   verdict: "pass",
   summary: "ok",
+  signedOut: false,
   checks: [],
   ...over,
 });

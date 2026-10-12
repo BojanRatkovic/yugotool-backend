@@ -188,3 +188,25 @@ export class BrowserTrace {
     return this.lines.join("\n");
   }
 }
+
+const SIGN_IN_PATH = /(^|\/)(log-?in|sign-?in|auth)(\/|$)/i;
+
+/**
+ * True when a page asked for `asked` was sent to the app's sign-in page
+ * instead: a saved session that no longer signs in.
+ */
+export function landedOnSignIn(asked: string, landed: string | null | undefined): boolean {
+  if (!landed || SIGN_IN_PATH.test(asked)) return false;
+  return SIGN_IN_PATH.test(landed);
+}
+
+/** Why a capture made with a saved `session` shows the sign-in page; null when it does not. */
+export function sessionProblem(
+  asked: string,
+  landed: string | null | undefined,
+  session: StorageState | null,
+): string | null {
+  return session && landedOnSignIn(asked, landed)
+    ? `The app showed its sign-in page (${landed}): the saved sign-in no longer works. Click Sign in again.`
+    : null;
+}

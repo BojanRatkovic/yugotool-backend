@@ -4,6 +4,7 @@ import {
   BrowserTrace,
   hasState,
   parseSavedSession,
+  landedOnSignIn,
   redactUrl,
   retargetSession,
   type SavedSession,
@@ -206,5 +207,20 @@ describe("BrowserTrace", () => {
       trace.navigated(url);
     }
     expect(trace.loopSuspected()).toBe(false);
+  });
+});
+
+describe("landedOnSignIn", () => {
+  it("is true when the app sent the page to its sign-in screen", () => {
+    expect(landedOnSignIn("/", "/login")).toBe(true);
+    expect(landedOnSignIn("/1-acme/home", "/sign-in")).toBe(true);
+    expect(landedOnSignIn("/", "/auth/login")).toBe(true);
+  });
+
+  it("is false when the page stayed in the app, or sign-in was what was asked for", () => {
+    expect(landedOnSignIn("/", "/1-acme/home")).toBe(false);
+    expect(landedOnSignIn("/login", "/login")).toBe(false);
+    expect(landedOnSignIn("/", "/blog/logins-explained")).toBe(false);
+    expect(landedOnSignIn("/", null)).toBe(false);
   });
 });

@@ -1576,6 +1576,8 @@ export type QaRun = z.infer<typeof qaRunSchema>;
 export const qaVerdictSchema = z.object({
   verdict: z.enum(["pass", "fail"]),
   summary: z.string(),
+  /** The app showed its sign-in page instead of the screens: the session, not the change, is at fault. */
+  signedOut: z.boolean(),
   checks: z.array(
     z.object({
       /** e.g. "c3" for a listed check; null for a new problem the judge found itself. */

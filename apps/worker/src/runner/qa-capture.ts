@@ -81,6 +81,8 @@ export interface Capture {
   consoleErrors: string[];
   /** Set when the page could not be captured at all. */
   error: string | null;
+  /** The path the page ended on (after the app's redirects); null when it never loaded. */
+  landedPath?: string | null;
 }
 
 /**
@@ -141,7 +143,12 @@ export async function capturePage(input: {
       animations: "disabled",
       mask: [page.locator(MASK_SELECTOR)],
     });
-    return { file: input.file, consoleErrors, error: null };
+    return {
+      file: input.file,
+      consoleErrors,
+      error: null,
+      landedPath: new URL(page.url()).pathname,
+    };
   } catch (error) {
     return {
       file: input.file,

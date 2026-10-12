@@ -509,7 +509,9 @@ export async function workOrderRun(input: WorkOrderRunInput): Promise<void> {
           return;
         }
         notes.push({ station: station.name, text: result.summary });
-        if (result.status === "failed") {
+        // Signed out: no screen was judged, and the builder cannot sign in. The final gate shows it.
+        const signedOut = result.signedOut === true && patched("qa-signed-out-not-builders");
+        if (result.status === "failed" && !signedOut) {
           lastQaReport = result.report;
           if (loopBack(`${station.name} (QA failed)`, result.report)) continue;
           await finish("failed", `${station.name} still failing after ${MAX_FIX_LOOPS} fix loops`);
