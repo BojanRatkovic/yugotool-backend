@@ -33,3 +33,12 @@ export function skillSection(load: readonly string[]): string | null {
     `Before you start, load each of these with the Skill tool and follow them: ${load.map((s) => `\`${s}\``).join(", ")}. A \`/name\` in the task means that skill.`,
   ].join("\n\n");
 }
+
+/** The run-event line saying which skills a session loads and which it can't. Null for none. Pure. */
+export function skillNote(plan: SkillPlan): string | null {
+  const parts = [
+    plan.load.length ? `Skills to load: ${plan.load.join(", ")}` : null,
+    plan.missing.length ? `not available here: ${plan.missing.join(", ")}` : null,
+  ].filter(Boolean);
+  return parts.length ? parts.join(" · ") : null;
+}

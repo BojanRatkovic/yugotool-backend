@@ -58,7 +58,8 @@ import { hubOfRepo, hubRepos } from "@yugotool/local";
 import { hubPluginNames, hubPlugins, hubSession, linkIgnoredFiles } from "../runner/work-hub";
 import { installStepsFor } from "../runner/dependencies";
 import { ensurePinnedPnpm, pinnedNodeEnv } from "../runner/node-versions";
-import { skillPlan, skillSection } from "../runner/station-skills";
+import { contextTokensOf } from "../runner/context-tokens";
+import { skillNote, skillPlan, skillSection } from "../runner/station-skills";
 import { sessionSkills } from "@yugotool/skills";
 import { createCiActivities } from "./ci";
 import { createKnowledgeActivities } from "./knowledge";
@@ -798,20 +799,12 @@ export function createActivities(db: Database) {
             "system",
             `${input.resumeSessionId ? "Resumed session" : "Session"} ${message.session_id} · ${message.model}${effort ? ` · effort ${effort}` : ""} · ${auth.label ?? AUTH_LABEL[toAuthSource(message.apiKeySource)]}`,
           );
-          const skillNote = [
-            skills.load.length ? `Skills to load: ${skills.load.join(", ")}` : null,
-            skills.missing.length ? `not available here: ${skills.missing.join(", ")}` : null,
-          ]
-            .filter(Boolean)
-            .join(" · ");
-          if (skillNote) await appendEvent(input.runId, input.stationRunId, "system", skillNote);
+          const note = skillNote(skills);
+          if (note) await appendEvent(input.runId, input.stationRunId, "system", note);
         } else if (message.type === "assistant") {
           const usage = message.message.usage;
           if (message.parent_tool_use_id === null && usage) {
-            contextTokens =
-              usage.input_tokens +
-              (usage.cache_read_input_tokens ?? 0) +
-              (usage.cache_creation_input_tokens ?? 0);
+            contextTokens = contextTokensOf(usage);
           }
           for (const block of message.message.content) {
             if (block.type === "text" && block.text.trim()) {

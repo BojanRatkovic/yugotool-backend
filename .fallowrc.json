@@ -47,6 +47,9 @@
     "complexity-crap": "warn"
   },
   "audit": {
-    "gate": "new-only"
+    "gate": "new-only",
+    // Accepted debt: a change fails only when it makes a file's complexity worse.
+    // Re-save after paying debt down: pnpm fallow:baseline
+    "healthBaseline": "fallow-baselines/health.json"
   }
 }
