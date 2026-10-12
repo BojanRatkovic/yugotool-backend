@@ -174,3 +174,23 @@ describe("parseDiffFiles", () => {
     ]);
   });
 });
+
+describe("worktreeDiff index", () => {
+  it("lists a new file without marking it in the worktree's own index", async () => {
+    const repo = mkdtempSync(path.join(tmpdir(), "yugotool-diffindex-"));
+    git(repo, "init", "-q", "-b", "main");
+    git(repo, "config", "user.email", "test@example.com");
+    git(repo, "config", "user.name", "test");
+    writeFileSync(path.join(repo, "a.txt"), "base\n");
+    git(repo, "add", ".");
+    git(repo, "commit", "-q", "-m", "init");
+    writeFileSync(path.join(repo, "new.txt"), "new\n");
+
+    const diff = await worktreeDiff(repo, "main", { patchChars: 100_000, listChars: 10_000 });
+
+    expect(diff.files.map((file) => file.path)).toEqual(["new.txt"]);
+    // The run's delivery owns the index: a diff refresh must leave it (and its lock) alone.
+    expect(git(repo, "status", "--porcelain").toString()).toBe("?? new.txt\n");
+    rmSync(repo, { recursive: true, force: true });
+  });
+});

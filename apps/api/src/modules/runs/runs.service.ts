@@ -67,7 +67,14 @@ export class RunsService {
     if (!workspace) throw new RunNotFoundError(`run ${runId} not found`);
     const limits = { patchChars: MAX_PATCH_CHARS, listChars: MAX_LIST_CHARS };
     const cwd = workspace.worktreePath;
-    if (cwd && existsSync(cwd)) return worktreeDiff(cwd, workspace.baseBranch, limits);
+    if (cwd && existsSync(cwd)) {
+      try {
+        return await worktreeDiff(cwd, workspace.baseBranch, limits);
+      } catch (error) {
+        // Archived while we read it: fall through to the branch, which now holds the work.
+        if (existsSync(path.join(cwd, ".git"))) throw error;
+      }
+    }
     // Finished runs: the worktree was removed, the branch holds the work.
     if (workspace.branch && (await branchExists(workspace.repoPath, workspace.branch)))
       return branchDiff(workspace.repoPath, workspace.branch, workspace.baseBranch, limits);
