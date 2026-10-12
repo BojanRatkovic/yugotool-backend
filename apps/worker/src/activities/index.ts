@@ -1088,7 +1088,7 @@ export function createActivities(db: Database) {
           workOrderId: input.workOrderId,
           worktreePath: dir,
           baseBranch,
-          branch: row.branch,
+          fromBranch: row.branch,
         });
         const result = await localRunner.openPullRequest({
           dir,
