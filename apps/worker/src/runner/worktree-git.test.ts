@@ -153,3 +153,22 @@ describe("index.lock held by another git", () => {
     expect(git(dir, "show", "yugotool/task-lock:a.txt")).toBe("changed");
   });
 });
+
+describe("diffStatAgainst a branch", () => {
+  it("stats the branch, not the checkout it runs in, and leaves that checkout's index alone", async () => {
+    const dir = repo();
+    git(dir, "switch", "-q", "-c", "yugotool/task-pr");
+    writeFileSync(path.join(dir, "feature.txt"), "run work\n");
+    git(dir, "add", "-A");
+    git(dir, "commit", "-q", "-m", "run work");
+    git(dir, "switch", "-q", "main");
+    // The user's own, uncommitted file in their checkout.
+    writeFileSync(path.join(dir, "notes.md"), "mine\n");
+
+    const stat = await localRunner.diffStatAgainst(dir, "main", "yugotool/task-pr");
+
+    expect(stat).toContain("feature.txt");
+    expect(stat).not.toContain("notes.md");
+    expect(git(dir, "status", "--porcelain")).toBe("?? notes.md");
+  });
+});

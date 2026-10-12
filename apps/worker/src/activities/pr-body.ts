@@ -19,6 +19,8 @@ export function createPrBodyComposer(db: Database) {
     workOrderId: string;
     worktreePath: string;
     baseBranch: string;
+    /** Stat this branch's commits, not `worktreePath`'s working tree (it may be the user's checkout). */
+    branch?: string;
   }): Promise<string> {
     const [row] = await db
       .select({ description: workOrders.description, line: lines.stations })
@@ -69,7 +71,11 @@ export function createPrBodyComposer(db: Database) {
     const verdict = runRows.filter((r) => r.verdict).at(-1)?.verdict ?? null;
     let diffStat = "";
     try {
-      diffStat = await localRunner.diffStatAgainst(input.worktreePath, input.baseBranch);
+      diffStat = await localRunner.diffStatAgainst(
+        input.worktreePath,
+        input.baseBranch,
+        input.branch,
+      );
     } catch {
       // A stat is nice to have; the PR still opens without it.
     }

@@ -96,9 +96,14 @@ export const localRunner = {
     return stdout.trim();
   },
 
-  /** Stat of the worktree (uncommitted and new files included) against the base branch. */
-  async diffStatAgainst(worktreePath: string, baseBranch: string): Promise<string> {
-    const git = gitIn(worktreePath, { maxBuffer: 10 * 1024 * 1024 });
+  /**
+   * Stat of the worktree (uncommitted and new files included) against the base branch.
+   * With `branch`, the stat of that branch's commits instead: `dir` may then be the
+   * user's checkout (the worktree is gone), whose HEAD and index are none of ours.
+   */
+  async diffStatAgainst(dir: string, baseBranch: string, branch?: string): Promise<string> {
+    const git = gitIn(dir, { maxBuffer: 10 * 1024 * 1024 });
+    const head = branch ? `refs/heads/${branch}` : "HEAD";
     // Compare with what the PR will be compared with: the remote base when there is one,
     // from the merge-base, so commits that only moved the local base don't show up.
     const remoteBase = `origin/${baseBranch}`;
@@ -109,8 +114,9 @@ export const localRunner = {
     const { stdout: mergeBase } = await git(
       "merge-base",
       hasRemote ? remoteBase : baseBranch,
-      "HEAD",
+      head,
     );
+    if (branch) return (await git("diff", "--stat=100", mergeBase.trim(), head)).stdout;
     await git("add", "-N", ".");
     const { stdout } = await git("diff", "--stat=100", mergeBase.trim());
     return stdout;
