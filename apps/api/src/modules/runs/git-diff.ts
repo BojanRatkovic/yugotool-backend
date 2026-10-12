@@ -1,4 +1,7 @@
 import { spawn } from "node:child_process";
+import { copyFile, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 
 export interface CappedOutput {
   text: string;
@@ -9,10 +12,21 @@ export interface CappedOutput {
  * Runs `git <args>` and keeps at most `maxChars` of stdout. Once the cap is hit
  * the process is killed, so output size never fails the call (unlike execFile's
  * maxBuffer) and a huge diff costs only what we keep.
+ *
+ * Optional locks are off: the API only reads, and a `git diff` that refreshes
+ * the index takes `index.lock`, which fails the worker's `git add` at delivery.
  */
-export function gitCapped(cwd: string, args: string[], maxChars: number): Promise<CappedOutput> {
+export function gitCapped(
+  cwd: string,
+  args: string[],
+  maxChars: number,
+  env: NodeJS.ProcessEnv = {},
+): Promise<CappedOutput> {
   return new Promise((resolve, reject) => {
-    const child = spawn("git", ["-C", cwd, ...args], { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn("git", ["-C", cwd, ...args], {
+      stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, GIT_OPTIONAL_LOCKS: "0", ...env },
+    });
     let text = "";
     let truncated = false;
     let stderr = "";
@@ -125,12 +139,17 @@ async function diffBase(cwd: string, baseBranch: string, head = "HEAD"): Promise
 }
 
 /** The file list and the patch of `git diff <range>`; the list is never cut. */
-async function diffOf(cwd: string, range: string[], limits: DiffLimits): Promise<Diff> {
+async function diffOf(
+  cwd: string,
+  range: string[],
+  limits: DiffLimits,
+  env: NodeJS.ProcessEnv = {},
+): Promise<Diff> {
   const flags = ["-M", "--no-color", "--no-ext-diff"];
   const [numstat, nameStatus, patch] = await Promise.all([
-    gitCapped(cwd, ["diff", ...flags, "-z", "--numstat", ...range], limits.listChars),
-    gitCapped(cwd, ["diff", ...flags, "-z", "--name-status", ...range], limits.listChars),
-    gitCapped(cwd, ["diff", ...flags, ...range], limits.patchChars),
+    gitCapped(cwd, ["diff", ...flags, "-z", "--numstat", ...range], limits.listChars, env),
+    gitCapped(cwd, ["diff", ...flags, "-z", "--name-status", ...range], limits.listChars, env),
+    gitCapped(cwd, ["diff", ...flags, ...range], limits.patchChars, env),
   ]);
   return {
     files: parseDiffFiles(numstat.text, nameStatus.text),
@@ -139,14 +158,28 @@ async function diffOf(cwd: string, range: string[], limits: DiffLimits): Promise
   };
 }
 
-/** Worktree vs the merge-base with its base: committed and uncommitted changes, new files included. */
+/**
+ * Worktree vs the merge-base with its base: committed and uncommitted changes, new files included.
+ * New files are marked intent-to-add on a copy of the index, never the worktree's own: the run
+ * (and its delivery `git add`) owns that index and its lock.
+ */
 export async function worktreeDiff(
   cwd: string,
   baseBranch: string,
   limits: DiffLimits,
 ): Promise<Diff> {
-  await gitCapped(cwd, ["add", "--intent-to-add", "."], 10_000);
-  return diffOf(cwd, [await diffBase(cwd, baseBranch)], limits);
+  const index = (
+    await gitCapped(cwd, ["rev-parse", "--path-format=absolute", "--git-path", "index"], 4_096)
+  ).text.trim();
+  const scratch = await mkdtemp(path.join(tmpdir(), "yugotool-diff-"));
+  try {
+    const env = { GIT_INDEX_FILE: path.join(scratch, "index") };
+    await copyFile(index, env.GIT_INDEX_FILE).catch(() => undefined); // none yet: git starts empty
+    await gitCapped(cwd, ["add", "--intent-to-add", "."], 10_000, env);
+    return await diffOf(cwd, [await diffBase(cwd, baseBranch)], limits, env);
+  } finally {
+    await rm(scratch, { recursive: true, force: true });
+  }
 }
 
 /**

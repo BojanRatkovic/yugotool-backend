@@ -5,6 +5,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -134,5 +135,21 @@ describe("archiveWorkspace", () => {
     ).toBeNull();
     expect(existsSync(tree)).toBe(false);
     expect(git(dir, "rev-parse", "yugotool/task-2")).toBe(head);
+  });
+});
+
+describe("index.lock held by another git", () => {
+  it("waits for the lock instead of failing the commit", async () => {
+    const dir = repo();
+    const tree = path.join(mkdtempSync(path.join(tmpdir(), "yugotool-lock-")), "wt");
+    git(dir, "worktree", "add", "-q", "-b", "yugotool/task-lock", tree);
+    writeFileSync(path.join(tree, "a.txt"), "changed\n");
+    // Another process (the API's diff, an editor) holds the worktree's index for a moment.
+    const lock = git(tree, "rev-parse", "--path-format=absolute", "--git-path", "index.lock");
+    writeFileSync(lock, "");
+    setTimeout(() => rmSync(lock), 400);
+
+    expect(await localRunner.checkpoint(tree, "wip: locked")).toMatch(/^[0-9a-f]{7,}$/);
+    expect(git(dir, "show", "yugotool/task-lock:a.txt")).toBe("changed");
   });
 });

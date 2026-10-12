@@ -2,6 +2,7 @@ import { execFile, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { access, constants, cp, mkdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 import { promisify } from "node:util";
 
 import { SIGNATURE } from "./pr-body";
@@ -10,6 +11,33 @@ import { hubWorktreePath } from "./work-hub";
 import { yugotoolHome } from "@yugotool/local";
 
 const exec = promisify(execFile);
+
+/**
+ * `git -C <dir> …`, retried for a few seconds while another git (an editor's,
+ * a diff refresh) holds the worktree's `index.lock`. Runs go in parallel and
+ * a held lock otherwise fails delivery outright.
+ */
+function gitIn(dir: string, options: { maxBuffer?: number } = {}) {
+  return async (...args: string[]) => {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await exec("git", ["-C", dir, ...args], options);
+      } catch (error) {
+        if (attempt >= 5 || !indexLocked(error)) throw error;
+        await sleep(250 * 2 ** attempt);
+      }
+    }
+  };
+}
+
+function indexLocked(error: unknown): boolean {
+  return (
+    !!error &&
+    typeof error === "object" &&
+    "stderr" in error &&
+    /index\.lock': File exists/.test(String(error.stderr))
+  );
+}
 
 /** Where worktrees live: outside the repo so the user's checkout is never touched. */
 const WORKTREES_ROOT = path.join(yugotoolHome(), "worktrees");
@@ -62,15 +90,15 @@ export const localRunner = {
 
   /** The diff the reviewers see, base...worktree including uncommitted changes. */
   async diffStat(worktreePath: string): Promise<string> {
-    await exec("git", ["-C", worktreePath, "add", "-N", "."]);
-    const { stdout } = await exec("git", ["-C", worktreePath, "diff", "--stat"]);
+    const git = gitIn(worktreePath);
+    await git("add", "-N", ".");
+    const { stdout } = await git("diff", "--stat");
     return stdout.trim();
   },
 
   /** Stat of the worktree (uncommitted and new files included) against the base branch. */
   async diffStatAgainst(worktreePath: string, baseBranch: string): Promise<string> {
-    const git = (...args: string[]) =>
-      exec("git", ["-C", worktreePath, ...args], { maxBuffer: 10 * 1024 * 1024 });
+    const git = gitIn(worktreePath, { maxBuffer: 10 * 1024 * 1024 });
     // Compare with what the PR will be compared with: the remote base when there is one,
     // from the merge-base, so commits that only moved the local base don't show up.
     const remoteBase = `origin/${baseBranch}`;
@@ -109,8 +137,7 @@ export const localRunner = {
 
   /** Files changed since `sha`, committed or not, new files included. */
   async changedFiles(worktreePath: string, sha: string): Promise<string[]> {
-    const git = (...args: string[]) =>
-      exec("git", ["-C", worktreePath, ...args], { maxBuffer: 10 * 1024 * 1024 });
+    const git = gitIn(worktreePath, { maxBuffer: 10 * 1024 * 1024 });
     await git("add", "-N", ".");
     const { stdout } = await git("diff", "--name-only", sha);
     return stdout.split("\n").filter(Boolean);
@@ -118,8 +145,7 @@ export const localRunner = {
 
   /** Unified diff of the worktree (incl. new files) against `sha`, lockfiles left out. */
   async diffAgainst(worktreePath: string, sha: string): Promise<string> {
-    const git = (...args: string[]) =>
-      exec("git", ["-C", worktreePath, ...args], { maxBuffer: 50 * 1024 * 1024 });
+    const git = gitIn(worktreePath, { maxBuffer: 50 * 1024 * 1024 });
     await git("add", "-N", ".");
     const { stdout } = await git(
       "diff",
@@ -197,7 +223,7 @@ export const localRunner = {
     if (existsSync(worktreePath)) {
       const memory = path.join(worktreePath, ".yugotool");
       if (existsSync(memory)) await cp(memory, input.memoryDir, { recursive: true });
-      const git = (...args: string[]) => exec("git", ["-C", worktreePath, ...args]);
+      const git = gitIn(worktreePath);
       await git("add", "-A");
       const { stdout: staged } = await git("diff", "--cached", "--name-only");
       if (staged.trim()) {
@@ -234,7 +260,7 @@ export const localRunner = {
    */
   async uncommitSince(worktreePath: string, sha: string): Promise<number> {
     const count = await localRunner.commitsSince(worktreePath, sha);
-    if (count > 0) await exec("git", ["-C", worktreePath, "reset", "--mixed", sha]);
+    if (count > 0) await gitIn(worktreePath)("reset", "--mixed", sha);
     return count;
   },
 
@@ -272,7 +298,7 @@ export const localRunner = {
 
   /** Commits everything (`.yugotool/` is excluded) without hooks; null when there was nothing to commit. */
   async checkpoint(worktreePath: string, message: string): Promise<string | null> {
-    const git = (...args: string[]) => exec("git", ["-C", worktreePath, ...args]);
+    const git = gitIn(worktreePath);
     await git("add", "-A");
     const { stdout: staged } = await git("diff", "--cached", "--name-only");
     if (!staged.trim()) return null;
@@ -323,7 +349,7 @@ export const localRunner = {
     worktreePath: string,
     title: string,
   ): Promise<{ passed: boolean; output: string } | null> {
-    const git = (...args: string[]) => exec("git", ["-C", worktreePath, ...args]);
+    const git = gitIn(worktreePath);
     const { stdout } = await git(
       "rev-parse",
       "--path-format=absolute",
@@ -377,7 +403,7 @@ export const localRunner = {
     );
     if (!executable) return null;
     await onStart();
-    await exec("git", ["-C", worktreePath, "add", "-A"]);
+    await gitIn(worktreePath)("add", "-A");
     // Like `git commit` runs it: no CI env, so hooks behave as they do for a person.
     return localRunner.runCommand(worktreePath, "git hook run pre-commit", onProgress, {
       ci: false,
@@ -395,7 +421,7 @@ export const localRunner = {
     /** Open the pull request as a draft. */
     draft?: boolean;
   }): Promise<{ prUrl: string | null; summary: string }> {
-    const git = (...args: string[]) => exec("git", ["-C", input.worktreePath, ...args]);
+    const git = gitIn(input.worktreePath);
     await git("add", "-A");
     const { stdout: staged } = await git("diff", "--cached", "--name-only");
     if (staged.trim()) await git("commit", "-m", input.title, "-m", `${SIGNATURE}.`);
@@ -421,7 +447,7 @@ export const localRunner = {
     body: string;
     draft?: boolean;
   }): Promise<{ prUrl: string | null; summary: string; reason?: string }> {
-    const git = (...args: string[]) => exec("git", ["-C", input.dir, ...args]);
+    const git = gitIn(input.dir);
     const { stdout: remotes } = await git("remote");
     if (!remotes.split("\n").includes("origin")) {
       return {
