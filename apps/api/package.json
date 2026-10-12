@@ -20,6 +20,7 @@
     "@temporalio/client": "^1.22.0",
     "@yugotool/contracts": "workspace:*",
     "@yugotool/db": "workspace:*",
+    "@yugotool/local": "workspace:*",
     "@yugotool/notify": "workspace:*",
     "@yugotool/skills": "workspace:*",
     "drizzle-orm": "^0.45.2",

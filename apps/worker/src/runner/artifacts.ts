@@ -1,6 +1,6 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { yugotoolHome } from "./home";
+import { yugotoolHome } from "@yugotool/local";
 import {
   parseSavedSession,
   type PreviewPlace,

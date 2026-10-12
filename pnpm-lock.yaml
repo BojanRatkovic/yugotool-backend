@@ -62,6 +62,9 @@ importers:
       '@yugotool/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@yugotool/local':
+        specifier: workspace:*
+        version: link:../../packages/local
       '@yugotool/notify':
         specifier: workspace:*
         version: link:../../packages/notify
@@ -168,6 +171,9 @@ importers:
       '@yugotool/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@yugotool/local':
+        specifier: workspace:*
+        version: link:../../packages/local
       '@yugotool/notify':
         specifier: workspace:*
         version: link:../../packages/notify
@@ -221,6 +227,16 @@ importers:
       drizzle-kit:
         specifier: ^0.31.10
         version: 0.31.11
+
+  packages/local:
+    dependencies:
+      '@yugotool/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+    devDependencies:
+      '@types/node':
+        specifier: ^24.19.1
+        version: 24.19.1
 
   packages/notify:
     dependencies:

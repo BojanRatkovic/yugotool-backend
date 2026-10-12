@@ -1,11 +1,10 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { copyFile, mkdir, readdir, rename, rm, stat } from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import type { KnowledgeMount, KnowledgeSourceKind } from "@yugotool/contracts";
-import { yugotoolHome } from "./home";
+import { expandHome, yugotoolHome } from "@yugotool/local";
 
 const exec = promisify(execFile);
 
@@ -26,13 +25,6 @@ export interface KnowledgeSourceInput {
   branch: string | null;
   entryFile: string | null;
   excludes: string[];
-}
-
-/** `~/x` → absolute; everything else resolved as given. */
-function expandHome(location: string): string {
-  if (location === "~") return os.homedir();
-  if (location.startsWith("~/")) return path.join(os.homedir(), location.slice(2));
-  return path.resolve(location);
 }
 
 /** Whether a file or folder name matches an exclude pattern (`*` = any run of characters). Pure. */

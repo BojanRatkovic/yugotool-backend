@@ -1,14 +1,7 @@
 import { existsSync } from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import type { KnowledgeSourceKind } from "@yugotool/contracts";
-
-/** `~/x` → absolute; everything else resolved as given. Pure but for the home dir. */
-export function expandHome(location: string): string {
-  if (location === "~") return os.homedir();
-  if (location.startsWith("~/")) return path.join(os.homedir(), location.slice(2));
-  return path.resolve(location);
-}
+import { expandHome } from "@yugotool/local";
 
 /**
  * Why a location can't work for its kind, or null. Local kinds must exist on

@@ -12,7 +12,8 @@ import {
 import { type Database, projects } from "@yugotool/db";
 import { eq } from "drizzle-orm";
 import { localRunner } from "../runner/local-runner";
-import { buildDiscoveryPrompt, normalizeDiscovery, routeSourceHash } from "../runner/route-map";
+import { routeSourceHash } from "@yugotool/local";
+import { buildDiscoveryPrompt, normalizeDiscovery } from "../runner/route-map";
 import { accountNote, type ClaudeAuth, claudeAuthFor, withClaudeAuth } from "../claude-env";
 import { sandboxFor } from "../runner/sandbox";
 

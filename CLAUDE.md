@@ -6,6 +6,7 @@ NestJS API + Temporal worker for YugoTool (software factory) — pnpm workspace.
 - `apps/worker` — Temporal worker (plain TS, **not** Nest): `workOrderRun` workflow, Agent SDK activities, local git-worktree runner
 - `packages/contracts` — Zod schemas + types shared api↔worker (frontend mirrors them)
 - `packages/db` — Drizzle schema, migrations, pg client
+- `packages/local` — Node helpers api and worker share about this machine (data home, work hubs, route hash): one copy, so they can't drift
 
 Spec: `../yugotool-work/specs/0001-mvp.md`.
 

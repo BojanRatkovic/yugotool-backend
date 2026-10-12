@@ -1,6 +1,6 @@
 import { realpath } from "node:fs/promises";
 import path from "node:path";
-import { yugotoolHome } from "../config/home";
+import { yugotoolHome } from "@yugotool/local";
 
 /** Written by the worker (screenshots, preview tests); the API only reads. */
 const ARTIFACTS_ROOT = path.join(yugotoolHome(), "artifacts");

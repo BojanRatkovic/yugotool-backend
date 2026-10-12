@@ -6,7 +6,7 @@ import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
-import { yugotoolHome } from "./home";
+import { yugotoolHome } from "@yugotool/local";
 
 const exec = promisify(execFile);
 

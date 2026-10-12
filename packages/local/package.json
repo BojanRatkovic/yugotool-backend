@@ -1,0 +1,20 @@
+{
+  "name": "@yugotool/local",
+  "version": "0.0.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "@yugotool/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.1"
+  }
+}

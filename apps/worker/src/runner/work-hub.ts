@@ -2,13 +2,12 @@
 // whose CLAUDE.md/AGENTS.md, knowledge and skills teach agents that code.
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { copyFile, lstat, mkdir, readFile, readdir, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
-import { hubCandidateOf } from "@yugotool/contracts";
 import { bundledHubPlugins, hubUserPlugins, manifestName, pluginName } from "@yugotool/skills";
-import { yugotoolHome } from "./home";
+import { isHubRoot, yugotoolHome } from "@yugotool/local";
 
 export { bundledHubPlugins, pluginName };
 
@@ -16,31 +15,6 @@ const exec = promisify(execFile);
 
 /** Where generated hub plugins live (one per hub, its skills symlinked in). */
 const HUB_PLUGINS_ROOT = path.join(yugotoolHome(), "hub-plugins");
-
-/** A hub root: instructions for agents at the top and a `repos/` folder. */
-function isHubRoot(dir: string): boolean {
-  const hasInstructions = ["CLAUDE.md", "AGENTS.md"].some((f) => existsSync(path.join(dir, f)));
-  return hasInstructions && isDirectory(path.join(dir, "repos"));
-}
-
-/** The hub `repoPath` belongs to (`<hub>/repos/<name>`), else null. */
-export function hubOfRepo(repoPath: string): string | null {
-  const hub = hubCandidateOf(path.resolve(repoPath));
-  return hub && isHubRoot(hub) ? hub : null;
-}
-
-/** The git checkouts in a hub's `repos/`, by name (mirrors the API's `hubRepos`). */
-export function hubRepoNames(hub: string): string[] {
-  const reposDir = path.join(hub, "repos");
-  try {
-    return readdirSync(reposDir, { withFileTypes: true })
-      .filter((e) => e.isDirectory() && existsSync(path.join(reposDir, e.name, ".git")))
-      .map((e) => e.name)
-      .toSorted((a, b) => a.localeCompare(b));
-  } catch {
-    return [];
-  }
-}
 
 /** The hub a run's worktree sits in (`<hub>/worktrees/<name>`), else null. */
 export function hubOfWorktree(worktreePath: string): string | null {
@@ -194,14 +168,6 @@ export async function hubPlugins(
     ...hubUserPlugins(hub, configDir),
   ];
   return paths.map((p) => ({ type: "local" as const, path: p }));
-}
-
-function isDirectory(dir: string): boolean {
-  try {
-    return statSync(dir).isDirectory();
-  } catch {
-    return false;
-  }
 }
 
 /**

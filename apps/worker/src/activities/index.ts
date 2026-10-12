@@ -54,14 +54,8 @@ import {
   resolveResearch,
   syncHubReposShared,
 } from "../runner/hub-research";
-import {
-  hubOfRepo,
-  hubPluginNames,
-  hubPlugins,
-  hubRepoNames,
-  hubSession,
-  linkIgnoredFiles,
-} from "../runner/work-hub";
+import { hubOfRepo, hubRepos } from "@yugotool/local";
+import { hubPluginNames, hubPlugins, hubSession, linkIgnoredFiles } from "../runner/work-hub";
 import { installStepsFor } from "../runner/dependencies";
 import { ensurePinnedPnpm, pinnedNodeEnv } from "../runner/node-versions";
 import { skillPlan, skillSection } from "../runner/station-skills";
@@ -342,7 +336,7 @@ export function createActivities(db: Database) {
       // once the repo is chosen (prepareRepoWorkspace).
       if (row.project.kind === "hub") {
         const hub = row.project.repoPath;
-        const repos = hubRepoNames(hub);
+        const repos = hubRepos(hub).map((repo) => repo.name);
         const repoSettings = row.project.repoSettings ?? {};
         await appendEvent(
           input.runId,

@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { DEFAULT_STATIONS, hubCandidateOf, updateLineSchema } from "@yugotool/contracts";
 import { afterAll, describe, expect, it } from "vitest";
-import { hubOfRepo, hubRepos, isHubRoot } from "../src/modules/projects/work-hub";
+import { hubOfRepo, hubRepos, isHubRoot } from "@yugotool/local";
 
 const root = mkdtempSync(path.join(os.tmpdir(), "yugotool-api-hub-"));
 afterAll(() => rmSync(root, { recursive: true, force: true }));

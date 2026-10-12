@@ -1,36 +1,8 @@
-import { execFile } from "node:child_process";
-import { createHash } from "node:crypto";
-import { promisify } from "node:util";
 import type { RouteDiscoveryOutput, RouteEntry, RouteMap } from "@yugotool/contracts";
 import { routeEntrySchema } from "@yugotool/contracts";
 
-const exec = promisify(execFile);
-
 /** Routes kept from one discovery; a map is a menu for the planner, not a sitemap. */
 const MAX_DISCOVERED_ROUTES = 150;
-
-/**
- * Cache key of a route map: the git blob ids of its source files at `ref`.
- * The API computes the same hash (projects/route-hash.ts) to flag a stale map.
- */
-export async function routeSourceHash(repo: string, ref: string, files: string[]): Promise<string> {
-  const lines = await Promise.all(
-    files.toSorted().map(async (file) => {
-      const blob = await exec("git", [
-        "-C",
-        repo,
-        "rev-parse",
-        "--verify",
-        "--quiet",
-        `${ref}:${file}`,
-      ])
-        .then(({ stdout }) => stdout.trim())
-        .catch(() => "missing");
-      return `${file}\0${blob}\n`;
-    }),
-  );
-  return createHash("sha256").update(lines.join("")).digest("hex");
-}
 
 /** A map needs (re)discovery when there is none, or a machine-made one whose sources changed. */
 export function needsDiscovery(map: RouteMap | null, currentHash: string | null): boolean {
