@@ -153,11 +153,24 @@ export function stripFiller(text: string): string {
   return out ? out.charAt(0).toUpperCase() + out.slice(1) : text;
 }
 
+/**
+ * Builders report the worktree as they leave it ("Nothing is committed; the
+ * change is in the working tree."). By the time the PR exists that is false:
+ * delivery committed it.
+ */
+export function stripCommitNotes(text: string): string {
+  return text
+    .replace(/\s*\((?:nothing|not yet|not) committed[^)]*\)/gi, "")
+    .replace(/[ \t]*\bNothing (?:is|was|has been) committed\b[^.\n]*\.?/gi, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 /** The pull request description: outcome first, the work order itself collapsed at the end. */
 export function renderPrBody(input: PrBodyInput): string {
   const sections = [
     input.summary?.trim()
-      ? `## Summary\n\n${trimTo(stripFiller(input.summary.trim()), MAX_SUMMARY_CHARS)}`
+      ? `## Summary\n\n${trimTo(stripCommitNotes(stripFiller(input.summary.trim())), MAX_SUMMARY_CHARS)}`
       : "",
     input.diffStat.trim() ? `## Changes\n\n${renderStat(input.diffStat)}` : "",
     input.verdict ? `## Validation\n\n${renderVerdict(input.verdict)}` : "",

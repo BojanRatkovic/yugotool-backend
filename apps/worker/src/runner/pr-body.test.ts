@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderPrBody, SIGNATURE, stripFiller } from "./pr-body";
+import { renderPrBody, SIGNATURE, stripCommitNotes, stripFiller } from "./pr-body";
 
 const base = {
   description:
@@ -153,5 +153,26 @@ describe("stripFiller", () => {
   it("keeps a summary that starts with the change", () => {
     expect(stripFiller("Added a footer line.")).toBe("Added a footer line.");
     expect(stripFiller("Done.")).toBe("Done.");
+  });
+});
+
+describe("stripCommitNotes", () => {
+  it("drops what the builder said about the uncommitted worktree", () => {
+    expect(
+      stripCommitNotes(
+        "Added the tests.\n\nChecks pass.\n\nNothing is committed; the change is in the working tree.",
+      ),
+    ).toBe("Added the tests.\n\nChecks pass.");
+    expect(
+      stripCommitNotes(
+        "Done. Nothing is committed.\n\n**Changed files** (nothing committed):\n- a.ts",
+      ),
+    ).toBe("Done.\n\n**Changed files**:\n- a.ts");
+  });
+
+  it("keeps a summary that says nothing about commits", () => {
+    expect(stripCommitNotes("Committed nothing new to the API; the UI changed.")).toBe(
+      "Committed nothing new to the API; the UI changed.",
+    );
   });
 });
