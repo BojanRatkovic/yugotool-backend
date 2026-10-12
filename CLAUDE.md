@@ -32,6 +32,8 @@ pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build && p
 duplication, complexity, and the `.fallowrc.json` boundaries (workflows may import
 only `@yugotool/contracts` + activity types). `pnpm fallow` is the full report;
 prove an export is unused with `pnpm exec fallow dead-code --trace <file>:<export>`.
+Existing complexity is accepted in `fallow-baselines/health.json` (a change fails when it makes a
+file worse); re-save it with `pnpm fallow:baseline` after paying debt down.
 
 ## Rules
 

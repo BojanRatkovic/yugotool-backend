@@ -1,0 +1,271 @@
+{
+  "kind": "health",
+  "finding_counts": {
+    "apps/api/src/modules/claude-accounts/claude-accounts.service.ts": {
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "apps/api/src/modules/claude-accounts/claude-cli.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "apps/api/src/modules/dispatcher/dispatcher.service.ts": {
+      "complexity_high": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "apps/api/src/modules/knowledge/knowledge.service.ts": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "apps/api/src/modules/productive/productive.service.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "apps/api/src/modules/projects/preview-detect.ts": {
+      "complexity_high": {
+        "count": 1
+      }
+    },
+    "apps/api/src/modules/projects/preview-session.service.ts": {
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "apps/api/src/modules/pull-requests/pull-request-reviews.repository.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "apps/api/src/modules/pull-requests/pull-request-reviews.service.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "apps/api/src/modules/pull-requests/pull-request-writes.service.ts": {
+      "complexity_high": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "apps/api/src/modules/pull-requests/pull-requests.mapper.ts": {
+      "complexity_moderate": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 2
+      },
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "apps/api/src/modules/pull-requests/pull-requests.service.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "apps/api/src/modules/pull-requests/review-findings.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "apps/api/src/modules/runs/git-diff.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "apps/api/src/modules/runs/runs.repository.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "apps/api/src/modules/runs/runs.service.ts": {
+      "crap_moderate": {
+        "count": 3
+      }
+    },
+    "apps/api/src/modules/system/doctor.service.ts": {
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "apps/api/src/modules/system/plan-usage.service.ts": {
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "apps/api/test/db/global-setup.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "apps/desktop/src/events.ts": {
+      "complexity_moderate": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "apps/desktop/src/main.ts": {
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 6
+      }
+    },
+    "apps/supervisor/src/cli.ts": {
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "apps/supervisor/src/supervisor.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "apps/worker/src/activities/ci.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    },
+    "apps/worker/src/activities/index.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "complexity_high": {
+        "count": 1
+      },
+      "complexity_moderate": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_high": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 4
+      }
+    },
+    "apps/worker/src/activities/pr-body.ts": {
+      "crap_moderate": {
+        "count": 2
+      }
+    },
+    "apps/worker/src/activities/preview-sign-in.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "apps/worker/src/activities/qa.ts": {
+      "complexity_critical": {
+        "count": 2
+      },
+      "complexity_high": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 2
+      },
+      "crap_high": {
+        "count": 1
+      }
+    },
+    "apps/worker/src/activities/routes.ts": {
+      "complexity_high": {
+        "count": 1
+      }
+    },
+    "apps/worker/src/activities/shifts.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "apps/worker/src/runner/diff-anchors.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "apps/worker/src/runner/node-versions.ts": {
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "apps/worker/src/runner/qa-logic.ts": {
+      "complexity_moderate": {
+        "count": 1
+      },
+      "crap_moderate": {
+        "count": 1
+      }
+    },
+    "apps/worker/src/workflows/ci-logic.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "apps/worker/src/workflows/review-run.workflow.ts": {
+      "complexity_critical": {
+        "count": 1
+      }
+    },
+    "apps/worker/src/workflows/work-order-run.workflow.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "crap_critical": {
+        "count": 1
+      }
+    }
+  },
+  "runtime_coverage_findings": [],
+  "target_keys": [
+    "apps/api/src/modules/dispatcher/dispatcher.service.ts:high impact",
+    "apps/worker/src/activities/index.ts:complexity",
+    "apps/api/src/core/artifacts/artifacts.ts:high impact",
+    "apps/worker/src/runner/node-versions.ts:high impact",
+    "packages/skills/src/index.ts:high impact",
+    "apps/worker/src/workflows/ci-logic.ts:high impact",
+    "apps/api/test/pull-requests-fake-github.ts:high impact",
+    "apps/worker/src/activities/pr-body.ts:untested risk",
+    "apps/api/src/modules/pull-requests/github/gh-client.ts:high impact",
+    "apps/worker/src/activities/shifts.ts:complexity",
+    "apps/worker/src/workflows/work-order-run.workflow.ts:complexity",
+    "apps/worker/src/activities/qa.ts:complexity",
+    "apps/worker/src/workflows/review-run.workflow.ts:complexity",
+    "apps/supervisor/src/cli.ts:untested risk"
+  ]
+}
