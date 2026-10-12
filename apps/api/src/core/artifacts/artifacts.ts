@@ -3,7 +3,7 @@ import path from "node:path";
 import { yugotoolHome } from "../config/home";
 
 /** Written by the worker (screenshots, preview tests); the API only reads. */
-export const ARTIFACTS_ROOT = path.join(yugotoolHome(), "artifacts");
+const ARTIFACTS_ROOT = path.join(yugotoolHome(), "artifacts");
 
 /** Run worktrees, created by the worker; removed with their project. */
 export const WORKTREES_ROOT = path.join(yugotoolHome(), "worktrees");

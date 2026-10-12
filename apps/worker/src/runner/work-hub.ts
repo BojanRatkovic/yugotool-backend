@@ -18,7 +18,7 @@ const exec = promisify(execFile);
 const HUB_PLUGINS_ROOT = path.join(yugotoolHome(), "hub-plugins");
 
 /** A hub root: instructions for agents at the top and a `repos/` folder. */
-export function isHubRoot(dir: string): boolean {
+function isHubRoot(dir: string): boolean {
   const hasInstructions = ["CLAUDE.md", "AGENTS.md"].some((f) => existsSync(path.join(dir, f)));
   return hasInstructions && isDirectory(path.join(dir, "repos"));
 }

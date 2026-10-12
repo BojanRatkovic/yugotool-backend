@@ -26,7 +26,7 @@ const runtimeToolSchema = z.object({
   /** The executable's path inside the archive. */
   entry: z.string(),
 });
-export const runtimeManifestSchema = z.object({ tools: z.array(runtimeToolSchema).min(1) });
+const runtimeManifestSchema = z.object({ tools: z.array(runtimeToolSchema).min(1) });
 export type RuntimeManifest = z.infer<typeof runtimeManifestSchema>;
 export type RuntimeTool = z.infer<typeof runtimeToolSchema>;
 export type ToolName = RuntimeTool["name"];
@@ -56,7 +56,7 @@ export function findTool(manifest: RuntimeManifest, name: ToolName): RuntimeTool
 }
 
 /** A tool's folder only appears by rename once complete, so the file is enough. */
-export const toolInstalled = (home: string, tool: RuntimeTool): boolean =>
+const toolInstalled = (home: string, tool: RuntimeTool): boolean =>
   existsSync(toolPath(home, tool));
 
 const mb = (bytes: number): number => Math.round(bytes / 1_048_576);
@@ -69,7 +69,7 @@ export function progressText(progress: RuntimeProgress): string {
 }
 
 /** Throws unless `digest` matches an SRI-style integrity string. Pure. */
-export function checkIntegrity(integrity: string, digest: Buffer, label: string): void {
+function checkIntegrity(integrity: string, digest: Buffer, label: string): void {
   const [algorithm, expected] = integrity.split("-", 2);
   if (digest.toString("base64") !== expected) {
     throw new Error(`${label} download is corrupted (${algorithm} mismatch); try again`);

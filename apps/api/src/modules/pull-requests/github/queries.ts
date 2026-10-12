@@ -12,7 +12,7 @@ export const VIEWER = /* GraphQL */ `
 `;
 
 /** What a board card needs. `$viewer` scopes `myReviews` to my own reviews. */
-export const PR_FIELDS = /* GraphQL */ `
+const PR_FIELDS = /* GraphQL */ `
   fragment PrFields on PullRequest {
     id
     number

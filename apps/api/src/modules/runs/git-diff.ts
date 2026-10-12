@@ -105,7 +105,7 @@ export function parseDiffFiles(numstat: string, nameStatus: string): DiffFile[] 
  * local base. Diffing against the local branch directly showed every commit
  * the local base is behind (or ahead) as a change of the run.
  */
-export async function diffBase(cwd: string, baseBranch: string, head = "HEAD"): Promise<string> {
+async function diffBase(cwd: string, baseBranch: string, head = "HEAD"): Promise<string> {
   for (const ref of [`origin/${baseBranch}`, baseBranch]) {
     const mergeBase = await gitCapped(cwd, ["merge-base", head, ref], 200).then(
       (out) => out.text.trim(),

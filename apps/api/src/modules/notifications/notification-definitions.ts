@@ -36,7 +36,7 @@ type PayloadByKind = { [J in NotificationJob as J["kind"]]: J["payload"] };
 type Registry = { [K in keyof PayloadByKind]: Definition<PayloadByKind[K]> };
 
 /** A review opens its pull request; everything else the work order on the board. */
-export function workOrderPath(workOrder: WorkOrderContext): string {
+function workOrderPath(workOrder: WorkOrderContext): string {
   return workOrder.pullRequestNumber !== null
     ? `/projects/${workOrder.projectId}/pulls/assigned?pr=${workOrder.pullRequestNumber}`
     : `/projects/${workOrder.projectId}?view=board&wo=${workOrder.id}`;

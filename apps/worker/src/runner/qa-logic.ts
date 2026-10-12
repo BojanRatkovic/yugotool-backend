@@ -27,7 +27,7 @@ export function deriveRoutes(files: string[]): string[] {
 }
 
 /** Like deriveRoutes, with the first changed file behind each route. */
-export function deriveRoutesWithFiles(files: string[]): Map<string, string> {
+function deriveRoutesWithFiles(files: string[]): Map<string, string> {
   const routes = new Map<string, string>();
   for (const raw of files) {
     const file = raw.trim().replace(/^\.\//, "");
@@ -102,7 +102,7 @@ export function planScreens(station: QaStation, changedFiles: string[]): Planned
 
 /** The planner's screens are 2–6; pinned routes come on top. */
 export const MAX_PLANNED_SCREENS = 6;
-export const MAX_PLANNED_SCENARIOS = 6;
+const MAX_PLANNED_SCENARIOS = 6;
 
 /** A visitable path: absolute, no unresolved `:param`/`*`/`[id]`, no origin. */
 export function visitablePath(raw: string): string | null {
@@ -150,7 +150,7 @@ export function mergePlan(
 }
 
 /** Diff text handed to the planner is capped; the stat always fits. */
-export const MAX_PLANNER_DIFF_CHARS = 40_000;
+const MAX_PLANNER_DIFF_CHARS = 40_000;
 
 /** Keeps whole file sections of a unified diff until the cap; notes what was cut. */
 export function trimDiff(diff: string, maxChars = MAX_PLANNER_DIFF_CHARS): string {

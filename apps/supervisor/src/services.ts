@@ -112,7 +112,7 @@ function runtime({ config, log, progress }: ServiceContext): Service {
 }
 
 /** The fetched Claude Code binary, or null to let the Agent SDK find its own. */
-export function claudeBin(config: SupervisorConfig): string | null {
+function claudeBin(config: SupervisorConfig): string | null {
   const tool = config.runtime && findTool(config.runtime, "claude");
   return tool ? toolPath(config.home, tool) : null;
 }

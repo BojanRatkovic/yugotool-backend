@@ -1,5 +1,5 @@
 /** Same cap as a run's diff: past it, the UI links to GitHub. */
-export const MAX_PATCH_CHARS = 5 * 1024 * 1024;
+const MAX_PATCH_CHARS = 5 * 1024 * 1024;
 
 /** Cuts a patch at the last whole line under `max` characters. Pure. */
 export function capPatch(

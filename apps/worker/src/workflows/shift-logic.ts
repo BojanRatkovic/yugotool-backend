@@ -11,7 +11,7 @@ export const DEFAULT_CONTEXT_WINDOW = 200_000;
 /** progress.md entries replayed into a new shift's prompt. */
 const PROGRESS_ENTRIES_IN_PROMPT = 3;
 /** Idle shifts in a row that count as stuck. */
-export const STUCK_AFTER_IDLE_SHIFTS = 2;
+const STUCK_AFTER_IDLE_SHIFTS = 2;
 
 export interface ShiftTally {
   commits: number;
@@ -19,7 +19,7 @@ export interface ShiftTally {
 }
 
 /** Room a shift gets for real work even when the session starts above the line. */
-export const MIN_WORK_TOKENS = 15_000;
+const MIN_WORK_TOKENS = 15_000;
 
 /**
  * The handoff point in tokens. Claude Code's own system prompt, tools and
@@ -73,7 +73,7 @@ export function handoffFromFeedback(source: string, report: string): Handoff {
 const list = (items: string[]): string =>
   items.length ? items.map((item) => `- ${item}`).join("\n") : "- (none)";
 
-export function renderHandoff(handoff: Handoff): string {
+function renderHandoff(handoff: Handoff): string {
   return [
     handoff.summary,
     `**Done**\n${list(handoff.done)}`,
@@ -132,7 +132,7 @@ export function asShiftStation(station: AgentStation): ShiftStation {
 }
 
 /** Context room a resumed session must have left, in points below the handoff line. */
-export const RESUME_HEADROOM_PCT = 10;
+const RESUME_HEADROOM_PCT = 10;
 
 /**
  * Work coming back to an editing station resumes its last session (it holds

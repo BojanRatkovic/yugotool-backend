@@ -25,7 +25,6 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@temporalio/client": "^1.24.0",
     "@temporalio/testing": "^1.24.0",
     "@types/pngjs": "^6.0.5"
   }

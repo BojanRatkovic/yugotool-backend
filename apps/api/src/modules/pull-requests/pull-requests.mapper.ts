@@ -34,7 +34,7 @@ const ghRollupSchema = z
   })
   .nullable();
 
-export const ghPullRequestSchema = z.object({
+const ghPullRequestSchema = z.object({
   id: z.string(),
   number: z.number().int(),
   title: z.string(),
@@ -138,12 +138,12 @@ const FAILED_STATUSES = new Set(["FAILURE", "ERROR"]);
 const compact = <T>(list: { nodes: (T | null)[] } | null | undefined): T[] =>
   (list?.nodes ?? []).filter((n): n is T => n !== null);
 
-export function toActor(actor: { login: string; avatarUrl?: string | undefined } | null): PrActor {
+function toActor(actor: { login: string; avatarUrl?: string | undefined } | null): PrActor {
   return actor ? { login: actor.login, avatarUrl: actor.avatarUrl ?? "" } : GHOST;
 }
 
 /** The head commit's check rollup as one state. */
-export function ciState(rollupState: string | null | undefined): PrCiState {
+function ciState(rollupState: string | null | undefined): PrCiState {
   switch (rollupState) {
     case "SUCCESS":
       return "success";
@@ -202,7 +202,7 @@ function myLastReview(pr: GhPullRequest): PullRequestSummary["myLastReview"] {
  * Unresolved threads, and those waiting on me: the last comment isn't mine,
  * and the thread is mine to answer (my PR, or I started it).
  */
-export function threadCounts(
+function threadCounts(
   threads: { isResolved: boolean; first: string | undefined; last: string | undefined }[],
   prAuthor: string | undefined,
   viewer: string,
@@ -466,7 +466,7 @@ type GhCheckContext = z.infer<typeof ghCheckContextSchema>;
 
 const WRITE_PERMISSIONS = new Set(["ADMIN", "MAINTAIN", "WRITE"]);
 
-export function toCheck(context: GhCheckContext): PrCheck {
+function toCheck(context: GhCheckContext): PrCheck {
   if (context.kind === "StatusContext") {
     const state = context.state ?? "";
     return {
@@ -509,7 +509,7 @@ const CHECK_ORDER: Record<PrCheck["state"], number> = {
   cancel: 4,
 };
 
-export function toThread(thread: GhThread): PrThread {
+function toThread(thread: GhThread): PrThread {
   const comments = compact(thread.comments);
   return {
     id: thread.id,
@@ -532,7 +532,7 @@ export function toThread(thread: GhThread): PrThread {
   };
 }
 
-export function toFile(file: GhFile): PrFile {
+function toFile(file: GhFile): PrFile {
   return {
     path: file.path,
     additions: file.additions,

@@ -23,7 +23,7 @@ export interface NodeRelease {
 }
 
 /** The pin a repo declares in `.nvmrc` or `.node-version`, else null. */
-export async function readNodePin(dir: string): Promise<string | null> {
+async function readNodePin(dir: string): Promise<string | null> {
   for (const file of [".nvmrc", ".node-version"]) {
     const raw = await readFile(path.join(dir, file), "utf8").catch(() => null);
     const pin = raw === null ? null : cleanPin(raw);
@@ -154,7 +154,7 @@ const installing = new Map<string, Promise<void>>();
  * The bin folder of the Node a pin means, downloading it once. Offline, the
  * newest installed version that matches the pin. Null when nothing matches.
  */
-export async function ensureNode(
+async function ensureNode(
   pin: string,
   onDownload?: (version: string) => void,
 ): Promise<{ version: string; binDir: string } | null> {

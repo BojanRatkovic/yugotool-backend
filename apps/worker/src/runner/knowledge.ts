@@ -10,7 +10,7 @@ import { yugotoolHome } from "./home";
 const exec = promisify(execFile);
 
 /** Snapshots live outside every repo; agents get read access to one per source. */
-export const KNOWLEDGE_ROOT = path.join(yugotoolHome(), "knowledge");
+const KNOWLEDGE_ROOT = path.join(yugotoolHome(), "knowledge");
 
 /** Snapshots kept per source: the current one and a couple that runs may still read. */
 const KEEP_SNAPSHOTS = 3;
@@ -29,7 +29,7 @@ export interface KnowledgeSourceInput {
 }
 
 /** `~/x` → absolute; everything else resolved as given. */
-export function expandHome(location: string): string {
+function expandHome(location: string): string {
   if (location === "~") return os.homedir();
   if (location.startsWith("~/")) return path.join(os.homedir(), location.slice(2));
   return path.resolve(location);
@@ -47,7 +47,7 @@ export function isExcluded(name: string, excludes: string[]): boolean {
 }
 
 /** The named entry file when it exists, else the first usual suspect, else the first root .md. */
-export async function resolveEntryFile(dir: string, wanted: string | null): Promise<string | null> {
+async function resolveEntryFile(dir: string, wanted: string | null): Promise<string | null> {
   if (wanted && existsSync(path.join(dir, wanted))) return wanted;
   for (const candidate of ENTRY_CANDIDATES) {
     if (existsSync(path.join(dir, candidate))) return candidate;

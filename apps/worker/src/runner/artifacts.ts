@@ -9,7 +9,7 @@ import {
 } from "./sign-in";
 
 /** Screenshots and other run outputs; never inside a worktree, never committed. */
-export const ARTIFACTS_ROOT = path.join(yugotoolHome(), "artifacts");
+const ARTIFACTS_ROOT = path.join(yugotoolHome(), "artifacts");
 
 export function runArtifactsDir(runId: string): string {
   return path.join(ARTIFACTS_ROOT, runId);

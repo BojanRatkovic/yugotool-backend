@@ -7,7 +7,7 @@ import { routeEntrySchema } from "@yugotool/contracts";
 const exec = promisify(execFile);
 
 /** Routes kept from one discovery; a map is a menu for the planner, not a sitemap. */
-export const MAX_DISCOVERED_ROUTES = 150;
+const MAX_DISCOVERED_ROUTES = 150;
 
 /**
  * Cache key of a route map: the git blob ids of its source files at `ref`.
