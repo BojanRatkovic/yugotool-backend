@@ -544,6 +544,92 @@ function toFile(file: GhFile): PrFile {
 
 const actorOf = (node: GhTimelineNode): PrActor | null => (node.actor ? toActor(node.actor) : null);
 
+type PlainEvent = Extract<
+  PrTimelineItem,
+  { kind: "force_push" | "ready_for_review" | "closed" | "reopened" }
+>["kind"];
+
+/** Events that are just "who did it, when". */
+const PLAIN_EVENTS: Record<string, PlainEvent> = {
+  HeadRefForcePushedEvent: "force_push",
+  ReadyForReviewEvent: "ready_for_review",
+  ClosedEvent: "closed",
+  ReopenedEvent: "reopened",
+};
+
+function reviewItem(
+  node: GhTimelineNode,
+  threadIdsByReviewId: ReadonlyMap<string, string[]>,
+): PrTimelineItem | null {
+  const state = reviewState(node.state ?? "");
+  if (!state || state === "PENDING") return null;
+  const threadIds = threadIdsByReviewId.get(node.id ?? "") ?? [];
+  return {
+    kind: "review",
+    id: node.id ?? "",
+    author: toActor(node.author ?? null),
+    state,
+    bodyHtml: node.bodyHTML ?? "",
+    createdAt: node.submittedAt ?? node.createdAt ?? "",
+    threadIds: [...new Set(threadIds)],
+  };
+}
+
+/** Adds a commit, folding it into the previous item when that is the same author's commits. */
+function pushCommit(items: PrTimelineItem[], commit: NonNullable<GhTimelineNode["commit"]>): void {
+  const author = commit.author?.user ? toActor(commit.author.user) : null;
+  const last = items.at(-1);
+  if (last?.kind === "commits" && last.author?.login === author?.login) {
+    last.count += 1;
+    last.oids.push(commit.oid);
+    return;
+  }
+  items.push({
+    kind: "commits",
+    count: 1,
+    oids: [commit.oid],
+    createdAt: commit.committedDate,
+    author,
+  });
+}
+
+/** Every kind but commits and reviews: one node, at most one item. */
+function eventItem(node: GhTimelineNode): PrTimelineItem | null {
+  const createdAt = node.createdAt ?? "";
+  const plain = PLAIN_EVENTS[node.kind];
+  if (plain && Object.hasOwn(PLAIN_EVENTS, node.kind)) {
+    return { kind: plain, createdAt, author: actorOf(node) };
+  }
+  switch (node.kind) {
+    case "IssueComment":
+      return {
+        kind: "comment",
+        id: node.id ?? "",
+        author: toActor(node.author ?? null),
+        bodyHtml: node.bodyHTML ?? "",
+        createdAt,
+      };
+    case "ReviewRequestedEvent": {
+      const reviewer = node.requestedReviewer?.login ?? node.requestedReviewer?.name;
+      return reviewer
+        ? { kind: "review_requested", createdAt, author: actorOf(node), reviewer }
+        : null;
+    }
+    case "MergedEvent":
+      return { kind: "merged", createdAt, by: actorOf(node) };
+    case "RenamedTitleEvent":
+      return {
+        kind: "renamed",
+        createdAt,
+        author: actorOf(node),
+        from: node.previousTitle ?? "",
+        to: node.currentTitle ?? "",
+      };
+    default:
+      return null;
+  }
+}
+
 /**
  * Timeline items, oldest first. Consecutive commits by the same author become
  * one `commits` item; my pending review and unknown kinds are left out.
@@ -554,84 +640,13 @@ export function toTimeline(
 ): PrTimelineItem[] {
   const items: PrTimelineItem[] = [];
   for (const node of timelineNodes) {
-    const createdAt = node.createdAt ?? "";
-    switch (node.kind) {
-      case "IssueComment":
-        items.push({
-          kind: "comment",
-          id: node.id ?? "",
-          author: toActor(node.author ?? null),
-          bodyHtml: node.bodyHTML ?? "",
-          createdAt,
-        });
-        break;
-      case "PullRequestReview": {
-        const state = reviewState(node.state ?? "");
-        if (!state || state === "PENDING") break;
-        const threadIds = threadIdsByReviewId.get(node.id ?? "") ?? [];
-        items.push({
-          kind: "review",
-          id: node.id ?? "",
-          author: toActor(node.author ?? null),
-          state,
-          bodyHtml: node.bodyHTML ?? "",
-          createdAt: node.submittedAt ?? createdAt,
-          threadIds: [...new Set(threadIds)],
-        });
-        break;
-      }
-      case "PullRequestCommit": {
-        if (!node.commit) break;
-        const author = node.commit.author?.user ? toActor(node.commit.author.user) : null;
-        const last = items.at(-1);
-        if (last?.kind === "commits" && last.author?.login === author?.login) {
-          last.count += 1;
-          last.oids.push(node.commit.oid);
-        } else {
-          items.push({
-            kind: "commits",
-            count: 1,
-            oids: [node.commit.oid],
-            createdAt: node.commit.committedDate,
-            author,
-          });
-        }
-        break;
-      }
-      case "HeadRefForcePushedEvent":
-        items.push({ kind: "force_push", createdAt, author: actorOf(node) });
-        break;
-      case "ReadyForReviewEvent":
-        items.push({ kind: "ready_for_review", createdAt, author: actorOf(node) });
-        break;
-      case "ReviewRequestedEvent": {
-        const reviewer = node.requestedReviewer?.login ?? node.requestedReviewer?.name;
-        if (reviewer) {
-          items.push({ kind: "review_requested", createdAt, author: actorOf(node), reviewer });
-        }
-        break;
-      }
-      case "MergedEvent":
-        items.push({ kind: "merged", createdAt, by: actorOf(node) });
-        break;
-      case "ClosedEvent":
-        items.push({ kind: "closed", createdAt, author: actorOf(node) });
-        break;
-      case "ReopenedEvent":
-        items.push({ kind: "reopened", createdAt, author: actorOf(node) });
-        break;
-      case "RenamedTitleEvent":
-        items.push({
-          kind: "renamed",
-          createdAt,
-          author: actorOf(node),
-          from: node.previousTitle ?? "",
-          to: node.currentTitle ?? "",
-        });
-        break;
-      default:
-        break;
+    if (node.kind === "PullRequestCommit") {
+      if (node.commit) pushCommit(items, node.commit);
+      continue;
     }
+    const item =
+      node.kind === "PullRequestReview" ? reviewItem(node, threadIdsByReviewId) : eventItem(node);
+    if (item) items.push(item);
   }
   return items;
 }
