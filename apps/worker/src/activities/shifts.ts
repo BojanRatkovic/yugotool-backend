@@ -17,7 +17,8 @@ import { localRunner } from "../runner/local-runner";
 import { accountNote, claudeAuthFor, withClaudeAuth } from "../claude-env";
 import { sandboxFor } from "../runner/sandbox";
 import { shiftMemory } from "../runner/shift-memory";
-import { skillPlan, skillSection } from "../runner/station-skills";
+import { contextTokensOf } from "../runner/context-tokens";
+import { skillNote, skillPlan, skillSection } from "../runner/station-skills";
 import { hubSession } from "../runner/work-hub";
 import { sessionSkills } from "@yugotool/skills";
 import {
@@ -347,13 +348,8 @@ export function createShiftActivities(db: Database, deps: ShiftDeps) {
         `${input.skillText ?? ""}\n${station.prompt}`,
         sessionSkills(input.worktreePath, hub?.hub ?? null, auth.configDir),
       );
-      const skillNote = [
-        skills.load.length ? `Skills to load: ${skills.load.join(", ")}` : null,
-        skills.missing.length ? `not available here: ${skills.missing.join(", ")}` : null,
-      ]
-        .filter(Boolean)
-        .join(" · ");
-      if (skillNote) await deps.appendEvent(input.runId, input.stationRunId, "system", skillNote);
+      const note = skillNote(skills);
+      if (note) await deps.appendEvent(input.runId, input.stationRunId, "system", note);
       const tools = [
         ...new Set([
           ...station.allowedTools,
@@ -492,11 +488,7 @@ export function createShiftActivities(db: Database, deps: ShiftDeps) {
             readContextWindow().catch(() => undefined);
           } else if (message.type === "assistant" && message.parent_tool_use_id === null) {
             const usage = message.message.usage;
-            const seen = usage
-              ? usage.input_tokens +
-                (usage.cache_read_input_tokens ?? 0) +
-                (usage.cache_creation_input_tokens ?? 0)
-              : 0;
+            const seen = usage ? contextTokensOf(usage) : 0;
             // Synthetic messages carry zeroed usage; they say nothing about the context.
             if (seen > 0) {
               contextTokens = seen;

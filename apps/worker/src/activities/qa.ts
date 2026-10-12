@@ -76,6 +76,7 @@ import {
   visualStatus,
 } from "../runner/qa-logic";
 import { routeSourceHash } from "@yugotool/local";
+import { contextTokensOf } from "../runner/context-tokens";
 import { needsDiscovery } from "../runner/route-map";
 import { discoverRouteMap, runStructuredSession } from "./routes";
 import { accountNote, claudeAuthFor, withClaudeAuth } from "../claude-env";
@@ -1039,10 +1040,7 @@ export function createQaActivities(db: Database, deps: QaDeps) {
       } else if (message.type === "assistant") {
         const usage = message.message.usage;
         if (message.parent_tool_use_id === null && usage) {
-          contextTokens =
-            usage.input_tokens +
-            (usage.cache_read_input_tokens ?? 0) +
-            (usage.cache_creation_input_tokens ?? 0);
+          contextTokens = contextTokensOf(usage);
         }
         for (const block of message.message.content) {
           if (block.type === "text" && block.text.trim()) {
