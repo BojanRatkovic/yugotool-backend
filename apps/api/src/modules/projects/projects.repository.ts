@@ -24,7 +24,7 @@ import {
 } from "@yugotool/db";
 import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { iso } from "../../common/mappers";
-import { hubOfRepo } from "./work-hub";
+import { hubOfRepo } from "@yugotool/local";
 
 type ProjectRow = typeof projects.$inferSelect;
 type LineRow = typeof lines.$inferSelect;

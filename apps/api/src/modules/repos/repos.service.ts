@@ -7,7 +7,7 @@ import { ConfigService } from "@nestjs/config";
 import type { Repo } from "@yugotool/contracts";
 import type { Env } from "../../core/config/env.schema";
 import { RepoPathInvalidError } from "../projects/project.errors";
-import { hubRepos, isHubRoot } from "../projects/work-hub";
+import { hubRepos, isHubRoot } from "@yugotool/local";
 import { SettingsService } from "../settings/settings.service";
 
 const exec = promisify(execFile);

@@ -41,7 +41,7 @@ let installingChromium: Promise<void> | null = null;
  * Playwright's Chromium is fetched on first use (spec 0013), not set up by
  * hand: about 150 MB, once per Playwright version.
  */
-export async function ensureChromium(onInstall?: (message: string) => void): Promise<void> {
+async function ensureChromium(onInstall?: (message: string) => void): Promise<void> {
   if (existsSync(chromium.executablePath())) return;
   onInstall?.("Installing Chromium for QA (first run, about 150 MB)…");
   installingChromium ??= (async () => {

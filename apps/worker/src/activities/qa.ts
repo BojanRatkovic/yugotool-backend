@@ -75,7 +75,8 @@ import {
   trimDiff,
   visualStatus,
 } from "../runner/qa-logic";
-import { needsDiscovery, routeSourceHash } from "../runner/route-map";
+import { routeSourceHash } from "@yugotool/local";
+import { needsDiscovery } from "../runner/route-map";
 import { discoverRouteMap, runStructuredSession } from "./routes";
 import { accountNote, claudeAuthFor, withClaudeAuth } from "../claude-env";
 import { sandboxFor } from "../runner/sandbox";

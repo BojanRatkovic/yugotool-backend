@@ -26,32 +26,38 @@ export function deriveRoutes(files: string[]): string[] {
   return [...deriveRoutesWithFiles(files).keys()].toSorted();
 }
 
+/** The route one changed file renders, by framework convention, else null. */
+function routeOfFile(file: string): string | null {
+  if (file.endsWith(".html") && !file.includes("/")) {
+    return file === "index.html" ? "/" : `/${file}`;
+  }
+  if (/(^|\/)public\/[^/]+\.html$/.test(file)) {
+    const name = file.split("/").pop() ?? "";
+    return name === "index.html" ? "/" : `/${name}`;
+  }
+  if (/(^|\/)app\/(.*\/)?page\.(tsx|ts|jsx|js|mdx)$/.test(file)) {
+    return `/${file.replace(/^.*?(^|\/)app\//, "").replace(/\/?page\.\w+$/, "")}`;
+  }
+  if (/(^|\/)routes\/(.*\/)?\+page\.svelte$/.test(file)) {
+    return `/${file.replace(/^.*?(^|\/)routes\//, "").replace(/\/?\+page\.svelte$/, "")}`;
+  }
+  if (!/(^|\/)(pages|routes)\//.test(file) || !PAGE_EXT.test(file)) return null;
+  const rest = file.replace(/^.*?(^|\/)(pages|routes)\//, "").replace(PAGE_EXT, "");
+  if (/(^|\/)(_app|_document|__root|_layout|layout|-components)(\/|$)/.test(rest)) return null;
+  if (rest.split("/").some((part) => part.startsWith("-") || part.startsWith("_"))) return null;
+  return `/${rest.replace(/(^|\/)index$/, "").replace(/\./g, "/")}`;
+}
+
 /** Like deriveRoutes, with the first changed file behind each route. */
-export function deriveRoutesWithFiles(files: string[]): Map<string, string> {
+function deriveRoutesWithFiles(files: string[]): Map<string, string> {
   const routes = new Map<string, string>();
   for (const raw of files) {
     const file = raw.trim().replace(/^\.\//, "");
     if (!file || file.includes("node_modules/")) continue;
-    let route: string | null = null;
-
-    if (file.endsWith(".html") && !file.includes("/")) {
-      route = file === "index.html" ? "/" : `/${file}`;
-    } else if (/(^|\/)public\/[^/]+\.html$/.test(file)) {
-      const name = file.split("/").pop() ?? "";
-      route = name === "index.html" ? "/" : `/${name}`;
-    } else if (/(^|\/)app\/(.*\/)?page\.(tsx|ts|jsx|js|mdx)$/.test(file)) {
-      route = `/${file.replace(/^.*?(^|\/)app\//, "").replace(/\/?page\.\w+$/, "")}`;
-    } else if (/(^|\/)routes\/(.*\/)?\+page\.svelte$/.test(file)) {
-      route = `/${file.replace(/^.*?(^|\/)routes\//, "").replace(/\/?\+page\.svelte$/, "")}`;
-    } else if (/(^|\/)(pages|routes)\//.test(file) && PAGE_EXT.test(file)) {
-      const rest = file.replace(/^.*?(^|\/)(pages|routes)\//, "").replace(PAGE_EXT, "");
-      if (/(^|\/)(_app|_document|__root|_layout|layout|-components)(\/|$)/.test(rest)) continue;
-      if (rest.split("/").some((part) => part.startsWith("-") || part.startsWith("_"))) continue;
-      route = `/${rest.replace(/(^|\/)index$/, "").replace(/\./g, "/")}`;
-    }
-    if (route === null) continue;
+    const found = routeOfFile(file);
+    if (found === null) continue;
     // Next/Nuxt route groups `(marketing)` and dynamic segments cannot be visited blindly.
-    route = route.replace(/\/\([^/]+\)/g, "").replace(/\/+$/, "") || "/";
+    const route = found.replace(/\/\([^/]+\)/g, "").replace(/\/+$/, "") || "/";
     if (/[[\]$]/.test(route)) continue;
     if (!routes.has(route)) routes.set(route, file);
   }
@@ -102,7 +108,7 @@ export function planScreens(station: QaStation, changedFiles: string[]): Planned
 
 /** The planner's screens are 2–6; pinned routes come on top. */
 export const MAX_PLANNED_SCREENS = 6;
-export const MAX_PLANNED_SCENARIOS = 6;
+const MAX_PLANNED_SCENARIOS = 6;
 
 /** A visitable path: absolute, no unresolved `:param`/`*`/`[id]`, no origin. */
 export function visitablePath(raw: string): string | null {
@@ -150,7 +156,7 @@ export function mergePlan(
 }
 
 /** Diff text handed to the planner is capped; the stat always fits. */
-export const MAX_PLANNER_DIFF_CHARS = 40_000;
+const MAX_PLANNER_DIFF_CHARS = 40_000;
 
 /** Keeps whole file sections of a unified diff until the cap; notes what was cut. */
 export function trimDiff(diff: string, maxChars = MAX_PLANNER_DIFF_CHARS): string {

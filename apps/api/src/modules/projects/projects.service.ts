@@ -42,13 +42,14 @@ import {
   RepoPathInvalidError,
   RouteDiscoveryRunningError,
 } from "./project.errors";
-import { detectBaseBranch, hubRepos, isHubRoot } from "./work-hub";
+import { detectBaseBranch } from "./work-hub";
 import { detectPreview } from "./preview-detect";
 import { removeProjectFiles } from "./project-cleanup";
 import { projectRemote } from "./project-remote";
 import { ProjectsRepository } from "./projects.repository";
 import { readRepoFacts } from "./repo-facts";
-import { baseRef, routeSourceHash } from "./route-hash";
+import { baseRef } from "./route-hash";
+import { hubRepos, isHubRoot, routeSourceHash } from "@yugotool/local";
 
 /** Detected base branch per repo, no preview yet (spec 0014). */
 async function detectRepoSettings(repos: { name: string; path: string }[]): Promise<RepoSettings> {

@@ -6,6 +6,7 @@ NestJS API + Temporal worker for YugoTool (software factory) — pnpm workspace.
 - `apps/worker` — Temporal worker (plain TS, **not** Nest): `workOrderRun` workflow, Agent SDK activities, local git-worktree runner
 - `packages/contracts` — Zod schemas + types shared api↔worker (frontend mirrors them)
 - `packages/db` — Drizzle schema, migrations, pg client
+- `packages/local` — Node helpers api and worker share about this machine (data home, work hubs, route hash): one copy, so they can't drift
 
 Spec: `../yugotool-work/specs/0001-mvp.md`.
 
@@ -24,8 +25,13 @@ pnpm db:migrate               # Postgres: local Homebrew, DB `yugotool`
 pnpm build && pnpm dev        # api + worker + packages in watch mode
 
 # quality gate — before every commit:
-pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build
+pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build && pnpm fallow:audit
 ```
+
+`pnpm fallow:audit` (fallow) gates only what the change introduces: dead code,
+duplication, complexity, and the `.fallowrc.json` boundaries (workflows may import
+only `@yugotool/contracts` + activity types). `pnpm fallow` is the full report;
+prove an export is unused with `pnpm exec fallow dead-code --trace <file>:<export>`.
 
 ## Rules
 

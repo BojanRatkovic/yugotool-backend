@@ -11,8 +11,8 @@ import {
 import os from "node:os";
 import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
+import { hubOfRepo } from "@yugotool/local";
 import {
-  hubOfRepo,
   hubOfWorktree,
   bundledHubPlugins,
   hubInstructions,

@@ -47,7 +47,7 @@ export interface PreviewOptions {
 }
 
 /** Asks the OS for a free TCP port. */
-export function freePort(): Promise<number> {
+function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
     const server = net.createServer();
     server.unref();

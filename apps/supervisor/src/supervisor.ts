@@ -156,13 +156,6 @@ export class Supervisor extends EventEmitter<{ status: [SupervisorStatus] }> {
     await Promise.all([...this.logs.values()].map((log) => log.close()));
   }
 
-  /** Restarts one service by hand (e.g. after it was given up on). */
-  async restart(name: ServiceName): Promise<void> {
-    this.crashes.set(name, []);
-    await this.services[name].stop();
-    await this.startService(name);
-  }
-
   private async startService(name: ServiceName): Promise<void> {
     const service = this.services[name];
     this.set(name, "starting", null);

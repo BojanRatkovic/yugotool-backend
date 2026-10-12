@@ -39,9 +39,9 @@ import {
 import { startCiWatch } from "./watch-ci.workflow";
 import { hubPlanIndex, needsWorkspace, runsInHub } from "./hub-logic";
 
-export const gateDecisionSignal =
+const gateDecisionSignal =
   defineSignal<[GateDecision & { stationKey: string }]>(GATE_DECISION_SIGNAL);
-export const shiftControlSignal = defineSignal<[ShiftControl]>(SHIFT_CONTROL_SIGNAL);
+const shiftControlSignal = defineSignal<[ShiftControl]>(SHIFT_CONTROL_SIGNAL);
 
 /** Bookkeeping writes: short and retried hard — losing one desyncs the board. */
 const bookkeeping = proxyActivities<Activities>({

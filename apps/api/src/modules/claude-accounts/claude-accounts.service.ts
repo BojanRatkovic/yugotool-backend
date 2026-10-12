@@ -26,7 +26,7 @@ import {
 } from "./claude-accounts.errors";
 import { type ClaudeAccountRow, ClaudeAccountsRepository } from "./claude-accounts.repository";
 import { type ClaudeAuthStatus, ClaudeCli } from "./claude-cli";
-import { yugotoolHome } from "../../core/config/home";
+import { yugotoolHome } from "@yugotool/local";
 
 /**
  * Who a project's sessions run as, as far as plan limits go (spec 0016). The

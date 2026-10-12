@@ -5,121 +5,131 @@
  * its text. No dependency: the input is small and already sanitised.
  */
 export function htmlToMarkdown(html: string): string {
-  const tokens = tokenize(html);
-  const out: string[] = [];
-  /** Open lists, innermost last: ordered lists keep their counter. */
-  const lists: { ordered: boolean; n: number }[] = [];
-  let link: string | null = null;
-  let pre = false;
-  let quote = 0;
-
-  const newline = () => out.push("\n");
-  const block = () => out.push("\n\n");
-
-  for (const token of tokens) {
+  const state: State = { out: [], lists: [], link: null, pre: false, quote: 0 };
+  for (const token of tokenize(html)) {
     if (token.kind === "text") {
       const text = decodeEntities(token.text);
-      out.push(pre ? text : text.replace(/\s+/g, " "));
-      continue;
-    }
-    const { name, closing, attrs } = token;
-    switch (name) {
-      case "br":
-        out.push(quote > 0 ? "\n" + "> ".repeat(quote) : "  \n");
-        break;
-      case "p":
-      case "div":
-        // Rich editors wrap list items in <p>; inside a list it would break the item.
-        if (lists.length > 0) break;
-        block();
-        if (!closing && quote > 0) out.push("> ".repeat(quote));
-        break;
-      case "h1":
-      case "h2":
-      case "h3":
-        block();
-        if (!closing) out.push("#".repeat(Number(name[1])) + " ");
-        break;
-      case "strong":
-      case "b":
-        out.push("**");
-        break;
-      case "em":
-      case "i":
-        out.push("_");
-        break;
-      case "del":
-        out.push("~~");
-        break;
-      case "code":
-        if (!pre) out.push("`");
-        break;
-      case "pre":
-        if (closing) {
-          out.push("\n```");
-          block();
-        } else {
-          block();
-          out.push("```\n");
-        }
-        pre = !closing;
-        break;
-      case "blockquote":
-        quote = Math.max(0, quote + (closing ? -1 : 1));
-        block();
-        if (!closing) out.push("> ".repeat(quote));
-        break;
-      case "ul":
-      case "ol":
-        // Only the outermost list is a block; nested ones continue their item.
-        if (closing) lists.pop();
-        else lists.push({ ordered: name === "ol", n: 0 });
-        if (lists.length === (closing ? 0 : 1)) block();
-        break;
-      case "li": {
-        if (closing) break;
-        const list = lists.at(-1);
-        newline();
-        out.push("  ".repeat(Math.max(0, lists.length - 1)));
-        if (list?.ordered) {
-          list.n += 1;
-          out.push(`${list.n}. `);
-        } else out.push("- ");
-        break;
-      }
-      case "a":
-        if (closing) {
-          if (link !== null) out.push(`](${link})`);
-          link = null;
-        } else {
-          link = safeUrl(attrs.href);
-          if (link !== null) out.push("[");
-        }
-        break;
-      case "img": {
-        const src = safeUrl(attrs.src);
-        if (src !== null) out.push(`![${attrs.alt ?? ""}](${src})`);
-        break;
-      }
-      case "tr":
-        if (!closing) newline();
-        break;
-      case "td":
-      case "th":
-        if (!closing) out.push("| ");
-        else out.push(" ");
-        break;
-      case "hr":
-        block();
-        out.push("---");
-        block();
-        break;
-      default:
-        break;
+      state.out.push(state.pre ? text : text.replace(/\s+/g, " "));
+    } else {
+      if (Object.hasOwn(TAGS, token.name)) TAGS[token.name]?.(state, token);
     }
   }
-  return tidy(out.join(""));
+  return tidy(state.out.join(""));
 }
+
+interface State {
+  out: string[];
+  /** Open lists, innermost last: ordered lists keep their counter. */
+  lists: { ordered: boolean; n: number }[];
+  link: string | null;
+  pre: boolean;
+  quote: number;
+}
+
+type Tag = Extract<Token, { kind: "tag" }>;
+type TagHandler = (state: State, tag: Tag) => void;
+
+const block = (state: State) => state.out.push("\n\n");
+const mark =
+  (text: string): TagHandler =>
+  (state) =>
+    state.out.push(text);
+
+const paragraph: TagHandler = (state, { closing }) => {
+  // Rich editors wrap list items in <p>; inside a list it would break the item.
+  if (state.lists.length > 0) return;
+  block(state);
+  if (!closing && state.quote > 0) state.out.push("> ".repeat(state.quote));
+};
+
+const heading: TagHandler = (state, { name, closing }) => {
+  block(state);
+  if (!closing) state.out.push("#".repeat(Number(name[1])) + " ");
+};
+
+const list: TagHandler = (state, { name, closing }) => {
+  // Only the outermost list is a block; nested ones continue their item.
+  if (closing) state.lists.pop();
+  else state.lists.push({ ordered: name === "ol", n: 0 });
+  if (state.lists.length === (closing ? 0 : 1)) block(state);
+};
+
+const listItem: TagHandler = (state, { closing }) => {
+  if (closing) return;
+  const current = state.lists.at(-1);
+  state.out.push("\n", "  ".repeat(Math.max(0, state.lists.length - 1)));
+  if (current?.ordered) {
+    current.n += 1;
+    state.out.push(`${current.n}. `);
+  } else state.out.push("- ");
+};
+
+const anchor: TagHandler = (state, { closing, attrs }) => {
+  if (closing) {
+    if (state.link !== null) state.out.push(`](${state.link})`);
+    state.link = null;
+    return;
+  }
+  state.link = safeUrl(attrs.href);
+  if (state.link !== null) state.out.push("[");
+};
+
+const preformatted: TagHandler = (state, { closing }) => {
+  if (closing) {
+    state.out.push("\n```");
+    block(state);
+  } else {
+    block(state);
+    state.out.push("```\n");
+  }
+  state.pre = !closing;
+};
+
+const blockquote: TagHandler = (state, { closing }) => {
+  state.quote = Math.max(0, state.quote + (closing ? -1 : 1));
+  block(state);
+  if (!closing) state.out.push("> ".repeat(state.quote));
+};
+
+const cell: TagHandler = (state, { closing }) => state.out.push(closing ? " " : "| ");
+
+/** What each tag of the sanitised subset writes; any other tag keeps only its text. */
+const TAGS: Record<string, TagHandler> = {
+  br: (state) => state.out.push(state.quote > 0 ? "\n" + "> ".repeat(state.quote) : "  \n"),
+  p: paragraph,
+  div: paragraph,
+  h1: heading,
+  h2: heading,
+  h3: heading,
+  strong: mark("**"),
+  b: mark("**"),
+  em: mark("_"),
+  i: mark("_"),
+  del: mark("~~"),
+  code: (state) => {
+    if (!state.pre) state.out.push("`");
+  },
+  pre: preformatted,
+  blockquote,
+  ul: list,
+  ol: list,
+  li: listItem,
+  a: anchor,
+  img: (state, { attrs }) => {
+    const src = safeUrl(attrs.src);
+    if (src !== null) state.out.push(`![${attrs.alt ?? ""}](${src})`);
+  },
+  tr: (state, { closing }) => {
+    if (!closing) state.out.push("\n");
+  },
+  td: cell,
+  th: cell,
+  hr: (state) => {
+    block(state);
+    state.out.push("---");
+    block(state);
+  },
+};
 
 type Token =
   | { kind: "text"; text: string }

@@ -21,7 +21,7 @@ import {
 } from "./knowledge.errors";
 import { locationProblem } from "./knowledge.location";
 import { KnowledgeRepository } from "./knowledge.repository";
-import { yugotoolHome } from "../../core/config/home";
+import { yugotoolHome } from "@yugotool/local";
 
 /** Where the worker keeps snapshots (runner/knowledge.ts). */
 const KNOWLEDGE_ROOT = path.join(yugotoolHome(), "knowledge");

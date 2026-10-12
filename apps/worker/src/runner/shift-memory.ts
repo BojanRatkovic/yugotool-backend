@@ -7,7 +7,7 @@ import { parseShiftTasks, type ShiftTask } from "@yugotool/contracts";
 const exec = promisify(execFile);
 
 /** Durable memory of a shift station, inside the run's worktree; never committed. */
-export const MEMORY_DIR = ".yugotool";
+const MEMORY_DIR = ".yugotool";
 
 const memoryPath = (worktreePath: string, file: string): string =>
   path.join(worktreePath, MEMORY_DIR, file);

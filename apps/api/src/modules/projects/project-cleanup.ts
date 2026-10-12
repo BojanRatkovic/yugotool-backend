@@ -3,7 +3,7 @@ import { rm } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { previewTestDir, runArtifactsDir, WORKTREES_ROOT } from "../../core/artifacts/artifacts";
-import { hubOfRepo } from "./work-hub";
+import { hubOfRepo } from "@yugotool/local";
 
 const exec = promisify(execFile);
 

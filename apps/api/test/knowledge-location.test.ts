@@ -2,7 +2,8 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { expandHome, locationProblem } from "../src/modules/knowledge/knowledge.location";
+import { expandHome } from "@yugotool/local";
+import { locationProblem } from "../src/modules/knowledge/knowledge.location";
 
 const dir = mkdtempSync(path.join(os.tmpdir(), "yugotool-location-"));
 const repo = path.join(dir, "repo");

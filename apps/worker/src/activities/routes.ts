@@ -12,13 +12,14 @@ import {
 import { type Database, projects } from "@yugotool/db";
 import { eq } from "drizzle-orm";
 import { localRunner } from "../runner/local-runner";
-import { buildDiscoveryPrompt, normalizeDiscovery, routeSourceHash } from "../runner/route-map";
+import { routeSourceHash } from "@yugotool/local";
+import { buildDiscoveryPrompt, normalizeDiscovery } from "../runner/route-map";
 import { accountNote, type ClaudeAuth, claudeAuthFor, withClaudeAuth } from "../claude-env";
 import { sandboxFor } from "../runner/sandbox";
 
 const HEARTBEAT_MS = 10_000;
 /** Discovery is a short read-only session: a cheap model is enough. */
-export const ROUTE_DISCOVERY_MODEL = "claude-haiku-5-5";
+const ROUTE_DISCOVERY_MODEL = "claude-haiku-5-5";
 const DISCOVERY_MAX_TURNS = 40;
 const READ_ONLY_TOOLS = ["Read", "Grep", "Glob"];
 

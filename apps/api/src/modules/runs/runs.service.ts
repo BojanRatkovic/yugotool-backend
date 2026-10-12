@@ -32,7 +32,7 @@ import {
   ShiftReviewNotPendingError,
   WorkspaceGoneError,
 } from "./run.errors";
-import { hubRepos } from "../projects/work-hub";
+import { hubRepos } from "@yugotool/local";
 import { branchDiff, gitCapped, worktreeDiff } from "./git-diff";
 import { gateRepoProblem } from "./hub-gate";
 import { RunsRepository } from "./runs.repository";

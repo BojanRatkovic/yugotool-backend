@@ -7,7 +7,7 @@ import { promisify } from "node:util";
 import { SIGNATURE } from "./pr-body";
 import { pinnedNodeEnv } from "./node-versions";
 import { hubWorktreePath } from "./work-hub";
-import { yugotoolHome } from "./home";
+import { yugotoolHome } from "@yugotool/local";
 
 const exec = promisify(execFile);
 

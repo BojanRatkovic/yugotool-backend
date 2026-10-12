@@ -1,16 +1,15 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { copyFile, mkdir, readdir, rename, rm, stat } from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import type { KnowledgeMount, KnowledgeSourceKind } from "@yugotool/contracts";
-import { yugotoolHome } from "./home";
+import { expandHome, yugotoolHome } from "@yugotool/local";
 
 const exec = promisify(execFile);
 
 /** Snapshots live outside every repo; agents get read access to one per source. */
-export const KNOWLEDGE_ROOT = path.join(yugotoolHome(), "knowledge");
+const KNOWLEDGE_ROOT = path.join(yugotoolHome(), "knowledge");
 
 /** Snapshots kept per source: the current one and a couple that runs may still read. */
 const KEEP_SNAPSHOTS = 3;
@@ -28,13 +27,6 @@ export interface KnowledgeSourceInput {
   excludes: string[];
 }
 
-/** `~/x` → absolute; everything else resolved as given. */
-export function expandHome(location: string): string {
-  if (location === "~") return os.homedir();
-  if (location.startsWith("~/")) return path.join(os.homedir(), location.slice(2));
-  return path.resolve(location);
-}
-
 /** Whether a file or folder name matches an exclude pattern (`*` = any run of characters). Pure. */
 export function isExcluded(name: string, excludes: string[]): boolean {
   return excludes.some((pattern) => {
@@ -47,7 +39,7 @@ export function isExcluded(name: string, excludes: string[]): boolean {
 }
 
 /** The named entry file when it exists, else the first usual suspect, else the first root .md. */
-export async function resolveEntryFile(dir: string, wanted: string | null): Promise<string | null> {
+async function resolveEntryFile(dir: string, wanted: string | null): Promise<string | null> {
   if (wanted && existsSync(path.join(dir, wanted))) return wanted;
   for (const candidate of ENTRY_CANDIDATES) {
     if (existsSync(path.join(dir, candidate))) return candidate;

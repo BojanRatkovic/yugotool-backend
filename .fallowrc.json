@@ -1,0 +1,52 @@
+{
+  "$schema": "./node_modules/fallow/schema.json",
+  "minimumVersion": "3.33.1",
+  // Loaded by path at runtime, so no import reaches them.
+  "entry": [
+    "apps/desktop/src/preload.ts",
+    "apps/worker/scripts/*.mjs",
+    "apps/api/test/__fixtures__/**/*.mjs"
+  ],
+  "ignoreDependencies": [
+    // fallow itself runs from package.json scripts.
+    "fallow",
+    // Resolved by name per platform in apps/supervisor/src/services.ts.
+    "@embedded-postgres/*"
+  ],
+  // Types named in an exported signature stay exported (knip parity).
+  "ignoreExportsUsedInFile": { "type": true, "interface": true },
+  "boundaries": {
+    "zones": [
+      // Temporal workflow code runs in the deterministic sandbox: no I/O, no Node
+      // APIs, so it may only reach contracts (and activities as types).
+      { "name": "workflows", "patterns": ["apps/worker/src/workflows/**"] },
+      { "name": "worker", "patterns": ["apps/worker/**"] },
+      { "name": "api", "patterns": ["apps/api/**"] },
+      { "name": "supervisor", "patterns": ["apps/supervisor/**"] },
+      { "name": "desktop", "patterns": ["apps/desktop/**"] },
+      { "name": "contracts", "patterns": ["packages/contracts/**"] },
+      { "name": "packages", "patterns": ["packages/**"] }
+    ],
+    "rules": [
+      { "from": "workflows", "allow": ["contracts"], "allowTypeOnly": ["worker"] },
+      { "from": "worker", "allow": ["workflows", "contracts", "packages"] },
+      { "from": "api", "allow": ["contracts", "packages"], "allowTypeOnly": ["workflows"] },
+      { "from": "supervisor", "allow": ["contracts", "packages"] },
+      { "from": "desktop", "allow": ["supervisor", "contracts", "packages"] },
+      { "from": "contracts", "allow": [] },
+      // Shared packages never reach into apps.
+      { "from": "packages", "allow": ["contracts"] }
+    ]
+  },
+  "rules": {
+    "policy-violation": "off",
+    "require-suppression-reason": "warn",
+    // App code, not a published library.
+    "private-type-leaks": "off",
+    // CRAP needs real coverage; without it fallow estimates. Advisory only.
+    "complexity-crap": "warn"
+  },
+  "audit": {
+    "gate": "new-only"
+  }
+}

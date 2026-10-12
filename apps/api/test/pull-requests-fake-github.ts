@@ -15,7 +15,7 @@ for (const search of [...Object.values(mineFixture.data), ...Object.values(assig
 }
 
 /** The fixture search a query string asks for. */
-export function searchFixture(q: string): { nodes: unknown[] } {
+function searchFixture(q: string): { nodes: unknown[] } {
   const { data: mine } = mineFixture;
   const { data: assigned } = assignedFixture;
   if (q.includes(" author:@me")) return q.includes("is:open") ? mine.open : mine.done;
@@ -51,6 +51,7 @@ export class FakeGithub {
     }),
   };
 
+  // fallow-ignore-next-line unused-class-member -- stands in for GhClient.graphql
   graphql(query: string, variables: Record<string, unknown>, schema: Schema): Promise<unknown> {
     const operation = /(?:query|mutation) (\w+)/.exec(query)?.[1] ?? "?";
     this.calls.push({ operation, variables });

@@ -33,7 +33,7 @@ import {
   WorkOrderNotStartableError,
 } from "./work-order.errors";
 import { ProjectNotFoundError } from "../projects/project.errors";
-import { hubRepos } from "../projects/work-hub";
+import { hubRepos } from "@yugotool/local";
 import { followerOf, type ProjectRepos, repoProblem, splitProblem } from "./hub-work";
 import { WorkOrdersRepository } from "./work-orders.repository";
 import { ciRefreshMode } from "./ci-refresh";
