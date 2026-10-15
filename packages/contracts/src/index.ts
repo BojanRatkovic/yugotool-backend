@@ -522,6 +522,43 @@ export const projectRemoteSchema = z.object({
 });
 export type ProjectRemote = z.infer<typeof projectRemoteSchema>;
 
+/**
+ * GitHub's "Community Standards" checklist for a repo (spec 0020), read live
+ * from its community/profile. Reports only: no files are written.
+ */
+export const communityStandardKeySchema = z.enum([
+  "description",
+  "readme",
+  "code_of_conduct",
+  "contributing",
+  "license",
+  "security_policy",
+  "issue_template",
+  "pull_request_template",
+]);
+export type CommunityStandardKey = z.infer<typeof communityStandardKeySchema>;
+
+export const communityStandardItemSchema = z.object({
+  key: communityStandardKeySchema,
+  /** The file exists (or, for `description`, the repo has one). */
+  present: z.boolean(),
+  /** GitHub page for the file when present, or where to add it when missing. */
+  url: z.string(),
+});
+export type CommunityStandardItem = z.infer<typeof communityStandardItemSchema>;
+
+export const communityStandardsSchema = z.object({
+  /** `owner/name` of the GitHub repo these standards are for. */
+  slug: z.string(),
+  /** GitHub's own 0–100 health score (the checklist's progress bar). */
+  healthPercentage: z.number().int().min(0).max(100),
+  /** The checklist, in GitHub's display order. */
+  items: z.array(communityStandardItemSchema),
+  /** When GitHub last recomputed the profile; null when it never has. */
+  updatedAt: z.string().nullable(),
+});
+export type CommunityStandards = z.infer<typeof communityStandardsSchema>;
+
 /** The project's last preview test (persisted on disk by the worker), if any. */
 /**
  * A signed-in browser session saved for the preview ("Sign in once"): cookies

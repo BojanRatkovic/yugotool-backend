@@ -5,6 +5,7 @@ import { DatabaseModule } from "./core/database/database.module";
 import { EventsModule } from "./core/events/events.module";
 import { TemporalModule } from "./core/temporal/temporal.module";
 import { ClaudeAccountsModule } from "./modules/claude-accounts/claude-accounts.module";
+import { CommunityModule } from "./modules/community/community.module";
 import { DispatcherModule } from "./modules/dispatcher/dispatcher.module";
 import { HealthModule } from "./modules/health/health.module";
 import { KnowledgeModule } from "./modules/knowledge/knowledge.module";
@@ -37,6 +38,7 @@ import { WorkOrdersModule } from "./modules/work-orders/work-orders.module";
     PullRequestsModule,
     NotificationsModule,
     ProductiveModule,
+    CommunityModule,
   ],
 })
 export class AppModule {}
